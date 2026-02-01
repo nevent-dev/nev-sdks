@@ -160,7 +160,10 @@ export class NewsletterWidget {
   /**
    * Deep merge two objects
    */
-  private deepMerge<T extends Record<string, unknown>>(target: T, source: Partial<T>): T {
+  private deepMerge<T extends Record<string, unknown>>(
+    target: T,
+    source: Partial<T>
+  ): T {
     const result = { ...target };
 
     for (const key in source) {
@@ -201,15 +204,18 @@ export class NewsletterWidget {
       });
 
       if (response.ok) {
-        const serverConfig =
-          (await response.json()) as ServerWidgetConfig;
+        const serverConfig = (await response.json()) as ServerWidgetConfig;
 
         // Merge server config, handling optional properties correctly
         const mergedConfig = {
           ...this.config,
           ...serverConfig,
-          fields: serverConfig.fields ? { ...this.config.fields, ...serverConfig.fields } : this.config.fields,
-          messages: serverConfig.messages ? { ...this.config.messages, ...serverConfig.messages } : this.config.messages,
+          fields: serverConfig.fields
+            ? { ...this.config.fields, ...serverConfig.fields }
+            : this.config.fields,
+          messages: serverConfig.messages
+            ? { ...this.config.messages, ...serverConfig.messages }
+            : this.config.messages,
         };
 
         this.config = mergedConfig as Required<NewsletterConfig>;
@@ -339,7 +345,10 @@ export class NewsletterWidget {
         }
       });
 
-      this.logger.debug('Custom fonts loaded:', Array.from(this.loadedCustomFonts));
+      this.logger.debug(
+        'Custom fonts loaded:',
+        Array.from(this.loadedCustomFonts)
+      );
     } catch (error) {
       this.logger.warn('Error loading custom fonts:', error);
     }
@@ -665,7 +674,8 @@ export class NewsletterWidget {
     const styles = this.config.styles;
     const global = styles?.global || {};
 
-    const backgroundColor = global.backgroundColor || this.config.backgroundColor;
+    const backgroundColor =
+      global.backgroundColor || this.config.backgroundColor;
     const primaryColor = this.config.primaryColor;
     const borderRadius = this.extractNumericValue(this.config.borderRadius);
 

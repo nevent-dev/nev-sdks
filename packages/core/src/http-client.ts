@@ -50,8 +50,7 @@ export class HttpClient {
 
     const controller = new AbortController();
     const timeoutId =
-      config.timeout &&
-      setTimeout(() => controller.abort(), config.timeout);
+      config.timeout && setTimeout(() => controller.abort(), config.timeout);
 
     try {
       const fetchOptions: RequestInit = {
@@ -131,7 +130,8 @@ export class HttpClient {
       message,
       status,
       code: `HTTP_${status}`,
-      details: typeof data === 'object' ? (data as Record<string, unknown>) : {},
+      details:
+        typeof data === 'object' ? (data as Record<string, unknown>) : {},
     };
   }
 }

@@ -28,6 +28,7 @@ Before starting, ensure you have:
 ### 1.1 Create Development Bucket
 
 **Via AWS CLI:**
+
 ```bash
 # Create bucket
 aws s3 mb s3://dev-nevent-sdks --region eu-west-1
@@ -60,6 +61,7 @@ aws s3api put-public-access-block \
 ```
 
 **Via AWS Console:**
+
 1. Navigate to S3 console
 2. Click "Create bucket"
 3. Settings:
@@ -73,6 +75,7 @@ aws s3api put-public-access-block \
 ### 1.2 Create Production Bucket
 
 **Via AWS CLI:**
+
 ```bash
 # Create bucket
 aws s3 mb s3://prd-nevent-sdks --region eu-west-1
@@ -109,6 +112,7 @@ aws s3api put-public-access-block \
 ### 1.3 Enable CORS (Required for CDN)
 
 **Via AWS CLI:**
+
 ```bash
 # Development bucket CORS
 aws s3api put-bucket-cors \
@@ -118,6 +122,7 @@ aws s3api put-bucket-cors \
 ```
 
 **cors-config.json:**
+
 ```json
 {
   "CORSRules": [
@@ -133,6 +138,7 @@ aws s3api put-bucket-cors \
 ```
 
 **Repeat for production bucket:**
+
 ```bash
 aws s3api put-bucket-cors \
   --bucket prd-nevent-sdks \
@@ -141,6 +147,7 @@ aws s3api put-bucket-cors \
 ```
 
 **Via AWS Console:**
+
 1. Navigate to bucket → Permissions → CORS
 2. Paste CORS configuration JSON
 3. Save changes
@@ -152,6 +159,7 @@ aws s3api put-bucket-cors \
 ### 2.1 Placeholder Policy (Temporary)
 
 **Via AWS CLI:**
+
 ```bash
 aws s3api put-bucket-policy \
   --bucket dev-nevent-sdks \
@@ -160,6 +168,7 @@ aws s3api put-bucket-policy \
 ```
 
 **bucket-policy-placeholder.json:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -187,6 +196,7 @@ aws s3api put-bucket-policy \
 **Update after Step 4** with actual distribution IDs:
 
 **Development bucket policy:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -210,6 +220,7 @@ aws s3api put-bucket-policy \
 ```
 
 **Production bucket policy:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -233,6 +244,7 @@ aws s3api put-bucket-policy \
 ```
 
 **Via AWS Console:**
+
 1. Navigate to bucket → Permissions → Bucket Policy
 2. Paste policy JSON (replace ACCOUNT_ID and distribution IDs)
 3. Save changes
@@ -244,6 +256,7 @@ aws s3api put-bucket-policy \
 ### 3.1 Request Certificate
 
 **Via AWS CLI:**
+
 ```bash
 # Switch to us-east-1 (CloudFront requirement)
 aws acm request-certificate \
@@ -254,6 +267,7 @@ aws acm request-certificate \
 ```
 
 **Output:**
+
 ```json
 {
   "CertificateArn": "arn:aws:acm:us-east-1:123456789012:certificate/abcd1234-..."
@@ -261,6 +275,7 @@ aws acm request-certificate \
 ```
 
 **Via AWS Console:**
+
 1. Navigate to ACM (us-east-1 region)
 2. Click "Request certificate"
 3. Settings:
@@ -273,6 +288,7 @@ aws acm request-certificate \
 ### 3.2 Validate Certificate (DNS)
 
 **Via AWS Console:**
+
 1. Open certificate details
 2. Click "Create records in Route 53" (if hosted zone exists)
 3. Or manually create CNAME records:
@@ -282,6 +298,7 @@ aws acm request-certificate \
 **Wait for validation:** ~5-30 minutes
 
 **Verify:**
+
 ```bash
 aws acm describe-certificate \
   --certificate-arn "arn:aws:acm:us-east-1:123456789012:certificate/abcd1234-..." \
@@ -296,6 +313,7 @@ Should return: `"ISSUED"`
 ### 4.1 Create Origin Access Control (OAC)
 
 **Via AWS CLI:**
+
 ```bash
 aws cloudfront create-origin-access-control \
   --origin-access-control-config '{
@@ -308,6 +326,7 @@ aws cloudfront create-origin-access-control \
 ```
 
 **Output:**
+
 ```json
 {
   "OriginAccessControl": {
@@ -317,6 +336,7 @@ aws cloudfront create-origin-access-control \
 ```
 
 **Via AWS Console:**
+
 1. CloudFront → Security → Origin access
 2. Click "Create control setting"
 3. Settings:
@@ -328,6 +348,7 @@ aws cloudfront create-origin-access-control \
 ### 4.2 Create Development Distribution
 
 **Via AWS Console:**
+
 1. Navigate to CloudFront → Distributions
 2. Click "Create distribution"
 3. **Origin settings:**
@@ -353,6 +374,7 @@ aws cloudfront create-origin-access-control \
 ### 4.3 Create Production Distribution
 
 Repeat Step 4.2 with these changes:
+
 - **Origin domain:** `prd-nevent-sdks.s3.eu-west-1.amazonaws.com`
 - **Alternate domain names (CNAMEs):** `neventapps.com`
 
@@ -365,6 +387,7 @@ Now go back to **Step 2.2** and update bucket policies with the actual CloudFron
 ### 4.5 Wait for Distribution Deployment
 
 **Check status:**
+
 ```bash
 aws cloudfront get-distribution \
   --id E1234567890ABC \
@@ -378,6 +401,7 @@ Should return: `"Deployed"` (wait ~10-15 minutes)
 ### 5.1 Create ALIAS Records
 
 **Via AWS CLI:**
+
 ```bash
 # Get your Route53 hosted zone ID
 HOSTED_ZONE_ID=$(aws route53 list-hosted-zones \
@@ -396,6 +420,7 @@ aws route53 change-resource-record-sets \
 ```
 
 **dev-dns-record.json:**
+
 ```json
 {
   "Changes": [
@@ -416,6 +441,7 @@ aws route53 change-resource-record-sets \
 ```
 
 **prod-dns-record.json:**
+
 ```json
 {
   "Changes": [
@@ -438,6 +464,7 @@ aws route53 change-resource-record-sets \
 **Note:** `Z2FDTNDATAQYW2` is the standard CloudFront hosted zone ID (global, never changes)
 
 **Via AWS Console:**
+
 1. Navigate to Route53 → Hosted zones → neventapps.com
 2. Click "Create record"
 3. Settings:
@@ -471,16 +498,17 @@ Navigate to GitHub repository → Settings → Secrets and variables → Actions
 
 **Create these secrets:**
 
-| Secret Name | Value | How to Get |
-|-------------|-------|------------|
-| `AWS_ACCESS_KEY_ID` | `AKIAIOSFODNN7EXAMPLE` | IAM user credentials |
-| `AWS_SECRET_ACCESS_KEY` | `wJalrXUtnFEMI/K7MDENG/...` | IAM user credentials |
-| `CLOUDFRONT_DEV_DISTRIBUTION_ID` | `E1234567890ABC` | From Step 4.2 |
-| `CLOUDFRONT_PROD_DISTRIBUTION_ID` | `E0987654321XYZ` | From Step 4.3 |
+| Secret Name                       | Value                       | How to Get           |
+| --------------------------------- | --------------------------- | -------------------- |
+| `AWS_ACCESS_KEY_ID`               | `AKIAIOSFODNN7EXAMPLE`      | IAM user credentials |
+| `AWS_SECRET_ACCESS_KEY`           | `wJalrXUtnFEMI/K7MDENG/...` | IAM user credentials |
+| `CLOUDFRONT_DEV_DISTRIBUTION_ID`  | `E1234567890ABC`            | From Step 4.2        |
+| `CLOUDFRONT_PROD_DISTRIBUTION_ID` | `E0987654321XYZ`            | From Step 4.3        |
 
 ### 6.2 Create IAM User (if needed)
 
 **Via AWS CLI:**
+
 ```bash
 # Create IAM user
 aws iam create-user --user-name github-actions-nevent-sdks
@@ -490,6 +518,7 @@ aws iam create-access-key --user-name github-actions-nevent-sdks
 ```
 
 **Output:**
+
 ```json
 {
   "AccessKey": {
@@ -504,6 +533,7 @@ aws iam create-access-key --user-name github-actions-nevent-sdks
 ### 6.3 Attach IAM Policy
 
 **Via AWS CLI:**
+
 ```bash
 # Create policy
 aws iam create-policy \
@@ -517,6 +547,7 @@ aws iam attach-user-policy \
 ```
 
 **iam-policy.json:**
+
 ```json
 {
   "Version": "2012-10-17",
@@ -553,6 +584,7 @@ aws iam attach-user-policy \
 ```
 
 **Via AWS Console:**
+
 1. IAM → Policies → Create policy
 2. Paste JSON policy (replace account ID and distribution IDs)
 3. Create policy
@@ -622,6 +654,7 @@ echo | openssl s_client -connect dev.neventapps.com:443 -servername dev.neventap
 ### Issue: CloudFront returns 403 Forbidden
 
 **Solution:**
+
 1. Check S3 bucket policy allows CloudFront OAC
 2. Verify OAC is attached to CloudFront origin
 3. Check file exists in S3
@@ -629,6 +662,7 @@ echo | openssl s_client -connect dev.neventapps.com:443 -servername dev.neventap
 ### Issue: DNS not resolving
 
 **Solution:**
+
 1. Verify ALIAS record points to correct CloudFront distribution
 2. Wait for DNS propagation (~5-30 minutes)
 3. Clear local DNS cache: `sudo dscacheutil -flushcache` (macOS)
@@ -636,6 +670,7 @@ echo | openssl s_client -connect dev.neventapps.com:443 -servername dev.neventap
 ### Issue: SSL certificate not working
 
 **Solution:**
+
 1. Ensure certificate is in `us-east-1` region
 2. Verify certificate status is "Issued"
 3. Check CNAME in CloudFront matches certificate domain
@@ -643,6 +678,7 @@ echo | openssl s_client -connect dev.neventapps.com:443 -servername dev.neventap
 ### Issue: GitHub Actions fails with "Access Denied"
 
 **Solution:**
+
 1. Verify IAM user has correct permissions
 2. Check GitHub secrets are correctly set
 3. Verify S3 bucket policy allows IAM user or CloudFront
@@ -703,6 +739,7 @@ After infrastructure is set up:
 ## Support
 
 For infrastructure issues:
+
 - AWS Support: https://console.aws.amazon.com/support
 - CloudFront documentation: https://docs.aws.amazon.com/cloudfront
 - Internal DevOps team: devops@nevent.es

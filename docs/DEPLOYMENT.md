@@ -16,10 +16,10 @@ This guide covers the deployment process for the Nevent SDKs to our CDN infrastr
 
 The Nevent SDKs are deployed to a global CDN for easy integration via `<script>` tags. We maintain two environments:
 
-| Environment | Domain | Branch | Purpose |
-|-------------|--------|--------|---------|
-| Development | `dev.neventapps.com` | `development` | Testing and QA |
-| Production | `neventapps.com` | `main` | Public-facing releases |
+| Environment | Domain               | Branch        | Purpose                |
+| ----------- | -------------------- | ------------- | ---------------------- |
+| Development | `dev.neventapps.com` | `development` | Testing and QA         |
+| Production  | `neventapps.com`     | `main`        | Public-facing releases |
 
 ### URL Structure
 
@@ -29,6 +29,7 @@ https://{domain}/subs/latest/nevent-subscriptions.{format}
 ```
 
 **Examples:**
+
 - `https://neventapps.com/subs/v2.0.0/nevent-subscriptions.umd.cjs` (versioned, immutable)
 - `https://neventapps.com/subs/latest/nevent-subscriptions.umd.cjs` (mutable, auto-updates)
 
@@ -41,6 +42,7 @@ Deployments are fully automated via GitHub Actions. No manual intervention requi
 **Trigger:** Push to `development` branch
 
 **Process:**
+
 1. Workflow: `.github/workflows/deploy-dev.yml`
 2. Build packages with `npm run build`
 3. Extract version from `packages/subscriptions/package.json`
@@ -51,6 +53,7 @@ Deployments are fully automated via GitHub Actions. No manual intervention requi
 6. Post deployment summary with CDN URLs
 
 **Cache headers:**
+
 - Versioned files: `cache-control: public, max-age=31536000, immutable` (1 year)
 - Latest alias: `cache-control: public, max-age=300` (5 minutes)
 
@@ -61,6 +64,7 @@ Deployments are fully automated via GitHub Actions. No manual intervention requi
 **Trigger:** Push to `main` branch
 
 **Process:**
+
 1. Workflow: `.github/workflows/deploy-prod.yml`
 2. Build packages with `npm run build`
 3. Extract version from `packages/subscriptions/package.json`
@@ -215,6 +219,7 @@ echo "✅ Rolled back /latest/ to v${GOOD_VERSION}"
 ```
 
 **For production:**
+
 ```bash
 aws s3 sync s3://prd-nevent-sdks/subs/v${GOOD_VERSION}/ \
   s3://prd-nevent-sdks/subs/latest/ \
@@ -238,13 +243,13 @@ aws cloudfront create-invalidation \
 
 Configure these secrets in your GitHub repository settings:
 
-| Secret Name | Description | Example |
-|-------------|-------------|---------|
-| `AWS_ACCESS_KEY_ID` | IAM user access key | `AKIAIOSFODNN7EXAMPLE` |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
-| `CLOUDFRONT_DEV_DISTRIBUTION_ID` | Dev CloudFront distribution | `E1234567890ABC` |
-| `CLOUDFRONT_PROD_DISTRIBUTION_ID` | Prod CloudFront distribution | `E0987654321XYZ` |
-| `GITHUB_TOKEN` | Auto-provided by GitHub Actions | (automatic) |
+| Secret Name                       | Description                     | Example                                    |
+| --------------------------------- | ------------------------------- | ------------------------------------------ |
+| `AWS_ACCESS_KEY_ID`               | IAM user access key             | `AKIAIOSFODNN7EXAMPLE`                     |
+| `AWS_SECRET_ACCESS_KEY`           | IAM user secret key             | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `CLOUDFRONT_DEV_DISTRIBUTION_ID`  | Dev CloudFront distribution     | `E1234567890ABC`                           |
+| `CLOUDFRONT_PROD_DISTRIBUTION_ID` | Prod CloudFront distribution    | `E0987654321XYZ`                           |
+| `GITHUB_TOKEN`                    | Auto-provided by GitHub Actions | (automatic)                                |
 
 ### IAM Permissions Required
 
@@ -269,9 +274,7 @@ Configure these secrets in your GitHub repository settings:
     },
     {
       "Effect": "Allow",
-      "Action": [
-        "cloudfront:CreateInvalidation"
-      ],
+      "Action": ["cloudfront:CreateInvalidation"],
       "Resource": "*"
     }
   ]
@@ -284,11 +287,11 @@ We follow [Semantic Versioning (SemVer)](https://semver.org/):
 
 ### Version Types
 
-| Type | Example | Use Case | Breaking? |
-|------|---------|----------|-----------|
-| **Patch** | 2.0.0 → 2.0.1 | Bug fixes | No |
-| **Minor** | 2.0.0 → 2.1.0 | New features | No |
-| **Major** | 2.0.0 → 3.0.0 | Breaking changes | Yes |
+| Type      | Example       | Use Case         | Breaking? |
+| --------- | ------------- | ---------------- | --------- |
+| **Patch** | 2.0.0 → 2.0.1 | Bug fixes        | No        |
+| **Minor** | 2.0.0 → 2.1.0 | New features     | No        |
+| **Major** | 2.0.0 → 3.0.0 | Breaking changes | Yes       |
 
 ### Creating a Version
 
@@ -310,6 +313,7 @@ git push
 ### Version Bump Process
 
 1. **Development:**
+
    ```bash
    # Merge PR with changeset to development
    # Test on dev.neventapps.com
@@ -430,6 +434,7 @@ curl -I https://neventapps.com/subs/v2.0.0/nevent-subscriptions.umd.cjs
 ### CloudWatch Metrics
 
 Monitor these CloudFront metrics:
+
 - **Requests:** Total number of requests
 - **BytesDownloaded:** Bandwidth usage
 - **4xxErrorRate:** Client errors
@@ -439,6 +444,7 @@ Monitor these CloudFront metrics:
 ### Sentry Integration
 
 Track client-side errors:
+
 - SDK initialization failures
 - API request errors
 - Widget rendering errors
@@ -448,11 +454,13 @@ Track client-side errors:
 ### Deployment Fails: Version Already Exists
 
 **Error:**
+
 ```
 ERROR: Version 2.0.0 already exists in production!
 ```
 
 **Solution:**
+
 1. Update version in `packages/subscriptions/package.json`
 2. Create new changeset: `npm run changeset`
 3. Commit and push
@@ -462,6 +470,7 @@ ERROR: Version 2.0.0 already exists in production!
 **Symptoms:** Old version still served from `/latest/`
 
 **Solution:**
+
 ```bash
 # Manual invalidation
 aws cloudfront create-invalidation \
@@ -478,7 +487,9 @@ curl -I https://neventapps.com/subs/latest/nevent-subscriptions.umd.cjs
 **Symptoms:** `curl` returns 404 for CDN URLs
 
 **Solution:**
+
 1. Verify S3 bucket has files:
+
    ```bash
    aws s3 ls s3://prd-nevent-sdks/subs/v2.0.0/
    ```
@@ -492,6 +503,7 @@ curl -I https://neventapps.com/subs/latest/nevent-subscriptions.umd.cjs
 
 **Solution:**
 Add CORS configuration to S3 bucket:
+
 ```json
 {
   "CORSRules": [
@@ -508,6 +520,7 @@ Add CORS configuration to S3 bucket:
 ## Support
 
 For deployment issues:
+
 - **CI/CD failures:** Check GitHub Actions logs
 - **AWS infrastructure:** Contact DevOps team
 - **CDN issues:** Check CloudFront status

@@ -90,6 +90,7 @@ Refs: NEV-XXX"
 ```
 
 **Commit Types:**
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `refactor`: Code refactoring
@@ -106,6 +107,7 @@ pnpm changeset
 ```
 
 Follow the prompts to:
+
 1. Select affected packages
 2. Choose version bump type (major/minor/patch)
 3. Describe the changes
@@ -131,7 +133,7 @@ gh pr create --base development --title "feat: your feature name"
 
 Example:
 
-```typescript
+````typescript
 /**
  * Validates an email address
  *
@@ -149,7 +151,7 @@ Example:
 export function validateEmail(email: string): ValidationResult {
   // Implementation
 }
-```
+````
 
 ### ESLint
 

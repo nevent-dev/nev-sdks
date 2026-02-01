@@ -9,6 +9,7 @@ pnpm changeset
 ```
 
 Follow the prompts to:
+
 1. Select which packages have changes
 2. Choose the version bump type (major, minor, patch)
 3. Provide a summary of the changes

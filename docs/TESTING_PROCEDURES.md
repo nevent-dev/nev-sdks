@@ -41,6 +41,7 @@ ls -lh packages/subscriptions/dist/
 ```
 
 **Success criteria:**
+
 - ✅ No build errors
 - ✅ All output files present
 - ✅ File sizes reasonable (~15KB minified)
@@ -57,6 +58,7 @@ echo "Extracted version: $VERSION"
 ```
 
 **Success criteria:**
+
 - ✅ Version extracted successfully
 - ✅ Version format is valid semver (e.g., 2.0.0)
 
@@ -71,6 +73,7 @@ npm run typecheck
 ```
 
 **Success criteria:**
+
 - ✅ No linting errors
 - ✅ No TypeScript errors
 
@@ -85,6 +88,7 @@ npm run test:coverage
 ```
 
 **Success criteria:**
+
 - ✅ All tests pass
 - ✅ Coverage thresholds met (80%+ lines, functions, statements)
 
@@ -113,6 +117,7 @@ npx serve .
 4. Revert changes before committing
 
 **Success criteria:**
+
 - ✅ Widget initializes without errors
 - ✅ Form renders correctly
 - ✅ No console errors
@@ -140,6 +145,7 @@ aws s3 ls s3://dev-nevent-sdks/subs/v${VERSION}/ --region eu-west-1
 ```
 
 **Success criteria:**
+
 - ✅ All files present in versioned path
 - ✅ File sizes match local build
 
@@ -153,6 +159,7 @@ aws s3 ls s3://dev-nevent-sdks/subs/latest/ --region eu-west-1
 ```
 
 **Success criteria:**
+
 - ✅ Latest alias updated
 - ✅ Files match versioned path
 
@@ -170,6 +177,7 @@ curl -I https://dev.neventapps.com/subs/v${VERSION}/nevent-subscriptions.umd.cjs
 ```
 
 **Success criteria:**
+
 - ✅ HTTP 200 response
 - ✅ Cache-Control header: `max-age=31536000, immutable`
 - ✅ CloudFront headers present
@@ -188,6 +196,7 @@ curl -I https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs
 ```
 
 **Success criteria:**
+
 - ✅ HTTP 200 response
 - ✅ Cache-Control header: `max-age=300`
 - ✅ Content matches versioned URL
@@ -209,6 +218,7 @@ rm downloaded.js
 ```
 
 **Success criteria:**
+
 - ✅ File downloads successfully
 - ✅ File size matches expected (~15KB)
 - ✅ Content is valid JavaScript (UMD wrapper)
@@ -218,6 +228,7 @@ rm downloaded.js
 **Test after merging to `main` branch:**
 
 Repeat all development tests (1.1 - 1.5) but with production URLs:
+
 - Replace `dev-nevent-sdks` with `prd-nevent-sdks`
 - Replace `dev.neventapps.com` with `neventapps.com`
 
@@ -231,6 +242,7 @@ gh release list
 ```
 
 **Via GitHub UI:**
+
 1. Navigate to repository → Releases
 2. Verify release `v2.0.0` exists
 3. Check release notes include:
@@ -239,6 +251,7 @@ gh release list
    - ✅ Module formats listed
 
 **Success criteria:**
+
 - ✅ Release created with correct tag
 - ✅ Release notes complete
 - ✅ URLs in release notes are correct
@@ -264,6 +277,7 @@ gh release list
    - ✅ Deployment summary
 
 **View deployment summary:**
+
 1. Click on workflow run
 2. Scroll to "Deployment summary" step
 3. Verify CDN URLs are correct
@@ -277,11 +291,13 @@ gh release list
 #### Test 1: Load from CDN
 
 1. Open `examples/basic-integration.html` in browser:
+
    ```bash
    open https://dev.neventapps.com/examples/basic-integration.html
    ```
 
    **Note:** This won't work initially. Instead, serve locally:
+
    ```bash
    cd examples/
    npx serve .
@@ -309,13 +325,14 @@ gh release list
 Test on different browsers to ensure compatibility:
 
 | Browser | Version | Status |
-|---------|---------|--------|
-| Chrome | Latest | ☐ Pass |
-| Firefox | Latest | ☐ Pass |
-| Safari | Latest | ☐ Pass |
-| Edge | Latest | ☐ Pass |
+| ------- | ------- | ------ |
+| Chrome  | Latest  | ☐ Pass |
+| Firefox | Latest  | ☐ Pass |
+| Safari  | Latest  | ☐ Pass |
+| Edge    | Latest  | ☐ Pass |
 
 **For each browser:**
+
 1. Open example page
 2. Verify widget loads
 3. Verify no console errors
@@ -346,24 +363,25 @@ Create a test HTML file on a different domain:
 <!-- test-cors.html -->
 <!DOCTYPE html>
 <html>
-<body>
-  <div id="widget"></div>
-  <script src="https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs"></script>
-  <script>
-    const widget = new NeventSubscriptions.NewsletterWidget({
-      newsletterId: 'test',
-      tenantId: 'test',
-      containerId: 'widget'
-    });
-    widget.init().then(() => console.log('CORS OK'));
-  </script>
-</body>
+  <body>
+    <div id="widget"></div>
+    <script src="https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs"></script>
+    <script>
+      const widget = new NeventSubscriptions.NewsletterWidget({
+        newsletterId: 'test',
+        tenantId: 'test',
+        containerId: 'widget',
+      });
+      widget.init().then(() => console.log('CORS OK'));
+    </script>
+  </body>
 </html>
 ```
 
 Serve on different port and verify no CORS errors.
 
 **Success criteria:**
+
 - ✅ Script loads from different origin
 - ✅ No CORS errors in console
 - ✅ Widget initializes successfully
@@ -382,6 +400,7 @@ time curl https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs -o
 ```
 
 **Browser Network timing:**
+
 1. Open DevTools → Network
 2. Reload page
 3. Find SDK request
@@ -407,6 +426,7 @@ curl -I https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs | gr
 ```
 
 **Success criteria:**
+
 - ✅ First request: Cache miss (as expected)
 - ✅ Second request: Cache hit (cached at edge)
 - ✅ Cache hit latency < 50ms
@@ -426,6 +446,7 @@ curl -H "Accept-Encoding: br" -I https://dev.neventapps.com/subs/latest/nevent-s
 ```
 
 **Compare sizes:**
+
 ```bash
 # Uncompressed
 curl https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs | wc -c
@@ -437,6 +458,7 @@ curl -H "Accept-Encoding: gzip" https://dev.neventapps.com/subs/latest/nevent-su
 ```
 
 **Success criteria:**
+
 - ✅ Compression enabled (Gzip or Brotli)
 - ✅ Compressed size ~5KB (target)
 - ✅ Compression ratio >60%
@@ -455,6 +477,7 @@ curl -I http://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs
 ```
 
 **Success criteria:**
+
 - ✅ HTTP requests redirect to HTTPS
 - ✅ HTTPS connection works
 - ✅ Valid SSL certificate
@@ -473,6 +496,7 @@ echo | openssl s_client -connect dev.neventapps.com:443 -servername dev.neventap
 ```
 
 **Via browser:**
+
 1. Navigate to `https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs`
 2. Click padlock icon in address bar
 3. View certificate
@@ -492,6 +516,7 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 ```
 
 **Success criteria:**
+
 - ✅ Direct S3 access blocked
 - ✅ Only CloudFront can access S3 (OAC)
 
@@ -501,6 +526,7 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 
 1. Load SDK in browser
 2. Inspect global scope:
+
    ```javascript
    console.log(typeof NeventSubscriptions);
    // Should be: "object"
@@ -514,12 +540,13 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
    const widget = new NeventSubscriptions.NewsletterWidget({
      newsletterId: '<script>alert("XSS")</script>',
      tenantId: 'test',
-     containerId: 'widget'
+     containerId: 'widget',
    });
    // Should not execute script
    ```
 
 **Success criteria:**
+
 - ✅ No XSS vulnerabilities
 - ✅ Input sanitized/escaped
 - ✅ No `eval()` usage
@@ -531,18 +558,21 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 **Simulate a bad deployment:**
 
 1. Manually upload broken file to `/latest/`:
+
    ```bash
    echo "broken" > broken.js
    aws s3 cp broken.js s3://dev-nevent-sdks/subs/latest/nevent-subscriptions.umd.cjs
    ```
 
 2. Verify it's broken:
+
    ```bash
    curl https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs
    # Should return: "broken"
    ```
 
 3. Rollback to previous version:
+
    ```bash
    PREVIOUS_VERSION="2.0.0"
    aws s3 sync s3://dev-nevent-sdks/subs/v${PREVIOUS_VERSION}/ \
@@ -551,6 +581,7 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
    ```
 
 4. Invalidate CloudFront:
+
    ```bash
    aws cloudfront create-invalidation \
      --distribution-id E1234567890ABC \
@@ -564,6 +595,7 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
    ```
 
 **Success criteria:**
+
 - ✅ Rollback completes in < 5 minutes
 - ✅ /latest/ points to previous version
 - ✅ Versioned URLs unaffected
@@ -584,6 +616,7 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
    - **CacheHitRate:** Should be >80% after warm-up
 
 **Success criteria:**
+
 - ✅ No error spikes after deployment
 - ✅ Cache hit rate >80%
 - ✅ Latency within acceptable range
@@ -595,6 +628,7 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 1. Enable CloudFront logging (if not enabled)
 2. Download recent logs from S3
 3. Analyze:
+
    ```bash
    # Count requests
    grep "/subs/latest/" access.log | wc -l
@@ -610,6 +644,7 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 ## Test Checklist Summary
 
 ### Pre-Deployment
+
 - [ ] Build succeeds
 - [ ] Version extracts correctly
 - [ ] Linting passes
@@ -618,6 +653,7 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 - [ ] Local integration test passes
 
 ### Post-Deployment (Dev)
+
 - [ ] S3 versioned path has files
 - [ ] S3 latest alias updated
 - [ ] Versioned CDN URL works (HTTP 200)
@@ -626,11 +662,13 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 - [ ] File content valid
 
 ### Post-Deployment (Prod)
+
 - [ ] All dev tests pass for prod
 - [ ] GitHub Release created
 - [ ] Release notes complete
 
 ### Manual Testing
+
 - [ ] Browser loads SDK
 - [ ] Widget renders correctly
 - [ ] No console errors
@@ -639,18 +677,21 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 - [ ] CORS works
 
 ### Performance
+
 - [ ] Load time < 1 second
 - [ ] Cache hits after second request
 - [ ] Compression enabled
 - [ ] Compressed size ~5KB
 
 ### Security
+
 - [ ] HTTPS enforced
 - [ ] SSL certificate valid
 - [ ] Direct S3 access blocked
 - [ ] No XSS vulnerabilities
 
 ### Monitoring
+
 - [ ] CloudWatch metrics normal
 - [ ] No error rate spikes
 - [ ] Cache hit rate >80%
@@ -660,11 +701,13 @@ curl -I https://dev-nevent-sdks.s3.eu-west-1.amazonaws.com/subs/latest/nevent-su
 ### Issue: 404 Not Found on CDN
 
 **Likely causes:**
+
 1. Files not uploaded to S3
 2. Wrong path in S3
 3. CloudFront not invalidated
 
 **Debug:**
+
 ```bash
 # Check S3
 aws s3 ls s3://dev-nevent-sdks/subs/ --recursive
@@ -676,10 +719,12 @@ aws cloudfront list-invalidations --distribution-id E1234567890ABC
 ### Issue: CORS errors
 
 **Likely causes:**
+
 1. S3 CORS not configured
 2. CloudFront not passing CORS headers
 
 **Debug:**
+
 ```bash
 # Check CORS config
 aws s3api get-bucket-cors --bucket dev-nevent-sdks
@@ -688,10 +733,12 @@ aws s3api get-bucket-cors --bucket dev-nevent-sdks
 ### Issue: Cache not working
 
 **Likely causes:**
+
 1. Cache-Control headers incorrect
 2. CloudFront cache policy wrong
 
 **Debug:**
+
 ```bash
 # Check headers
 curl -I https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs | grep -i cache
@@ -700,6 +747,7 @@ curl -I https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs | gr
 ## Support
 
 For testing issues:
+
 - **GitHub Actions:** Check workflow logs
 - **AWS Infrastructure:** See AWS_INFRASTRUCTURE_SETUP.md
 - **Deployment:** See DEPLOYMENT.md

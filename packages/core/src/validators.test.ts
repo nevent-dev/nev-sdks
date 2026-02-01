@@ -86,7 +86,12 @@ describe('FormValidator', () => {
     });
 
     it('should validate maximum length', () => {
-      const result = FormValidator.validateLength('abcdefghijk', 'Username', undefined, 10);
+      const result = FormValidator.validateLength(
+        'abcdefghijk',
+        'Username',
+        undefined,
+        10
+      );
       expect(result.valid).toBe(false);
       expect(result.errors[0]).toContain('at most 10');
     });
@@ -98,7 +103,12 @@ describe('FormValidator', () => {
       const tooShort = FormValidator.validateLength('abc', 'Code', 5, 10);
       expect(tooShort.valid).toBe(false);
 
-      const tooLong = FormValidator.validateLength('abcdefghijk', 'Code', 5, 10);
+      const tooLong = FormValidator.validateLength(
+        'abcdefghijk',
+        'Code',
+        5,
+        10
+      );
       expect(tooLong.valid).toBe(false);
     });
   });

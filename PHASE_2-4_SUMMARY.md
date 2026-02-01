@@ -14,6 +14,7 @@ All phases successfully executed on **February 1, 2026**.
 **Final Implementation:** npm workspaces (pnpm not available in environment)
 
 **Rationale:**
+
 - **Native**: Part of npm 7+, no additional setup needed
 - **Simple**: Sufficient for 2-package monorepo
 - **Compatible**: Works with all existing CI/CD tools
@@ -22,6 +23,7 @@ All phases successfully executed on **February 1, 2026**.
 ### Build Tooling: **Vite**
 
 **Rationale:**
+
 - **Modern**: ESM-first, native TypeScript support
 - **Fast**: esbuild-powered builds (10x faster than Rollup/Webpack)
 - **Library Mode**: Perfect for SDK bundling (ESM + UMD outputs)
@@ -30,6 +32,7 @@ All phases successfully executed on **February 1, 2026**.
 ### Testing: **Vitest**
 
 **Rationale:**
+
 - **Vite-Native**: Same config, consistent ecosystem
 - **Fast**: Native ESM support, parallel execution
 - **Modern**: Jest-compatible API with better performance
@@ -38,6 +41,7 @@ All phases successfully executed on **February 1, 2026**.
 ### Versioning: **Changesets**
 
 **Rationale:**
+
 - **Monorepo-Native**: Designed for multi-package repositories
 - **Developer-Friendly**: Write changelog entries during development
 - **Flexible**: Independent package versioning
@@ -128,11 +132,13 @@ npm run build
 **Build Artifacts:**
 
 **@nevent/core:**
+
 - `dist/index.js` (ESM) - 6.2 KB
 - `dist/index.cjs` (CommonJS) - 3.1 KB
 - Source maps included
 
 **@nevent/subscriptions:**
+
 - `dist/nevent-subscriptions.js` (ESM) - 23 KB
 - `dist/nevent-subscriptions.umd.cjs` (UMD) - 18 KB
 - Source maps included
@@ -146,6 +152,7 @@ npm test
 ```
 
 **Test Coverage:**
+
 - EmailValidator: 6 test cases
 - FormValidator: 7 test cases
 - All edge cases covered
@@ -157,18 +164,21 @@ npm test
 ### ✅ Bundle Analysis
 
 **Before (v1.3.6):**
+
 - Unminified: 80.3 KB
 - Minified: 39.8 KB
 - No source maps
 - No tree-shaking
 
 **After (v2.0.0):**
+
 - ESM Bundle: 23 KB (minified via esbuild)
 - UMD Bundle: 18 KB (minified via esbuild)
 - Source maps: Included
 - Tree-shakeable: Yes (ESM format)
 
 **Improvement:**
+
 - **71% size reduction** (unminified: 80KB → 23KB)
 - **55% size reduction** (minified: 40KB → 18KB)
 - **Modern build system** with automatic optimizations
@@ -176,6 +186,7 @@ npm test
 ### ✅ Development Experience
 
 **Scripts Available:**
+
 ```bash
 npm run dev              # Watch mode for development
 npm run build            # Build all packages
@@ -194,23 +205,27 @@ npm run changeset        # Create version changeset
 ### ✅ Quality Gates
 
 **ESLint Configuration:**
+
 - TypeScript strict rules
 - Import organization
 - No `any` types enforced
 - Unused variable detection
 
 **Prettier Configuration:**
+
 - Consistent code style
 - Automatic formatting
 - Pre-commit hooks ready (Husky)
 
 **TypeScript:**
+
 - Strict mode enabled
 - ES2020 target
 - Full type safety
 - No implicit any
 
 **Vitest:**
+
 - Coverage thresholds: 80% (lines, functions, statements), 75% (branches)
 - Fast execution with native ESM
 - Jest-compatible API
@@ -220,6 +235,7 @@ npm run changeset        # Create version changeset
 **GitHub Actions Workflows:**
 
 **1. CI Workflow** (`.github/workflows/ci.yml`):
+
 - ✅ Lint check
 - ✅ Format check
 - ✅ Type check
@@ -229,6 +245,7 @@ npm run changeset        # Create version changeset
 - ✅ Upload artifacts
 
 **2. Publish Workflow** (`.github/workflows/publish.yml`):
+
 - ✅ Automated NPM publishing
 - ✅ Changesets integration
 - ✅ Version management
@@ -238,19 +255,19 @@ npm run changeset        # Create version changeset
 
 ## Before vs After Comparison
 
-| Aspect | v1.3.6 (Before) | v2.0.0 (After) | Improvement |
-|--------|-----------------|----------------|-------------|
-| **Bundle Size (minified)** | 39.8 KB | 18 KB | **55% smaller** |
-| **TypeScript** | ❌ None | ✅ Strict mode | **100% coverage** |
-| **Tests** | ❌ None | ✅ Vitest | **13 tests passing** |
-| **Build System** | ❌ Manual | ✅ Vite | **Automated** |
-| **Module Format** | IIFE only | ESM + UMD | **Tree-shakeable** |
-| **Source Maps** | ❌ None | ✅ Included | **Better debugging** |
-| **Package Manager** | ❌ None | ✅ npm workspace | **Dependency management** |
-| **CI/CD** | ❌ None | ✅ GitHub Actions | **Automated testing & deployment** |
-| **Documentation** | Inline only | 4 markdown files | **Comprehensive** |
-| **Code Organization** | 1 file (2000+ lines) | 10+ modular files | **Maintainable** |
-| **Developer Experience** | Manual workflow | Modern tooling | **Professional** |
+| Aspect                     | v1.3.6 (Before)      | v2.0.0 (After)    | Improvement                        |
+| -------------------------- | -------------------- | ----------------- | ---------------------------------- |
+| **Bundle Size (minified)** | 39.8 KB              | 18 KB             | **55% smaller**                    |
+| **TypeScript**             | ❌ None              | ✅ Strict mode    | **100% coverage**                  |
+| **Tests**                  | ❌ None              | ✅ Vitest         | **13 tests passing**               |
+| **Build System**           | ❌ Manual            | ✅ Vite           | **Automated**                      |
+| **Module Format**          | IIFE only            | ESM + UMD         | **Tree-shakeable**                 |
+| **Source Maps**            | ❌ None              | ✅ Included       | **Better debugging**               |
+| **Package Manager**        | ❌ None              | ✅ npm workspace  | **Dependency management**          |
+| **CI/CD**                  | ❌ None              | ✅ GitHub Actions | **Automated testing & deployment** |
+| **Documentation**          | Inline only          | 4 markdown files  | **Comprehensive**                  |
+| **Code Organization**      | 1 file (2000+ lines) | 10+ modular files | **Maintainable**                   |
+| **Developer Experience**   | Manual workflow      | Modern tooling    | **Professional**                   |
 
 ---
 
@@ -324,15 +341,18 @@ $ npm run typecheck
 **Status:** TypeScript declarations for `@nevent/subscriptions` not generating due to workspace path resolution.
 
 **Impact:**
+
 - ⚠️ TypeScript consumers will need to use `// @ts-ignore` or type the imports manually
 - ✅ JavaScript bundles work perfectly
 - ✅ Runtime functionality unaffected
 
 **Workaround:**
+
 - Use JavaScript/UMD build for non-TypeScript projects
 - Manual type definitions can be added later
 
 **Fix Required:**
+
 - Adjust tsconfig.json paths or use project references correctly
 - Estimated effort: 30 minutes
 
@@ -343,6 +363,7 @@ $ npm run typecheck
    - Ensure .d.ts files are generated
 
 2. **Initialize Git repository** (10 min)
+
    ```bash
    git init
    git checkout -b development
@@ -366,6 +387,7 @@ $ npm run typecheck
 ### Modular Design
 
 **@nevent/core** provides reusable utilities:
+
 - `HttpClient`: Type-safe fetch wrapper with timeout and error handling
 - `EmailValidator`: RFC 5322 email validation
 - `FormValidator`: Required and length validators
@@ -373,6 +395,7 @@ $ npm run typecheck
 - `Storage`: LocalStorage wrapper with error handling
 
 **@nevent/subscriptions** uses core utilities:
+
 - NewsletterWidget class (main API)
 - Type-safe configuration
 - Layout renderers (column/row)
@@ -384,6 +407,7 @@ $ npm run typecheck
 ### TypeScript Strict Mode
 
 All code uses TypeScript strict mode:
+
 - `strict: true`
 - `noUnusedLocals: true`
 - `noUnusedParameters: true`
@@ -394,11 +418,13 @@ All code uses TypeScript strict mode:
 ### Modern Output Formats
 
 **ESM (ES Modules):**
+
 - Tree-shakeable
 - Works with Vite, Webpack 5, Rollup
 - Modern bundler optimization
 
 **UMD (Universal Module Definition):**
+
 - Works with script tags
 - AMD, CommonJS, global variable support
 - Legacy compatibility
@@ -409,18 +435,20 @@ All code uses TypeScript strict mode:
 
 ### Bundle Size Targets
 
-| Package | Target | Actual | Status |
-|---------|--------|--------|--------|
-| @nevent/core | < 10 KB | 6.2 KB | ✅ 38% under budget |
-| @nevent/subscriptions | < 30 KB | 23 KB | ✅ 23% under budget |
+| Package               | Target  | Actual | Status              |
+| --------------------- | ------- | ------ | ------------------- |
+| @nevent/core          | < 10 KB | 6.2 KB | ✅ 38% under budget |
+| @nevent/subscriptions | < 30 KB | 23 KB  | ✅ 23% under budget |
 
 ### Load Time Estimates
 
 **3G Network (750 kbps):**
+
 - @nevent/core: ~80ms
 - @nevent/subscriptions: ~250ms
 
 **4G Network (4 mbps):**
+
 - @nevent/core: ~15ms
 - @nevent/subscriptions: ~50ms
 
@@ -433,11 +461,13 @@ All code uses TypeScript strict mode:
 ### Step 1: Install Package
 
 **Before:**
+
 ```html
 <script src="https://api.nevent.es/widget/v1/newsletter-v1.3.6.min.js"></script>
 ```
 
 **After:**
+
 ```bash
 npm install @nevent/subscriptions
 ```
@@ -445,6 +475,7 @@ npm install @nevent/subscriptions
 ### Step 2: Update Integration
 
 **Before:**
+
 ```javascript
 new NeventWidget({
   newsletterId: '123',
@@ -453,6 +484,7 @@ new NeventWidget({
 ```
 
 **After:**
+
 ```typescript
 import { NewsletterWidget } from '@nevent/subscriptions';
 
@@ -492,12 +524,14 @@ await widget.init();
 ### Production Readiness
 
 **Ready for:**
+
 - ✅ Development and testing
 - ✅ JavaScript/UMD integration
 - ✅ Local development
 - ✅ CI/CD automation
 
 **Requires before NPM publish:**
+
 - ⚠️ Fix TypeScript declaration generation (30 min)
 - ⚠️ Initialize Git repository
 - ⚠️ Create first changeset

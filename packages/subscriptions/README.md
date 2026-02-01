@@ -28,24 +28,24 @@ pnpm add @nevent/subscriptions
 ```html
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Newsletter Subscription</title>
-</head>
-<body>
-  <div id="newsletter-container"></div>
+  <head>
+    <title>Newsletter Subscription</title>
+  </head>
+  <body>
+    <div id="newsletter-container"></div>
 
-  <script type="module">
-    import { NewsletterWidget } from '@nevent/subscriptions';
+    <script type="module">
+      import { NewsletterWidget } from '@nevent/subscriptions';
 
-    const widget = new NewsletterWidget({
-      newsletterId: 'newsletter-123',
-      tenantId: 'tenant-456',
-      containerId: 'newsletter-container',
-    });
+      const widget = new NewsletterWidget({
+        newsletterId: 'newsletter-123',
+        tenantId: 'tenant-456',
+        containerId: 'newsletter-container',
+      });
 
-    await widget.init();
-  </script>
-</body>
+      await widget.init();
+    </script>
+  </body>
 </html>
 ```
 
@@ -123,20 +123,20 @@ await widget.init();
 
 ### Optional
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `apiUrl` | string | `'https://api.nevent.es'` | API base URL |
-| `containerId` | string | `null` | Container element ID (or use `.nevent-widget` class) |
-| `primaryColor` | string | `'#007bff'` | Primary brand color |
-| `backgroundColor` | string | `'#ffffff'` | Form background color |
-| `borderRadius` | number | `8` | Border radius in pixels |
-| `fields` | object | See below | Form field configuration |
-| `messages` | object | See below | UI messages and labels |
-| `analytics` | boolean | `true` | Enable analytics tracking |
-| `resetOnSuccess` | boolean | `true` | Reset form after successful submission |
-| `showLabels` | boolean | `false` | Show field labels |
-| `animations` | boolean | `true` | Enable entry animations |
-| `debug` | boolean | `false` | Enable debug logging |
+| Option            | Type    | Default                   | Description                                          |
+| ----------------- | ------- | ------------------------- | ---------------------------------------------------- |
+| `apiUrl`          | string  | `'https://api.nevent.es'` | API base URL                                         |
+| `containerId`     | string  | `null`                    | Container element ID (or use `.nevent-widget` class) |
+| `primaryColor`    | string  | `'#007bff'`               | Primary brand color                                  |
+| `backgroundColor` | string  | `'#ffffff'`               | Form background color                                |
+| `borderRadius`    | number  | `8`                       | Border radius in pixels                              |
+| `fields`          | object  | See below                 | Form field configuration                             |
+| `messages`        | object  | See below                 | UI messages and labels                               |
+| `analytics`       | boolean | `true`                    | Enable analytics tracking                            |
+| `resetOnSuccess`  | boolean | `true`                    | Reset form after successful submission               |
+| `showLabels`      | boolean | `false`                   | Show field labels                                    |
+| `animations`      | boolean | `true`                    | Enable entry animations                              |
+| `debug`           | boolean | `false`                   | Enable debug logging                                 |
 
 ### Field Configuration
 
@@ -202,6 +202,7 @@ await widget.init();
 - Modern mobile browsers
 
 For older browsers, consider using polyfills for:
+
 - `fetch` API
 - `Promise`
 - ES2020 features

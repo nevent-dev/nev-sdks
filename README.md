@@ -4,10 +4,10 @@ Official JavaScript/TypeScript SDKs for the Nevent platform.
 
 ## Packages
 
-| Package | Version | Description | Size |
-|---------|---------|-------------|------|
-| [@nevent/core](./packages/core) | 0.1.0 | Core utilities and types | ~5KB |
-| [@nevent/subscriptions](./packages/subscriptions) | 2.0.0 | Newsletter widget | ~15KB |
+| Package                                           | Version | Description              | Size  |
+| ------------------------------------------------- | ------- | ------------------------ | ----- |
+| [@nevent/core](./packages/core)                   | 0.1.0   | Core utilities and types | ~5KB  |
+| [@nevent/subscriptions](./packages/subscriptions) | 2.0.0   | Newsletter widget        | ~15KB |
 
 ## Installation
 
@@ -22,7 +22,7 @@ The fastest way to get started is to load the SDK directly from our CDN:
   const widget = new NeventSubscriptions.NewsletterWidget({
     newsletterId: 'your-newsletter-id',
     tenantId: 'your-tenant-id',
-    containerId: 'newsletter-container'
+    containerId: 'newsletter-container',
   });
   widget.init();
 </script>
@@ -34,6 +34,7 @@ The fastest way to get started is to load the SDK directly from our CDN:
 **Important:** Always use versioned URLs in production (e.g., `/v2.0.0/`) to prevent breaking changes. The `/latest/` alias auto-updates and should only be used for development/testing.
 
 **Available formats:**
+
 - **UMD (Browser):** `nevent-subscriptions.umd.cjs` - Global `NeventSubscriptions` object
 - **ES Module:** `nevent-subscriptions.js` - For modern bundlers
 
@@ -188,6 +189,7 @@ pnpm test:coverage
 ```
 
 Coverage thresholds are enforced:
+
 - Lines: 80%
 - Functions: 80%
 - Branches: 75%
@@ -211,5 +213,6 @@ MIT
 ## Support
 
 For issues and questions:
+
 - [GitHub Issues](https://github.com/nevent/nev-sdks/issues)
 - Email: support@nevent.es
