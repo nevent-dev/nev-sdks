@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Nevent SDK - Test CDN + Database Config</title>
+    <title>Nevent SDK - Test with Mock API</title>
     <style>
       * {
         margin: 0;
@@ -48,12 +48,16 @@
         padding: 8px 16px;
         border-radius: 20px;
         font-size: 0.9rem;
-        margin-top: 10px;
+        margin: 10px 5px 0;
         backdrop-filter: blur(10px);
       }
 
       .badge.success {
         background: rgba(16, 185, 129, 0.3);
+      }
+
+      .badge.warning {
+        background: rgba(245, 158, 11, 0.3);
       }
 
       .grid {
@@ -110,11 +114,6 @@
         font-weight: 500;
         background: #f3f4f6;
         color: #374151;
-      }
-
-      .meta-tag.loading {
-        background: #dbeafe;
-        color: #1e40af;
       }
 
       .meta-tag.success {
@@ -277,24 +276,26 @@
       <!-- Header -->
       <div class="header">
         <h1>🚀 Nevent SDK Test</h1>
-        <p>Testing CDN deployment with real database configurations</p>
+        <p>Testing CDN deployment with mocked API responses</p>
         <div class="badge success">
           ✅ Loaded from: dev.neventapps.com/subs/latest/
         </div>
-        <div class="badge">🗄️ Config from: MongoDB (tenant: 68383f4e0532b0378dcf7791)</div>
+        <div class="badge warning">
+          🔧 API: Mocked (simulating DB configs)
+        </div>
       </div>
 
       <!-- Info Section -->
       <div class="info-section">
-        <h2>📊 SDK & Database Information</h2>
+        <h2>📊 SDK Information</h2>
         <div class="info-grid">
           <div class="info-item">
             <strong>CDN URL</strong>
-            <code id="cdn-url">Loading...</code>
+            <code id="cdn-url">https://dev.neventapps.com/subs/latest/</code>
           </div>
           <div class="info-item">
             <strong>SDK Version</strong>
-            <code id="sdk-version">Loading...</code>
+            <code id="sdk-version">v2.0.0</code>
           </div>
           <div class="info-item">
             <strong>Bundle Size</strong>
@@ -305,12 +306,12 @@
             <code id="load-time">Loading...</code>
           </div>
           <div class="info-item">
-            <strong>API Endpoint</strong>
-            <code id="api-endpoint">https://api.nevent.es</code>
+            <strong>API Mode</strong>
+            <code>MOCK (intercepted fetch)</code>
           </div>
           <div class="info-item">
-            <strong>Tenant ID</strong>
-            <code id="tenant-id">68383f4e0532b0378dcf7791</code>
+            <strong>Config Source</strong>
+            <code>Simulated MongoDB responses</code>
           </div>
         </div>
       </div>
@@ -321,12 +322,9 @@
         <div class="card">
           <div class="card-header">
             <h2>📧 Minimalista</h2>
-            <p>
-              Widget con configuración mínima cargada desde DB. Solo email
-              requerido.
-            </p>
+            <p>Widget con configuración mínima. Solo email requerido.</p>
             <div class="card-meta">
-              <span class="meta-tag" id="status-1">⏳ Loading config...</span>
+              <span class="meta-tag success">✅ Mock API</span>
               <span class="meta-tag">Font: Inter</span>
               <span class="meta-tag">Theme: Light Blue</span>
             </div>
@@ -340,12 +338,9 @@
         <div class="card">
           <div class="card-header">
             <h2>🎨 Moderna Vibrante</h2>
-            <p>
-              Colores vibrantes amarillos con todos los campos habilitados desde
-              DB.
-            </p>
+            <p>Colores vibrantes amarillos con todos los campos.</p>
             <div class="card-meta">
-              <span class="meta-tag" id="status-2">⏳ Loading config...</span>
+              <span class="meta-tag success">✅ Mock API</span>
               <span class="meta-tag">Font: Poppins</span>
               <span class="meta-tag">Theme: Yellow/Amber</span>
             </div>
@@ -359,11 +354,9 @@
         <div class="card">
           <div class="card-header">
             <h2>⚡ Elegante Oscura</h2>
-            <p>
-              Tema oscuro elegante con tipografía serif y campos intermedios.
-            </p>
+            <p>Tema oscuro elegante con tipografía serif.</p>
             <div class="card-meta">
-              <span class="meta-tag" id="status-3">⏳ Loading config...</span>
+              <span class="meta-tag success">✅ Mock API</span>
               <span class="meta-tag">Font: Playfair Display</span>
               <span class="meta-tag">Theme: Dark</span>
             </div>
@@ -378,11 +371,8 @@
       <div class="info-section">
         <h2>🔍 Test Console</h2>
         <div class="test-buttons">
-          <button class="test-btn" onclick="testConfigFetch()">
-            🔄 Fetch DB Config
-          </button>
-          <button class="test-btn" onclick="testWidgetInit()">
-            ✅ Test Widget Init
+          <button class="test-btn" onclick="testSDKLoaded()">
+            ✅ Check SDK
           </button>
           <button class="test-btn secondary" onclick="clearConsole()">
             🗑️ Clear Console
@@ -390,42 +380,274 @@
         </div>
         <div id="console" class="console">
           <div class="console-line info">
-            [INFO] Console ready. Loading SDK from CDN...
+            [INFO] Console ready. Intercepting API calls...
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Mock API configurations -->
+    <script>
+      const MOCK_CONFIGS = {
+        '697f9be729f8891a5cd890bb': {
+          name: 'SDK Test - Minimalista',
+          fields: {
+            email: { enabled: true, required: true, placeholder: 'Tu email' },
+            firstName: { enabled: false },
+            lastName: { enabled: false },
+          },
+          messages: {
+            submit: 'Suscribirse',
+            success: '¡Gracias por suscribirte!',
+            error: 'Error al suscribirse. Intenta de nuevo.',
+          },
+          styles: {
+            global: {
+              font: {
+                type: 'GOOGLE_FONT',
+                family: 'Inter',
+                subsets: ['latin'],
+                variants: ['regular', '600'],
+              },
+              backgroundColor: '#ffffff',
+              innerPadding: '32px',
+              direction: 'column',
+              spacingBetweenElements: '20px',
+            },
+            title: {
+              hidden: false,
+              fontSize: '28px',
+              fontWeight: '600',
+              color: '#1a1a1a',
+            },
+            subtitle: {
+              hidden: false,
+              fontSize: '16px',
+              fontWeight: '400',
+              color: '#6b7280',
+            },
+            input: {
+              borderWidth: '1px',
+              borderRadius: '8px',
+              backgroundColor: '#ffffff',
+              borderColor: '#e5e7eb',
+              textColor: '#1a1a1a',
+              height: '48px',
+            },
+            button: {
+              borderWidth: '0px',
+              borderRadius: '8px',
+              backgroundColor: '#3b82f6',
+              borderColor: '#3b82f6',
+              textColor: '#ffffff',
+              height: '48px',
+            },
+          },
+          title: 'Newsletter Minimalista',
+          subtitle: 'Suscríbete para recibir actualizaciones',
+        },
+        '697f9be729f8891a5cd890bc': {
+          name: 'SDK Test - Moderna Vibrante',
+          fields: {
+            email: { enabled: true, required: true, placeholder: 'Email' },
+            firstName: {
+              enabled: true,
+              required: true,
+              placeholder: 'Nombre',
+            },
+            lastName: {
+              enabled: true,
+              required: true,
+              placeholder: 'Apellidos',
+            },
+            postalCode: {
+              enabled: true,
+              required: false,
+              placeholder: 'Código Postal',
+            },
+          },
+          messages: {
+            submit: '¡Únete ahora!',
+            success: '¡Bienvenido a nuestra comunidad!',
+            error: 'Ups, algo salió mal.',
+          },
+          styles: {
+            global: {
+              font: {
+                type: 'GOOGLE_FONT',
+                family: 'Poppins',
+                subsets: ['latin'],
+                variants: ['regular', '600', '700'],
+              },
+              backgroundColor: '#fef3c7',
+              innerPadding: '40px',
+              direction: 'column',
+              spacingBetweenElements: '24px',
+            },
+            title: {
+              hidden: false,
+              fontSize: '32px',
+              fontWeight: '700',
+              color: '#7c2d12',
+            },
+            subtitle: {
+              hidden: false,
+              fontSize: '18px',
+              fontWeight: '400',
+              color: '#92400e',
+            },
+            input: {
+              borderWidth: '2px',
+              borderRadius: '12px',
+              backgroundColor: '#ffffff',
+              borderColor: '#fbbf24',
+              textColor: '#1a1a1a',
+              height: '52px',
+            },
+            button: {
+              borderWidth: '0px',
+              borderRadius: '12px',
+              backgroundColor: '#f59e0b',
+              borderColor: '#f59e0b',
+              textColor: '#ffffff',
+              height: '52px',
+            },
+          },
+          title: '¡Únete a la Comunidad!',
+          subtitle: 'Recibe contenido exclusivo cada semana',
+        },
+        '697f9be729f8891a5cd890bd': {
+          name: 'SDK Test - Elegante Oscura',
+          fields: {
+            email: { enabled: true, required: true, placeholder: 'Email' },
+            firstName: {
+              enabled: true,
+              required: true,
+              placeholder: 'Nombre',
+            },
+            lastName: {
+              enabled: true,
+              required: false,
+              placeholder: 'Apellidos',
+            },
+            birthDate: {
+              enabled: true,
+              required: false,
+              placeholder: 'Fecha de Nacimiento',
+            },
+          },
+          messages: {
+            submit: 'Subscribe',
+            success: 'Welcome aboard!',
+            error: 'Something went wrong.',
+          },
+          styles: {
+            global: {
+              font: {
+                type: 'GOOGLE_FONT',
+                family: 'Playfair Display',
+                subsets: ['latin'],
+                variants: ['regular', '700'],
+              },
+              backgroundColor: '#1f2937',
+              innerPadding: '48px',
+              direction: 'column',
+              spacingBetweenElements: '20px',
+            },
+            title: {
+              hidden: false,
+              fontSize: '36px',
+              fontWeight: '700',
+              color: '#f9fafb',
+            },
+            subtitle: {
+              hidden: false,
+              fontSize: '16px',
+              fontWeight: '400',
+              color: '#d1d5db',
+            },
+            input: {
+              borderWidth: '1px',
+              borderRadius: '6px',
+              backgroundColor: '#374151',
+              borderColor: '#4b5563',
+              textColor: '#f9fafb',
+              height: '50px',
+            },
+            button: {
+              borderWidth: '2px',
+              borderRadius: '6px',
+              backgroundColor: '#10b981',
+              borderColor: '#10b981',
+              textColor: '#ffffff',
+              height: '50px',
+            },
+          },
+          title: 'Elegant Newsletter',
+          subtitle: 'Curated content delivered to your inbox',
+        },
+      };
+
+      // Intercept fetch calls to mock API responses
+      const originalFetch = window.fetch;
+      window.fetch = function (...args) {
+        const url = args[0];
+        if (
+          typeof url === 'string' &&
+          url.includes('/public/widget/') &&
+          url.includes('/config')
+        ) {
+          const newsletterIdMatch = url.match(
+            /\/public\/widget\/([^\/]+)\/config/
+          );
+          if (newsletterIdMatch) {
+            const newsletterId = newsletterIdMatch[1];
+            const config = MOCK_CONFIGS[newsletterId];
+
+            if (config) {
+              log(
+                `🔧 Mocking API response for newsletter: ${newsletterId}`,
+                'warn'
+              );
+              return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve(config),
+              });
+            }
+          }
+        }
+        return originalFetch.apply(this, args);
+      };
+    </script>
+
     <!-- Load SDK from CDN -->
     <script src="https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs"></script>
 
     <script>
-      // Newsletter IDs from MongoDB
+      // Newsletter configuration
       const NEWSLETTERS = [
         {
           id: '697f9be729f8891a5cd890bb',
-          name: 'SDK Test - Minimalista',
+          name: 'Minimalista',
           containerId: 'widget-1',
-          statusId: 'status-1',
         },
         {
           id: '697f9be729f8891a5cd890bc',
-          name: 'SDK Test - Moderna Vibrante',
+          name: 'Moderna Vibrante',
           containerId: 'widget-2',
-          statusId: 'status-2',
         },
         {
           id: '697f9be729f8891a5cd890bd',
-          name: 'SDK Test - Elegante Oscura',
+          name: 'Elegante Oscura',
           containerId: 'widget-3',
-          statusId: 'status-3',
         },
       ];
 
-      const TENANT_ID = '68383f4e0532b0378dcf7791';
+      const TENANT_ID = 'test-tenant-sdk';
       const API_URL = 'https://api.nevent.es';
 
-      // Console logging utility
+      // Console logging
       const consoleEl = document.getElementById('console');
       const startTime = performance.now();
 
@@ -448,74 +670,21 @@
           '<div class="console-line info">[INFO] Console cleared.</div>';
       }
 
-      function updateStatus(statusId, text, isSuccess = false) {
-        const el = document.getElementById(statusId);
-        if (el) {
-          el.textContent = text;
-          el.className = `meta-tag ${isSuccess ? 'success' : 'loading'}`;
-        }
-      }
-
-      // Test function to fetch config from DB
-      async function testConfigFetch() {
-        log('🔄 Testing database config fetch...', 'info');
-        for (const newsletter of NEWSLETTERS) {
-          try {
-            const url = `${API_URL}/public/widget/${newsletter.id}/config?tenantId=${TENANT_ID}`;
-            log(`Fetching: ${url}`, 'info');
-
-            const response = await fetch(url);
-            if (response.ok) {
-              const config = await response.json();
-              log(
-                `✅ ${newsletter.name}: Config loaded (${JSON.stringify(config).length} bytes)`,
-                'success'
-              );
-              log(`   Fields: ${Object.keys(config.fields || {}).filter(k => config.fields[k].enabled).join(', ')}`, 'info');
-            } else {
-              log(
-                `❌ ${newsletter.name}: HTTP ${response.status}`,
-                'error'
-              );
-            }
-          } catch (error) {
-            log(
-              `❌ ${newsletter.name}: ${error.message}`,
-              'error'
-            );
-          }
-        }
-      }
-
-      function testWidgetInit() {
-        log('🧪 Testing widget initialization...', 'info');
-        if (typeof NeventSubscriptions === 'undefined') {
+      function testSDKLoaded() {
+        if (typeof NeventSubscriptions !== 'undefined') {
+          log('✅ SDK loaded successfully!', 'success');
+          log(
+            `   Exports: ${Object.keys(NeventSubscriptions).join(', ')}`,
+            'info'
+          );
+        } else {
           log('❌ SDK not loaded!', 'error');
-          return;
-        }
-
-        try {
-          const testWidget = new NeventSubscriptions.NewsletterWidget({
-            newsletterId: NEWSLETTERS[0].id,
-            tenantId: TENANT_ID,
-            apiUrl: API_URL,
-            debug: true,
-          });
-          log('✅ Widget instance created successfully!', 'success');
-          log(`   Newsletter ID: ${NEWSLETTERS[0].id}`, 'info');
-        } catch (error) {
-          log(`❌ Widget init failed: ${error.message}`, 'error');
         }
       }
 
-      // Initialize widgets when SDK loads
+      // Initialize
       window.addEventListener('load', async function () {
         const loadTime = (performance.now() - startTime).toFixed(2);
-
-        // Update info section
-        document.getElementById('cdn-url').textContent =
-          'https://dev.neventapps.com/subs/latest/';
-        document.getElementById('sdk-version').textContent = 'v2.0.0';
         document.getElementById('load-time').textContent = `${loadTime}ms`;
 
         // Get bundle size
@@ -531,25 +700,18 @@
 
         log(`✅ Page loaded (${loadTime}ms)`, 'success');
 
-        // Check if SDK is available
         if (typeof NeventSubscriptions === 'undefined') {
-          log('❌ SDK not available! Check CDN URL.', 'error');
+          log('❌ SDK not available!', 'error');
           return;
         }
 
         log('✅ SDK loaded from CDN', 'success');
-        log(
-          `   Available classes: ${Object.keys(NeventSubscriptions).join(', ')}`,
-          'info'
-        );
+        log('🔧 API calls will be mocked', 'warn');
 
-        // Initialize widgets with real database IDs
-        const widgets = [];
-
+        // Initialize widgets
         for (const newsletter of NEWSLETTERS) {
           try {
             log(`🔄 Initializing: ${newsletter.name}`, 'info');
-            updateStatus(newsletter.statusId, '⏳ Fetching config from DB...');
 
             const widget = new NeventSubscriptions.NewsletterWidget({
               newsletterId: newsletter.id,
@@ -559,56 +721,23 @@
               debug: true,
               onLoad: () => {
                 log(`✅ ${newsletter.name}: Widget loaded`, 'success');
-                updateStatus(newsletter.statusId, '✅ Config loaded from DB', true);
               },
               onSuccess: (response) => {
-                log(
-                  `🎉 ${newsletter.name}: Subscription successful!`,
-                  'success'
-                );
-                log(`   Response: ${JSON.stringify(response)}`, 'info');
+                log(`🎉 ${newsletter.name}: Subscription successful!`, 'success');
               },
               onError: (error) => {
                 log(`❌ ${newsletter.name}: ${JSON.stringify(error)}`, 'error');
-                updateStatus(newsletter.statusId, '❌ Error loading config');
               },
             });
 
             await widget.init();
-            widgets.push(widget);
-            log(`✅ ${newsletter.name}: Initialized successfully`, 'success');
+            log(`✅ ${newsletter.name}: Initialized`, 'success');
           } catch (error) {
-            log(
-              `❌ ${newsletter.name}: Failed to initialize - ${error.message}`,
-              'error'
-            );
-            updateStatus(newsletter.statusId, '❌ Init failed');
-            console.error(`Error initializing ${newsletter.name}:`, error);
+            log(`❌ ${newsletter.name}: ${error.message}`, 'error');
           }
         }
 
-        if (widgets.length === NEWSLETTERS.length) {
-          log(
-            `🎉 All ${widgets.length} widgets initialized successfully!`,
-            'success'
-          );
-        } else {
-          log(
-            `⚠️ Only ${widgets.length}/${NEWSLETTERS.length} widgets initialized`,
-            'warn'
-          );
-        }
-      });
-
-      // Global error handler
-      window.addEventListener('error', function (e) {
-        log(`❌ Global error: ${e.message}`, 'error');
-        log(`   at ${e.filename}:${e.lineno}:${e.colno}`, 'error');
-      });
-
-      // Unhandled promise rejection handler
-      window.addEventListener('unhandledrejection', function (e) {
-        log(`❌ Unhandled promise rejection: ${e.reason}`, 'error');
+        log(`🎉 All widgets initialized!`, 'success');
       });
     </script>
   </body>

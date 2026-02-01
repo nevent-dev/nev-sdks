@@ -6,7 +6,7 @@ Este archivo documenta las newsletters de prueba creadas en MongoDB para testing
 
 - **Database**: `nevent`
 - **Collection**: `newsletters`
-- **Tenant ID**: `test-tenant-sdk`
+- **Tenant ID**: `68383f4e0532b0378dcf7791` (tenant real de testing)
 
 ## Newsletters Creadas
 
@@ -37,7 +37,7 @@ Este archivo documenta las newsletters de prueba creadas en MongoDB para testing
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
   newsletterId: '697f9be729f8891a5cd890bb',
-  tenantId: 'test-tenant-sdk',
+  tenantId: '68383f4e0532b0378dcf7791',
   apiUrl: 'https://api.nevent.es',
   containerId: 'my-container',
 });
@@ -46,7 +46,7 @@ await widget.init();
 
 **Preview URL**:
 ```
-https://api.nevent.es/public/widget/697f9be729f8891a5cd890bb/config?tenantId=test-tenant-sdk
+https://api.nevent.es/public/widget/697f9be729f8891a5cd890bb/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
@@ -81,7 +81,7 @@ https://api.nevent.es/public/widget/697f9be729f8891a5cd890bb/config?tenantId=tes
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
   newsletterId: '697f9be729f8891a5cd890bc',
-  tenantId: 'test-tenant-sdk',
+  tenantId: '68383f4e0532b0378dcf7791',
   apiUrl: 'https://api.nevent.es',
   containerId: 'my-container',
 });
@@ -90,7 +90,7 @@ await widget.init();
 
 **Preview URL**:
 ```
-https://api.nevent.es/public/widget/697f9be729f8891a5cd890bc/config?tenantId=test-tenant-sdk
+https://api.nevent.es/public/widget/697f9be729f8891a5cd890bc/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
@@ -126,7 +126,7 @@ https://api.nevent.es/public/widget/697f9be729f8891a5cd890bc/config?tenantId=tes
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
   newsletterId: '697f9be729f8891a5cd890bd',
-  tenantId: 'test-tenant-sdk',
+  tenantId: '68383f4e0532b0378dcf7791',
   apiUrl: 'https://api.nevent.es',
   containerId: 'my-container',
 });
@@ -135,7 +135,7 @@ await widget.init();
 
 **Preview URL**:
 ```
-https://api.nevent.es/public/widget/697f9be729f8891a5cd890bd/config?tenantId=test-tenant-sdk
+https://api.nevent.es/public/widget/697f9be729f8891a5cd890bd/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
@@ -145,7 +145,7 @@ https://api.nevent.es/public/widget/697f9be729f8891a5cd890bd/config?tenantId=tes
 Para verificar que las newsletters existen:
 
 ```javascript
-mongosh nevent --eval 'db.newsletters.find({tenantId: "test-tenant-sdk"}).pretty()'
+mongosh nevent --eval 'db.newsletters.find({tenantId: "68383f4e0532b0378dcf7791"}).pretty()'
 ```
 
 O usando el agregador:
@@ -153,7 +153,7 @@ O usando el agregador:
 ```javascript
 mongosh nevent --eval '
   db.newsletters.aggregate([
-    { $match: { tenantId: "test-tenant-sdk" } },
+    { $match: { tenantId: "68383f4e0532b0378dcf7791" } },
     {
       $project: {
         _id: 1,
@@ -195,7 +195,7 @@ Carga las configuraciones reales desde MongoDB usando los IDs listados arriba.
 Para eliminar las newsletters de prueba:
 
 ```javascript
-mongosh nevent --eval 'db.newsletters.deleteMany({tenantId: "test-tenant-sdk"})'
+mongosh nevent --eval 'db.newsletters.deleteMany({tenantId: "68383f4e0532b0378dcf7791"})'
 ```
 
 ## Notas
