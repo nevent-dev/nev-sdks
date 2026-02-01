@@ -2,6 +2,9 @@
   "name": "@nevent/sdks",
   "version": "0.0.0",
   "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
   "description": "Nevent JavaScript/TypeScript SDK monorepo",
   "repository": {
     "type": "git",
@@ -28,11 +31,10 @@
     "typecheck": "cd packages/core && npm run typecheck && cd ../subscriptions && npm run typecheck",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
-    "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo node_modules",
+    "clean": "rm -rf packages/*/dist packages/*/*.tsbuildinfo",
     "changeset": "changeset",
     "version-packages": "changeset version",
-    "release": "npm run build && changeset publish",
-    "prepare": "husky install"
+    "release": "npm run build && changeset publish"
   },
   "devDependencies": {
     "@changesets/cli": "^2.27.1",

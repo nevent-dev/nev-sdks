@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Nevent SDK - Basic CDN Integration</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      margin-bottom: 30px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    h1 {
+      color: #333;
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #667eea;
+      color: white;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .description {
+      color: #666;
+      font-size: 1.1rem;
+      line-height: 1.6;
+      margin-bottom: 20px;
+    }
+
+    .widget-container {
+      background: white;
+      border-radius: 12px;
+      padding: 40px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      margin-bottom: 30px;
+    }
+
+    .widget-header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    .widget-header h2 {
+      color: #333;
+      font-size: 1.8rem;
+      margin-bottom: 10px;
+    }
+
+    .widget-header p {
+      color: #666;
+      font-size: 1rem;
+    }
+
+    #newsletter-widget {
+      min-height: 200px;
+    }
+
+    .info-box {
+      background: #f8f9fa;
+      border-left: 4px solid #667eea;
+      border-radius: 4px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .info-box h3 {
+      color: #333;
+      font-size: 1.2rem;
+      margin-bottom: 10px;
+    }
+
+    .info-box p {
+      color: #666;
+      line-height: 1.6;
+      margin-bottom: 10px;
+    }
+
+    .info-box code {
+      background: #e9ecef;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 0.9rem;
+      color: #d63384;
+    }
+
+    .code-example {
+      background: #2d2d2d;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      overflow-x: auto;
+    }
+
+    .code-example pre {
+      color: #f8f8f2;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin: 0;
+    }
+
+    .code-example .comment {
+      color: #6a9955;
+    }
+
+    .code-example .tag {
+      color: #569cd6;
+    }
+
+    .code-example .attr {
+      color: #9cdcfe;
+    }
+
+    .code-example .string {
+      color: #ce9178;
+    }
+
+    .code-example .keyword {
+      color: #c586c0;
+    }
+
+    footer {
+      text-align: center;
+      color: white;
+      margin-top: 40px;
+      padding: 20px;
+    }
+
+    footer a {
+      color: white;
+      text-decoration: none;
+      font-weight: 600;
+      border-bottom: 2px solid rgba(255, 255, 255, 0.3);
+      transition: border-color 0.3s;
+    }
+
+    footer a:hover {
+      border-color: white;
+    }
+
+    .status {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      padding: 12px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      display: none;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      border-color: #f5c6cb;
+      color: #721c24;
+    }
+
+    .status.show {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="badge">Nevent SDK v2.0.0</div>
+      <h1>Newsletter Subscription Widget</h1>
+      <p class="description">
+        This example demonstrates how to integrate the Nevent Subscriptions SDK using a simple <code>&lt;script&gt;</code> tag.
+        No build process, no npm, no bundler required - just copy and paste!
+      </p>
+    </div>
+
+    <!-- Info Box -->
+    <div class="info-box">
+      <h3>🚀 Quick Start</h3>
+      <p>
+        This page loads the SDK from our CDN at <code>dev.neventapps.com/subs/latest/</code>.
+        In production, always use versioned URLs like <code>neventapps.com/subs/v2.0.0/</code> to prevent breaking changes.
+      </p>
+      <p>
+        <strong>Note:</strong> This is a demo with placeholder IDs. Replace <code>newsletterId</code> and <code>tenantId</code> with your actual values.
+      </p>
+    </div>
+
+    <!-- Widget Container -->
+    <div class="widget-container">
+      <div class="widget-header">
+        <h2>Subscribe to Our Newsletter</h2>
+        <p>Get the latest updates and exclusive content delivered to your inbox</p>
+      </div>
+
+      <!-- Status Messages -->
+      <div id="status" class="status"></div>
+
+      <!-- Widget will be rendered here -->
+      <div id="newsletter-widget"></div>
+    </div>
+
+    <!-- Implementation Code -->
+    <div class="widget-container">
+      <h3 style="color: #333; margin-bottom: 20px;">Implementation Code</h3>
+      <div class="code-example">
+<pre><span class="comment">&lt;!-- Load SDK from CDN --&gt;</span>
+<span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="string">"https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs"</span><span class="tag">&gt;&lt;/script&gt;</span>
+
+<span class="comment">&lt;!-- Initialize Widget --&gt;</span>
+<span class="tag">&lt;script&gt;</span>
+  <span class="keyword">const</span> widget = <span class="keyword">new</span> NeventSubscriptions.NewsletterWidget({
+    newsletterId: <span class="string">'demo-newsletter-id'</span>,
+    tenantId: <span class="string">'demo-tenant-id'</span>,
+    containerId: <span class="string">'newsletter-widget'</span>,
+    apiUrl: <span class="string">'https://api.nevent.es'</span>
+  });
+
+  widget.init()
+    .then(() =&gt; console.log(<span class="string">'Widget loaded successfully!'</span>))
+    .catch(err =&gt; console.error(<span class="string">'Widget failed to load:'</span>, err));
+<span class="tag">&lt;/script&gt;</span>
+</pre>
+      </div>
+    </div>
+
+    <!-- Production Example -->
+    <div class="widget-container">
+      <h3 style="color: #333; margin-bottom: 20px;">Production Usage (Recommended)</h3>
+      <p style="color: #666; margin-bottom: 15px;">
+        For production environments, always pin to a specific version to prevent unexpected breaking changes:
+      </p>
+      <div class="code-example">
+<pre><span class="comment">&lt;!-- Production: Always use versioned URL --&gt;</span>
+<span class="tag">&lt;script</span> <span class="attr">src</span>=<span class="string">"https://neventapps.com/subs/v2.0.0/nevent-subscriptions.umd.cjs"</span><span class="tag">&gt;&lt;/script&gt;</span>
+
+<span class="tag">&lt;script&gt;</span>
+  <span class="keyword">const</span> widget = <span class="keyword">new</span> NeventSubscriptions.NewsletterWidget({
+    newsletterId: <span class="string">'your-newsletter-id'</span>,
+    tenantId: <span class="string">'your-tenant-id'</span>,
+    containerId: <span class="string">'newsletter-widget'</span>,
+
+    <span class="comment">// Optional configuration</span>
+    layout: <span class="string">'column'</span>,              <span class="comment">// 'column' or 'row'</span>
+    theme: <span class="string">'light'</span>,                <span class="comment">// 'light' or 'dark'</span>
+    buttonText: <span class="string">'Subscribe Now'</span>,   <span class="comment">// Custom button text</span>
+
+    <span class="comment">// Callbacks</span>
+    onSuccess: (data) =&gt; {
+      console.log(<span class="string">'Subscription successful!'</span>, data);
+      <span class="comment">// Handle success (e.g., show thank you message)</span>
+    },
+    onError: (error) =&gt; {
+      console.error(<span class="string">'Subscription failed:'</span>, error);
+      <span class="comment">// Handle error (e.g., show error message)</span>
+    }
+  });
+
+  widget.init();
+<span class="tag">&lt;/script&gt;</span>
+</pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>
+      Powered by <a href="https://nevent.es" target="_blank">Nevent</a> |
+      <a href="https://github.com/nevent/nev-sdks" target="_blank">View on GitHub</a> |
+      <a href="../docs/DEPLOYMENT.md">Deployment Guide</a>
+    </p>
+  </footer>
+
+  <!-- Load SDK from CDN (Development) -->
+  <script src="https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs"></script>
+
+  <!-- Initialize Widget -->
+  <script>
+    // Show status message
+    function showStatus(message, isError = false) {
+      const statusEl = document.getElementById('status');
+      statusEl.textContent = message;
+      statusEl.classList.add('show');
+      if (isError) {
+        statusEl.classList.add('error');
+      } else {
+        statusEl.classList.remove('error');
+      }
+    }
+
+    // Check if SDK loaded
+    if (typeof NeventSubscriptions === 'undefined') {
+      showStatus('❌ SDK failed to load from CDN. Check console for details.', true);
+      console.error('NeventSubscriptions not found. Ensure the SDK is loaded from the CDN.');
+    } else {
+      // Initialize widget
+      try {
+        const widget = new NeventSubscriptions.NewsletterWidget({
+          newsletterId: 'demo-newsletter-id',
+          tenantId: 'demo-tenant-id',
+          containerId: 'newsletter-widget',
+          apiUrl: 'https://api.nevent.es',
+
+          // Configuration
+          layout: 'column',
+          theme: 'light',
+          buttonText: 'Subscribe',
+
+          // Callbacks
+          onSuccess: (data) => {
+            console.log('✅ Subscription successful!', data);
+            showStatus('✅ Thank you for subscribing! Check your email to confirm.');
+          },
+          onError: (error) => {
+            console.error('❌ Subscription failed:', error);
+            showStatus('❌ Subscription failed. Please try again.', true);
+          }
+        });
+
+        // Initialize the widget
+        widget.init()
+          .then(() => {
+            console.log('✅ Widget loaded successfully!');
+            showStatus('✅ Widget loaded successfully. Enter your email to subscribe.');
+          })
+          .catch((error) => {
+            console.error('❌ Widget initialization failed:', error);
+            showStatus('❌ Widget failed to initialize. Check console for details.', true);
+          });
+
+      } catch (error) {
+        console.error('❌ Widget creation failed:', error);
+        showStatus('❌ Widget creation failed. Check console for details.', true);
+      }
+    }
+  </script>
+</body>
+</html>

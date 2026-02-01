@@ -9,7 +9,37 @@ Official JavaScript/TypeScript SDKs for the Nevent platform.
 | [@nevent/core](./packages/core) | 0.1.0 | Core utilities and types | ~5KB |
 | [@nevent/subscriptions](./packages/subscriptions) | 2.0.0 | Newsletter widget | ~15KB |
 
-## Quick Start
+## Installation
+
+### Via CDN (Recommended for quick integration)
+
+The fastest way to get started is to load the SDK directly from our CDN:
+
+```html
+<!-- Production (always pin to specific version) -->
+<script src="https://neventapps.com/subs/v2.0.0/nevent-subscriptions.umd.cjs"></script>
+<script>
+  const widget = new NeventSubscriptions.NewsletterWidget({
+    newsletterId: 'your-newsletter-id',
+    tenantId: 'your-tenant-id',
+    containerId: 'newsletter-container'
+  });
+  widget.init();
+</script>
+
+<!-- Development (latest version, updates automatically) -->
+<script src="https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs"></script>
+```
+
+**Important:** Always use versioned URLs in production (e.g., `/v2.0.0/`) to prevent breaking changes. The `/latest/` alias auto-updates and should only be used for development/testing.
+
+**Available formats:**
+- **UMD (Browser):** `nevent-subscriptions.umd.cjs` - Global `NeventSubscriptions` object
+- **ES Module:** `nevent-subscriptions.js` - For modern bundlers
+
+See [examples/basic-integration.html](./examples/basic-integration.html) for a complete working example.
+
+### Via npm/pnpm (For bundled applications)
 
 ```bash
 # Install packages

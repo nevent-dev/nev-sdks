@@ -20,7 +20,7 @@
   ],
   "scripts": {
     "dev": "vite build --watch",
-    "build": "vite build && tsc --project tsconfig.build.json --emitDeclarationOnly",
+    "build": "rm -f *.tsbuildinfo && vite build && tsc --project tsconfig.build.json --emitDeclarationOnly",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist *.tsbuildinfo"
   },
@@ -36,7 +36,7 @@
     "directory": "packages/core"
   },
   "devDependencies": {
-    "typescript": "workspace:*",
-    "vite": "workspace:*"
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12"
   }
 }

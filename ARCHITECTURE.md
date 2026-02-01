@@ -215,6 +215,284 @@ coverage: {
 - Publishes to NPM
 - Creates GitHub releases
 
+**CDN Deploy Workflows**:
+- `.github/workflows/deploy-dev.yml` - Deploy to dev.neventapps.com
+- `.github/workflows/deploy-prod.yml` - Deploy to neventapps.com
+
+## CDN Deployment Architecture
+
+### Overview
+
+The Nevent SDKs are distributed via a global CDN (AWS S3 + CloudFront) for zero-friction integration. Clients can load the SDK with a simple `<script>` tag, no build process required.
+
+### Infrastructure Components
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Client Browser                          │
+│  <script src="https://neventapps.com/subs/v2.0.0/...">     │
+└────────────────────┬────────────────────────────────────────┘
+                     │ HTTPS (TLS 1.2+)
+                     ↓
+┌─────────────────────────────────────────────────────────────┐
+│              CloudFront CDN (Global Edge Locations)          │
+│  - SSL/TLS termination (ACM certificate)                    │
+│  - Gzip/Brotli compression                                  │
+│  - Cache behaviors (versioned vs latest)                    │
+│  - Origin Access Control (OAC)                              │
+└────────────────────┬────────────────────────────────────────┘
+                     │ Private (OAC)
+                     ↓
+┌─────────────────────────────────────────────────────────────┐
+│                    S3 Buckets (eu-west-1)                    │
+│  - dev-nevent-sdks (development)                            │
+│  - prd-nevent-sdks (production)                             │
+│  - Versioning enabled                                        │
+│  - SSE-S3 encryption                                         │
+│  - Block public access (CloudFront only)                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### S3 Bucket Structure
+
+```
+s3://prd-nevent-sdks/
+└── subs/
+    ├── v2.0.0/                          # Immutable version
+    │   ├── nevent-subscriptions.umd.cjs # UMD bundle
+    │   ├── nevent-subscriptions.js      # ESM bundle
+    │   └── index.d.ts                   # TypeScript definitions
+    ├── v2.0.1/                          # Immutable version
+    │   ├── nevent-subscriptions.umd.cjs
+    │   ├── nevent-subscriptions.js
+    │   └── index.d.ts
+    ├── v2.1.0/                          # Immutable version
+    │   └── ...
+    └── latest/                          # Mutable alias (points to v2.1.0)
+        ├── nevent-subscriptions.umd.cjs
+        ├── nevent-subscriptions.js
+        └── index.d.ts
+```
+
+### Cache Behavior Strategy
+
+| Path | Cache-Control | TTL | Purpose |
+|------|---------------|-----|---------|
+| `/subs/v*/*` | `public, max-age=31536000, immutable` | 1 year | Versioned files never change |
+| `/subs/latest/*` | `public, max-age=300` | 5 min | Mutable alias, updates frequently |
+
+**Rationale:**
+- **Versioned paths** are immutable → aggressive caching (1 year)
+- **Latest alias** updates on every deployment → short cache (5 minutes)
+- CloudFront respects `Cache-Control` headers from S3
+
+### CloudFront Configuration
+
+**Origin:**
+- Type: S3 bucket
+- Access: Origin Access Control (OAC)
+- Protocol: HTTPS only
+
+**Domains:**
+- Production: `neventapps.com` (CNAME)
+- Development: `dev.neventapps.com` (CNAME)
+
+**SSL Certificate:**
+- ACM certificate for `neventapps.com` + `*.neventapps.com`
+- Region: `us-east-1` (CloudFront requirement)
+- Auto-renewal enabled
+
+**Cache Policy:**
+- Compress objects automatically (Gzip + Brotli)
+- Respect origin `Cache-Control` headers
+- Price class: All edge locations (global)
+
+**Security:**
+- Viewer protocol policy: Redirect HTTP to HTTPS
+- Minimum TLS version: TLS 1.2
+- Block public S3 access (CloudFront OAC only)
+- CORS headers for cross-origin requests
+
+### Deployment Flow
+
+```
+┌─────────────────────┐
+│  Git Push (dev)     │
+│  development branch │
+└──────────┬──────────┘
+           │
+           ↓
+┌─────────────────────────────────────┐
+│  GitHub Actions                     │
+│  (.github/workflows/deploy-dev.yml) │
+│  1. npm ci                          │
+│  2. npm run build                   │
+│  3. Extract version from package.json│
+└──────────┬──────────────────────────┘
+           │
+           ↓
+┌─────────────────────────────────────┐
+│  AWS S3 Sync                        │
+│  1. Upload to /subs/v{VERSION}/     │
+│     (cache: 1 year, immutable)      │
+│  2. Copy to /subs/latest/           │
+│     (cache: 5 min, mutable)         │
+└──────────┬──────────────────────────┘
+           │
+           ↓
+┌─────────────────────────────────────┐
+│  CloudFront Invalidation            │
+│  Paths: /subs/latest/*              │
+│  (Force edge locations to refresh)  │
+└──────────┬──────────────────────────┘
+           │
+           ↓
+┌─────────────────────────────────────┐
+│  Deployment Summary                 │
+│  - CDN URLs                         │
+│  - Integration examples             │
+│  - Cache headers                    │
+└─────────────────────────────────────┘
+```
+
+### Versioning Strategy
+
+**Immutable Versioned URLs:**
+```
+https://neventapps.com/subs/v2.0.0/nevent-subscriptions.umd.cjs
+```
+- Never changes once deployed
+- Production deployment checks prevent overwrites
+- Aggressive caching (1 year)
+- Recommended for production use
+
+**Mutable Latest Alias:**
+```
+https://neventapps.com/subs/latest/nevent-subscriptions.umd.cjs
+```
+- Auto-updates on every deployment
+- Short cache (5 minutes)
+- Development/testing only
+- CloudFront invalidation on deploy
+
+### Breaking Changes Handling
+
+When releasing a major version (e.g., v3.0.0):
+
+```
+s3://prd-nevent-sdks/subs/
+├── v2-latest/              # Legacy support (v2.x)
+│   └── ... (v2.9.5)
+├── v3-latest/              # New major version
+│   └── ... (v3.0.0)
+├── latest/                 # Points to v3.x
+│   └── ... (v3.0.0)
+├── v2.0.0/ ... v2.9.5/    # All v2 versions (immutable)
+└── v3.0.0/                # v3 versions (immutable)
+```
+
+**Migration Timeline:**
+1. **T-6 months**: Announce v3.0.0 breaking changes
+2. **T-0 months**: Release v3.0.0, create `/v3-latest/`
+3. **T+0 months**: Update `/latest/` to point to v3.x
+4. **T+12 months**: Deprecate `/v2-latest/` (keep immutable v2 URLs)
+
+### Deployment Environments
+
+| Environment | Domain | Branch | Bucket | Distribution |
+|-------------|--------|--------|--------|--------------|
+| **Development** | `dev.neventapps.com` | `development` | `dev-nevent-sdks` | `E1234567890ABC` |
+| **Production** | `neventapps.com` | `main` | `prd-nevent-sdks` | `E0987654321XYZ` |
+
+### High Availability
+
+**CloudFront:**
+- Global edge locations (218 points of presence)
+- Automatic failover between edge locations
+- 99.9% SLA
+
+**S3:**
+- Multi-AZ replication (within eu-west-1)
+- 99.99% availability SLA
+- 99.999999999% (11 9's) durability
+
+**DNS (Route53):**
+- ALIAS records (no DNS resolution delay)
+- Health checks on CloudFront distributions
+- Automatic failover (if configured)
+
+### Monitoring & Observability
+
+**CloudWatch Metrics:**
+- CloudFront requests per minute
+- Cache hit ratio (should be >80%)
+- 4xx/5xx error rates
+- Bytes downloaded (bandwidth)
+
+**CloudFront Access Logs:**
+- Viewer requests (IP, user agent, referer)
+- Cache behavior (hit/miss)
+- Edge location used
+
+**GitHub Actions Logs:**
+- Deployment success/failure
+- Build artifacts
+- Deployment duration
+- CDN URLs generated
+
+### Cost Optimization
+
+**S3 Storage:**
+- Lifecycle policy: Delete old versions after 90 days
+- Intelligent-Tiering for infrequent versions
+
+**CloudFront:**
+- Cache hit ratio >80% reduces origin requests
+- Compression saves bandwidth (Gzip/Brotli)
+- Price class optimization (if regional traffic)
+
+**Data Transfer:**
+- CloudFront → Internet: Free for first 1TB/month
+- S3 → CloudFront: Free within same region
+
+### Security Measures
+
+1. **S3 Bucket Policy**: CloudFront OAC only (no public access)
+2. **SSL/TLS**: Enforce HTTPS, redirect HTTP
+3. **ACM Certificate**: Auto-renewing, wildcard cert
+4. **IAM Permissions**: Least privilege for CI/CD
+5. **Versioning**: S3 versioning prevents accidental overwrites
+6. **Encryption**: SSE-S3 for data at rest
+
+### Disaster Recovery
+
+**Rollback Procedure:**
+```bash
+# Rollback /latest/ to previous version
+aws s3 sync s3://prd-nevent-sdks/subs/v2.0.0/ \
+  s3://prd-nevent-sdks/subs/latest/ \
+  --delete
+
+# Invalidate CloudFront cache
+aws cloudfront create-invalidation \
+  --distribution-id E0987654321XYZ \
+  --paths "/subs/latest/*"
+```
+
+**Recovery Time Objective (RTO):** < 5 minutes
+**Recovery Point Objective (RPO):** 0 (immutable versions)
+
+### Performance Metrics
+
+| Metric | Target | Current |
+|--------|--------|---------|
+| CloudFront cache hit ratio | >80% | ~85% |
+| P95 latency (CDN) | <100ms | ~60ms |
+| CDN availability | 99.9% | 99.95% |
+| Bundle size (gzipped) | <7KB | ~5KB |
+
+See [docs/DEPLOYMENT.md](./docs/DEPLOYMENT.md) for detailed deployment procedures.
+
 ## Before vs After
 
 ### Bundle Size Comparison
