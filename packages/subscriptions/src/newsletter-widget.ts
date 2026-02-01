@@ -216,6 +216,15 @@ export class NewsletterWidget {
           messages: serverConfig.messages
             ? { ...this.config.messages, ...serverConfig.messages }
             : this.config.messages,
+          styles: serverConfig.styles
+            ? {
+                global: { ...this.config.styles?.global, ...serverConfig.styles.global },
+                title: { ...this.config.styles?.title, ...serverConfig.styles.title },
+                subtitle: { ...this.config.styles?.subtitle, ...serverConfig.styles.subtitle },
+                input: { ...this.config.styles?.input, ...serverConfig.styles.input },
+                button: { ...this.config.styles?.button, ...serverConfig.styles.button },
+              }
+            : this.config.styles,
         };
 
         this.config = mergedConfig as Required<NewsletterConfig>;
