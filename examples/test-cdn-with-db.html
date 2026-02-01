@@ -400,22 +400,22 @@
     <script src="https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs"></script>
 
     <script>
-      // Newsletter IDs from MongoDB
+      // Newsletter IDs from MongoDB (Development cluster)
       const NEWSLETTERS = [
         {
-          id: '697fa2061412a0cb615445e9',
+          id: '697fa7955712aef3f7b46e6a',
           name: 'SDK Test - Minimalista',
           containerId: 'widget-1',
           statusId: 'status-1',
         },
         {
-          id: '697fa2061412a0cb615445ea',
+          id: '697fa7955712aef3f7b46e6b',
           name: 'SDK Test - Moderna Vibrante',
           containerId: 'widget-2',
           statusId: 'status-2',
         },
         {
-          id: '697fa2061412a0cb615445eb',
+          id: '697fa7955712aef3f7b46e6c',
           name: 'SDK Test - Elegante Oscura',
           containerId: 'widget-3',
           statusId: 'status-3',
@@ -423,7 +423,7 @@
       ];
 
       const TENANT_ID = '68383f4e0532b0378dcf7791';
-      const API_URL = 'https://api.nevent.es';
+      const API_URL = 'http://localhost:8080';
 
       // Console logging utility
       const consoleEl = document.getElementById('console');

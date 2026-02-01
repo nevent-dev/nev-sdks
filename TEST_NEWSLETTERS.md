@@ -12,7 +12,7 @@ Este archivo documenta las newsletters de prueba creadas en MongoDB para testing
 
 ### 1. SDK Test - Minimalista
 
-**ID**: `697fa2061412a0cb615445e9`
+**ID**: `697fa7955712aef3f7b46e6a`
 
 **Descripción**: Newsletter minimalista para testing del SDK - Solo email
 
@@ -36,9 +36,9 @@ Este archivo documenta las newsletters de prueba creadas en MongoDB para testing
 **Uso en SDK**:
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
-  newsletterId: '697fa2061412a0cb615445e9',
+  newsletterId: '697fa7955712aef3f7b46e6a',
   tenantId: '68383f4e0532b0378dcf7791',
-  apiUrl: 'https://api.nevent.es',
+  apiUrl: 'http://localhost:8080',
   containerId: 'my-container',
 });
 await widget.init();
@@ -46,14 +46,14 @@ await widget.init();
 
 **Preview URL**:
 ```
-https://api.nevent.es/public/widget/697fa2061412a0cb615445e9/config?tenantId=68383f4e0532b0378dcf7791
+http://localhost:8080/public/widget/697fa7955712aef3f7b46e6a/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
 
 ### 2. SDK Test - Moderna Vibrante
 
-**ID**: `697fa2061412a0cb615445ea`
+**ID**: `697fa7955712aef3f7b46e6b`
 
 **Descripción**: Newsletter con colores vibrantes y todos los campos para testing completo
 
@@ -80,9 +80,9 @@ https://api.nevent.es/public/widget/697fa2061412a0cb615445e9/config?tenantId=683
 **Uso en SDK**:
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
-  newsletterId: '697fa2061412a0cb615445ea',
+  newsletterId: '697fa7955712aef3f7b46e6b',
   tenantId: '68383f4e0532b0378dcf7791',
-  apiUrl: 'https://api.nevent.es',
+  apiUrl: 'http://localhost:8080',
   containerId: 'my-container',
 });
 await widget.init();
@@ -90,14 +90,14 @@ await widget.init();
 
 **Preview URL**:
 ```
-https://api.nevent.es/public/widget/697fa2061412a0cb615445ea/config?tenantId=68383f4e0532b0378dcf7791
+http://localhost:8080/public/widget/697fa7955712aef3f7b46e6b/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
 
 ### 3. SDK Test - Elegante Oscura
 
-**ID**: `697fa2061412a0cb615445eb`
+**ID**: `697fa7955712aef3f7b46e6c`
 
 **Descripción**: Newsletter con tema oscuro elegante y campos intermedios
 
@@ -125,9 +125,9 @@ https://api.nevent.es/public/widget/697fa2061412a0cb615445ea/config?tenantId=683
 **Uso en SDK**:
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
-  newsletterId: '697fa2061412a0cb615445eb',
+  newsletterId: '697fa7955712aef3f7b46e6c',
   tenantId: '68383f4e0532b0378dcf7791',
-  apiUrl: 'https://api.nevent.es',
+  apiUrl: 'http://localhost:8080',
   containerId: 'my-container',
 });
 await widget.init();
@@ -135,7 +135,7 @@ await widget.init();
 
 **Preview URL**:
 ```
-https://api.nevent.es/public/widget/697fa2061412a0cb615445eb/config?tenantId=68383f4e0532b0378dcf7791
+http://localhost:8080/public/widget/697fa7955712aef3f7b46e6c/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
@@ -212,7 +212,7 @@ mongosh nevent --eval 'db.newsletters.deleteMany({tenantId: "68383f4e0532b0378dc
 
 1. Verificar que el endpoint del API está correcto:
    ```
-   https://api.nevent.es/public/widget/{newsletterId}/config?tenantId={tenantId}
+   http://localhost:8080/public/widget/{newsletterId}/config?tenantId={tenantId}
    ```
 
 2. Verificar que las newsletters existen en MongoDB
