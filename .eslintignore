@@ -1,0 +1,20 @@
+# Build outputs
+dist
+coverage
+*.tsbuildinfo
+
+# Config files
+.eslintrc.js
+vite.config.ts
+vitest.config.ts
+
+# Dependencies
+node_modules
+
+# Temporary files
+*.log
+.DS_Store
+
+# Documentation
+docs
+examples
