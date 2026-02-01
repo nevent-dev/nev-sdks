@@ -1,0 +1,46 @@
+{
+  "name": "@nevent/subscriptions",
+  "version": "2.0.0",
+  "description": "Newsletter subscription widget for Nevent platform",
+  "author": "Nevent Team",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/nevent-subscriptions.umd.cjs",
+  "module": "./dist/nevent-subscriptions.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/nevent-subscriptions.js",
+      "require": "./dist/nevent-subscriptions.umd.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build && tsc --project tsconfig.build.json --emitDeclarationOnly",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "nevent",
+    "newsletter",
+    "subscription",
+    "widget",
+    "gdpr"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nevent/nev-sdks.git",
+    "directory": "packages/subscriptions"
+  },
+  "dependencies": {
+    "@nevent/core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "workspace:*",
+    "vite": "workspace:*"
+  }
+}

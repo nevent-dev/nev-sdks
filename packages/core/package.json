@@ -1,0 +1,42 @@
+{
+  "name": "@nevent/core",
+  "version": "0.1.0",
+  "description": "Core utilities and shared types for Nevent SDKs",
+  "author": "Nevent Team",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build && tsc --project tsconfig.build.json --emitDeclarationOnly",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist *.tsbuildinfo"
+  },
+  "keywords": [
+    "nevent",
+    "sdk",
+    "utilities",
+    "types"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/nevent/nev-sdks.git",
+    "directory": "packages/core"
+  },
+  "devDependencies": {
+    "typescript": "workspace:*",
+    "vite": "workspace:*"
+  }
+}
