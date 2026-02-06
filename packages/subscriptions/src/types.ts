@@ -6,13 +6,56 @@ import type { ConsentData, I18nDictionary } from '@nevent/core';
 export type LayoutDirection = 'column' | 'row';
 
 /**
- * Form field configuration
+ * Form field configuration (legacy)
  */
 export interface FieldConfig {
   enabled: boolean;
   required: boolean;
   placeholder?: string;
   label?: string;
+}
+
+/**
+ * Field types supported by dynamic forms
+ */
+export type FieldType =
+  | 'text'
+  | 'email'
+  | 'tel'
+  | 'number'
+  | 'url'
+  | 'password'
+  | 'select'
+  | 'checkbox'
+  | 'radio'
+  | 'textarea'
+  | 'date'
+  | 'time'
+  | 'file';
+
+/**
+ * Field option for select, radio, and checkbox inputs
+ */
+export interface FieldOption {
+  value: string | number;
+  label: string;
+  disabled?: boolean;
+  selected?: boolean; // For select
+  checked?: boolean; // For checkbox/radio
+}
+
+/**
+ * Dynamic field configuration from API
+ */
+export interface FieldConfiguration {
+  fieldName: string; // Technical name (e.g., "email", "firstName")
+  displayName: string; // Display label (e.g., "Email Address")
+  hint?: string | null; // Help text shown below field
+  required: boolean; // Whether field is required
+  type: FieldType; // Type of input field
+  options?: FieldOption[]; // Options for select/radio/checkbox
+  placeholder?: string; // Placeholder text
+  metadata?: Record<string, unknown>; // Additional metadata
 }
 
 /**
@@ -151,6 +194,7 @@ export interface ServerWidgetConfig {
   privacyPolicyUrl?: string;
   title?: string;
   subtitle?: string;
+  fieldConfigurations?: FieldConfiguration[]; // Dynamic form fields from API
 }
 
 /**
