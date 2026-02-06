@@ -1,0 +1,35 @@
+.nevent-phone-input {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  position: relative;
+}
+
+.nevent-phone-country-select {
+  width: 120px;
+  padding: var(--nev-input-padding, 8px 12px);
+  border: 1px solid var(--nev-input-border-color, #ddd);
+  border-radius: var(--nev-input-border-radius, 4px);
+  font-size: var(--nev-font-size-base, 16px);
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.nevent-phone-country-select:focus {
+  outline: none;
+  border-color: var(--nev-input-focus-border-color, #007bff);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.nevent-phone-number {
+  flex: 1;
+}
+
+.nevent-phone-input .nevent-field-error {
+  position: absolute;
+  bottom: -20px;
+  left: 0;
+  font-size: var(--nev-font-size-small, 12px);
+  color: var(--nev-error-color, #dc3545);
+}

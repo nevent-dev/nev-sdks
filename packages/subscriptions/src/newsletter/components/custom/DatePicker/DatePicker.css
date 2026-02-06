@@ -1,0 +1,132 @@
+.nevent-datepicker {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.nevent-datepicker-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.nevent-datepicker-input {
+  flex: 1;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+.nevent-datepicker-icon {
+  position: absolute;
+  right: 12px;
+  font-size: 20px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.nevent-datepicker-calendar {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid var(--nev-input-border-color, #ddd);
+  border-radius: var(--nev-input-border-radius, 8px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  min-width: 280px;
+}
+
+.nevent-datepicker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.nevent-datepicker-nav-btn {
+  background: transparent;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.nevent-datepicker-nav-btn:hover {
+  background: var(--nev-hover-bg, #f0f0f0);
+}
+
+.nevent-datepicker-month-year {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--nev-text-color, #333);
+}
+
+.nevent-datepicker-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.nevent-datepicker-weekday {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--nev-secondary-color, #666);
+  padding: 4px;
+}
+
+.nevent-datepicker-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.nevent-datepicker-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.nevent-datepicker-day:not(.empty):not(.disabled):hover {
+  background: var(--nev-hover-bg, #e6f2ff);
+}
+
+.nevent-datepicker-day.today {
+  font-weight: 600;
+  color: var(--nev-primary-color, #007bff);
+}
+
+.nevent-datepicker-day.selected {
+  background: var(--nev-primary-color, #007bff);
+  color: white;
+  font-weight: 600;
+}
+
+.nevent-datepicker-day.disabled {
+  color: var(--nev-disabled-color, #ccc);
+  cursor: not-allowed;
+}
+
+.nevent-datepicker-day.empty {
+  cursor: default;
+}
+
+/* Focus styles for accessibility */
+.nevent-datepicker-day:focus {
+  outline: 2px solid var(--nev-primary-color, #007bff);
+  outline-offset: 2px;
+}
+
+.nevent-datepicker-nav-btn:focus {
+  outline: 2px solid var(--nev-primary-color, #007bff);
+  outline-offset: 2px;
+}

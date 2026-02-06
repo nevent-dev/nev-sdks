@@ -1,0 +1,109 @@
+.nevent-file-upload {
+  width: 100%;
+}
+
+.nevent-file-dropzone {
+  border: 2px dashed var(--nev-input-border-color, #ddd);
+  border-radius: var(--nev-input-border-radius, 8px);
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: var(--nev-bg-color, #fafafa);
+}
+
+.nevent-file-dropzone:hover,
+.nevent-file-dropzone.dragover {
+  border-color: var(--nev-primary-color, #007bff);
+  background: var(--nev-hover-bg, #f0f8ff);
+}
+
+.nevent-file-dropzone:focus {
+  outline: 2px solid var(--nev-primary-color, #007bff);
+  outline-offset: 2px;
+}
+
+.nevent-file-dropzone-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.nevent-file-icon {
+  font-size: 48px;
+}
+
+.nevent-file-dropzone-text {
+  margin: 0;
+  font-size: var(--nev-font-size-base, 16px);
+  color: var(--nev-text-color, #333);
+}
+
+.nevent-file-dropzone-hint {
+  margin: 0;
+  font-size: var(--nev-font-size-small, 14px);
+  color: var(--nev-secondary-color, #666);
+}
+
+.nevent-file-preview {
+  border: 1px solid var(--nev-input-border-color, #ddd);
+  border-radius: var(--nev-input-border-radius, 8px);
+  padding: 16px;
+  background: white;
+}
+
+.nevent-file-preview-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.nevent-file-preview-image {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.nevent-file-icon-large {
+  font-size: 64px;
+}
+
+.nevent-file-info {
+  flex: 1;
+}
+
+.nevent-file-name {
+  margin: 0 0 4px;
+  font-weight: 600;
+  font-size: var(--nev-font-size-small, 14px);
+  color: var(--nev-text-color, #333);
+  word-break: break-word;
+}
+
+.nevent-file-size {
+  margin: 0;
+  font-size: var(--nev-font-size-small, 12px);
+  color: var(--nev-secondary-color, #666);
+}
+
+.nevent-file-remove {
+  padding: 8px 16px;
+  background: var(--nev-error-color, #dc3545);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: var(--nev-font-size-small, 14px);
+  transition: opacity 0.2s;
+}
+
+.nevent-file-remove:hover {
+  opacity: 0.9;
+}
+
+.nevent-file-remove:focus {
+  outline: 2px solid var(--nev-error-color, #dc3545);
+  outline-offset: 2px;
+}
