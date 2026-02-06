@@ -1,0 +1,69 @@
+/**
+ * CSS Custom Properties for Newsletter Widget
+ *
+ * These variables can be overridden without !important:
+ *
+ * @example
+ * ```css
+ * :root {
+ *   --nev-primary-color: #ff6b6b;
+ *   --nev-font-family: 'Inter', sans-serif;
+ * }
+ * ```
+ */
+
+:root {
+  /* ===== COLORS ===== */
+  --nev-primary-color: #007bff;
+  --nev-secondary-color: #6c757d;
+  --nev-success-color: #28a745;
+  --nev-error-color: #dc3545;
+  --nev-text-color: #333333;
+  --nev-bg-color: #ffffff;
+  --nev-hover-bg: #f8f9fa;
+  --nev-disabled-color: #cccccc;
+
+  /* ===== TYPOGRAPHY ===== */
+  --nev-font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --nev-font-size-base: 16px;
+  --nev-font-size-small: 14px;
+  --nev-font-size-large: 18px;
+  --nev-font-weight-normal: 400;
+  --nev-font-weight-bold: 600;
+  --nev-line-height: 1.5;
+
+  /* ===== SPACING ===== */
+  --nev-spacing-xs: 4px;
+  --nev-spacing-sm: 8px;
+  --nev-spacing-md: 16px;
+  --nev-spacing-lg: 24px;
+  --nev-spacing-xl: 32px;
+
+  /* ===== FORM ELEMENTS ===== */
+  --nev-input-border-color: #ced4da;
+  --nev-input-border-width: 1px;
+  --nev-input-border-radius: 4px;
+  --nev-input-padding: 8px 12px;
+  --nev-input-focus-border-color: #007bff;
+  --nev-input-error-border-color: #dc3545;
+  --nev-input-disabled-bg: #e9ecef;
+
+  /* ===== BUTTONS ===== */
+  --nev-button-bg: #007bff;
+  --nev-button-text-color: #ffffff;
+  --nev-button-border-radius: 4px;
+  --nev-button-padding: 10px 20px;
+  --nev-button-hover-opacity: 0.9;
+  --nev-button-disabled-opacity: 0.6;
+}
+
+/* ===== DARK THEME ===== */
+[data-theme="dark"] {
+  --nev-primary-color: #4dabf7;
+  --nev-secondary-color: #adb5bd;
+  --nev-text-color: #f8f9fa;
+  --nev-bg-color: #1a1a1a;
+  --nev-hover-bg: #2d2d2d;
+  --nev-input-border-color: #495057;
+  --nev-input-disabled-bg: #343a40;
+}

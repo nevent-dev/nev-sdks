@@ -9,6 +9,7 @@ import type {
   SubscriptionResponse,
 } from './types';
 import { FormRenderer } from './newsletter/form-renderer';
+import { StyleManager } from './newsletter/styles/StyleManager';
 
 /**
  * Nevent Newsletter Subscription Widget
@@ -44,6 +45,7 @@ export class NewsletterWidget {
   private logger: Logger;
   private formRenderer: FormRenderer | null = null;
   private fieldConfigurations: FieldConfiguration[] = [];
+  private styleManager: StyleManager | null = null;
 
   /**
    * Creates a new newsletter widget instance
@@ -752,60 +754,73 @@ export class NewsletterWidget {
   }
 
   /**
-   * Generates CSS for the widget
+   * Generates CSS for the widget using StyleManager
    */
   private generateCSS(): string {
+    // Initialize StyleManager if not already done
+    if (!this.styleManager) {
+      const customCSS: Record<string, string> = {};
+
+      // Map legacy styles to CSS variables
+      if (this.config.primaryColor) {
+        customCSS['--nev-primary-color'] = this.config.primaryColor;
+        customCSS['--nev-button-bg'] = this.config.primaryColor;
+        customCSS['--nev-input-focus-border-color'] = this.config.primaryColor;
+      }
+
+      if (this.config.backgroundColor) {
+        customCSS['--nev-bg-color'] = this.config.backgroundColor;
+      }
+
+      if (this.config.styles?.button?.backgroundColor) {
+        customCSS['--nev-button-bg'] = this.config.styles.button.backgroundColor;
+      }
+
+      if (this.config.styles?.button?.textColor) {
+        customCSS['--nev-button-text-color'] = this.config.styles.button.textColor;
+      }
+
+      if (this.config.styles?.input?.borderColor) {
+        customCSS['--nev-input-border-color'] = this.config.styles.input.borderColor;
+      }
+
+      this.styleManager = new StyleManager({ customCSS });
+    }
+
+    // Generate base CSS from StyleManager
+    let css = this.styleManager.generateCSS();
+
+    // Add legacy-specific styles for backward compatibility
     const styles = this.config.styles;
     const global = styles?.global || {};
-
-    const backgroundColor =
-      global.backgroundColor || this.config.backgroundColor;
-    const primaryColor = this.config.primaryColor;
     const borderRadius = this.extractNumericValue(this.config.borderRadius);
 
-    return `
+    css += `
+
+      /* Legacy widget-specific styles */
       .nevent-widget-form {
         display: flex;
         flex-direction: ${global.direction || 'column'};
-        gap: ${global.spacingBetweenElements || '12px'};
-        padding: ${global.innerPadding || '20px'};
-        background: ${backgroundColor};
+        gap: ${global.spacingBetweenElements || 'var(--nev-spacing-md)'};
+        padding: ${global.innerPadding || 'var(--nev-spacing-lg)'};
+        background: var(--nev-bg-color);
         border: 1px solid #e0e0e0;
         border-radius: ${borderRadius}px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family: var(--nev-font-family);
         box-sizing: border-box;
       }
 
       .nevent-title {
         margin: 0 0 8px 0;
         font-size: ${styles?.title?.fontSize || '24px'};
-        font-weight: ${styles?.title?.fontWeight || '600'};
-        color: ${styles?.title?.color || '#333'};
+        font-weight: ${styles?.title?.fontWeight || 'var(--nev-font-weight-bold)'};
+        color: ${styles?.title?.color || 'var(--nev-text-color)'};
       }
 
       .nevent-subtitle {
         margin: 0 0 16px 0;
-        font-size: ${styles?.subtitle?.fontSize || '14px'};
-        color: ${styles?.subtitle?.color || '#666'};
-      }
-
-      .nevent-field {
-        display: flex;
-        flex-direction: column;
-      }
-
-      .nevent-input {
-        padding: ${styles?.input?.padding || '12px'};
-        border: 1px solid ${styles?.input?.borderColor || '#ddd'};
-        border-radius: ${styles?.input?.borderRadius || '4px'};
-        background: ${styles?.input?.backgroundColor || '#fff'};
-        font-size: 14px;
-        transition: border-color 0.2s;
-      }
-
-      .nevent-input:focus {
-        outline: none;
-        border-color: ${primaryColor};
+        font-size: ${styles?.subtitle?.fontSize || 'var(--nev-font-size-small)'};
+        color: ${styles?.subtitle?.color || 'var(--nev-secondary-color)'};
       }
 
       .nevent-gdpr {
@@ -815,42 +830,22 @@ export class NewsletterWidget {
       .nevent-gdpr-label {
         display: flex;
         align-items: flex-start;
-        gap: 8px;
-        font-size: 12px;
-        color: #666;
+        gap: var(--nev-spacing-sm);
+        font-size: var(--nev-font-size-small);
+        color: var(--nev-secondary-color);
         cursor: pointer;
       }
 
       .nevent-gdpr-checkbox {
         margin-top: 2px;
         cursor: pointer;
-      }
-
-      .nevent-submit-button {
-        padding: ${styles?.button?.padding || '12px 24px'};
-        background: ${styles?.button?.backgroundColor || primaryColor};
-        color: ${styles?.button?.textColor || '#fff'};
-        border: none;
-        border-radius: ${styles?.button?.borderRadius || '4px'};
-        font-size: 16px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: background-color 0.2s;
-      }
-
-      .nevent-submit-button:hover {
-        background: ${styles?.button?.hoverBackgroundColor || '#0056b3'};
-      }
-
-      .nevent-submit-button:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
+        accent-color: var(--nev-primary-color);
       }
 
       .nevent-status-message {
-        padding: 12px;
-        border-radius: 4px;
-        font-size: 14px;
+        padding: var(--nev-spacing-md);
+        border-radius: var(--nev-input-border-radius);
+        font-size: var(--nev-font-size-base);
         text-align: center;
       }
 
@@ -875,6 +870,8 @@ export class NewsletterWidget {
         }
       }
     `;
+
+    return css;
   }
 
   /**
