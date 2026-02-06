@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Nevent SDK - Dynamic Fields Test (NEV-1324)</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
+        padding: 40px 20px;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+      }
+
+      .header {
+        text-align: center;
+        color: white;
+        margin-bottom: 60px;
+      }
+
+      .header h1 {
+        font-size: 3rem;
+        font-weight: 700;
+        margin-bottom: 10px;
+        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+      }
+
+      .header p {
+        font-size: 1.2rem;
+        opacity: 0.9;
+        margin-top: 10px;
+      }
+
+      .badge {
+        display: inline-block;
+        background: rgba(255, 255, 255, 0.2);
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        margin: 10px 5px 0;
+        backdrop-filter: blur(10px);
+      }
+
+      .badge.success {
+        background: rgba(16, 185, 129, 0.3);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+        gap: 30px;
+        margin-bottom: 40px;
+      }
+
+      .card {
+        background: white;
+        border-radius: 16px;
+        padding: 0;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        overflow: hidden;
+      }
+
+      .card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 15px 40px rgba(0, 0, 0, 0.3);
+      }
+
+      .card-header {
+        padding: 24px 30px;
+        border-bottom: 1px solid #e5e7eb;
+        background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
+      }
+
+      .card-header h2 {
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+        color: #111827;
+      }
+
+      .card-header p {
+        color: #6b7280;
+        font-size: 0.9rem;
+        line-height: 1.5;
+      }
+
+      .card-meta {
+        display: flex;
+        gap: 12px;
+        margin-top: 12px;
+        flex-wrap: wrap;
+      }
+
+      .meta-tag {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        background: #f3f4f6;
+        color: #374151;
+      }
+
+      .meta-tag.success {
+        background: #d1fae5;
+        color: #065f46;
+      }
+
+      .card-body {
+        padding: 30px;
+        min-height: 400px;
+      }
+
+      .widget-container {
+        min-height: 350px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>🚀 Dynamic Form Fields</h1>
+        <p>NEV-1324: Testing fieldConfigurations API</p>
+        <div class="badge success">✅ Dynamic Rendering</div>
+        <div class="badge success">✅ Type Validation</div>
+        <div class="badge success">✅ Hint Support</div>
+      </div>
+
+      <div class="grid">
+        <!-- Example 1: Basic Configuration -->
+        <div class="card">
+          <div class="card-header">
+            <h2>📧 Basic Fields</h2>
+            <p>Email only (backward compatibility test)</p>
+            <div class="card-meta">
+              <span class="meta-tag success">✅ fieldConfigurations: 1 field</span>
+              <span class="meta-tag">Email only</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="widget-basic" class="widget-container"></div>
+          </div>
+        </div>
+
+        <!-- Example 2: Advanced Configuration -->
+        <div class="card">
+          <div class="card-header">
+            <h2>✨ Advanced Fields</h2>
+            <p>Multiple fields with different types</p>
+            <div class="card-meta">
+              <span class="meta-tag success">✅ fieldConfigurations: 5 fields</span>
+              <span class="meta-tag">email, text, tel, number, date</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="widget-advanced" class="widget-container"></div>
+          </div>
+        </div>
+
+        <!-- Example 3: With Hints -->
+        <div class="card">
+          <div class="card-header">
+            <h2>💬 With Hint Text</h2>
+            <p>Fields with helpful hint messages</p>
+            <div class="card-meta">
+              <span class="meta-tag success">✅ fieldConfigurations: 3 fields</span>
+              <span class="meta-tag">Hints enabled</span>
+            </div>
+          </div>
+          <div class="card-body">
+            <div id="widget-hints" class="widget-container"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mock API configurations -->
+    <script>
+      // Mock API responses with fieldConfigurations
+      const MOCK_CONFIGS = {
+        'basic-newsletter': {
+          // Example 1: Basic - only email field
+          fieldConfigurations: [
+            {
+              fieldName: 'email',
+              displayName: 'Email Address',
+              hint: null,
+              required: true,
+              type: 'email',
+              placeholder: 'Enter your email',
+            },
+          ],
+          title: 'Subscribe to Newsletter',
+          subtitle: 'Get updates directly to your inbox',
+          styles: {
+            global: {
+              backgroundColor: '#ffffff',
+              innerPadding: '32px',
+              direction: 'column',
+              spacingBetweenElements: '16px',
+            },
+            title: {
+              fontSize: '24px',
+              fontWeight: '600',
+              color: '#1a1a1a',
+            },
+            subtitle: {
+              fontSize: '14px',
+              color: '#6b7280',
+            },
+            button: {
+              backgroundColor: '#667eea',
+              textColor: '#ffffff',
+              borderRadius: '8px',
+            },
+          },
+        },
+        'advanced-newsletter': {
+          // Example 2: Advanced - multiple field types
+          fieldConfigurations: [
+            {
+              fieldName: 'email',
+              displayName: 'Email Address',
+              hint: null,
+              required: true,
+              type: 'email',
+              placeholder: 'you@example.com',
+            },
+            {
+              fieldName: 'firstName',
+              displayName: 'First Name',
+              hint: null,
+              required: true,
+              type: 'text',
+              placeholder: 'John',
+            },
+            {
+              fieldName: 'phone',
+              displayName: 'Phone Number',
+              hint: null,
+              required: false,
+              type: 'tel',
+              placeholder: '+34 600 000 000',
+            },
+            {
+              fieldName: 'age',
+              displayName: 'Age',
+              hint: null,
+              required: false,
+              type: 'number',
+              placeholder: '25',
+            },
+            {
+              fieldName: 'birthDate',
+              displayName: 'Birth Date',
+              hint: null,
+              required: false,
+              type: 'date',
+              placeholder: '',
+            },
+          ],
+          title: 'Complete Profile',
+          subtitle: 'Fill in your details to get personalized content',
+          styles: {
+            global: {
+              backgroundColor: '#f9fafb',
+              innerPadding: '32px',
+              direction: 'column',
+              spacingBetweenElements: '16px',
+            },
+            button: {
+              backgroundColor: '#10b981',
+              textColor: '#ffffff',
+            },
+          },
+        },
+        'hints-newsletter': {
+          // Example 3: With hints
+          fieldConfigurations: [
+            {
+              fieldName: 'email',
+              displayName: 'Email Address',
+              hint: 'We will never share your email with third parties',
+              required: true,
+              type: 'email',
+              placeholder: 'your@email.com',
+            },
+            {
+              fieldName: 'firstName',
+              displayName: 'First Name',
+              hint: 'Used for personalized greetings',
+              required: true,
+              type: 'text',
+              placeholder: 'John',
+            },
+            {
+              fieldName: 'website',
+              displayName: 'Website (optional)',
+              hint: 'Share your personal or company website',
+              required: false,
+              type: 'url',
+              placeholder: 'https://example.com',
+            },
+          ],
+          title: 'Join Our Community',
+          subtitle: 'Subscribe with confidence',
+          styles: {
+            global: {
+              backgroundColor: '#ffffff',
+              innerPadding: '32px',
+            },
+            button: {
+              backgroundColor: '#f59e0b',
+              textColor: '#ffffff',
+            },
+          },
+        },
+      };
+
+      // Intercept fetch calls to mock API responses
+      const originalFetch = window.fetch;
+      window.fetch = function (...args) {
+        const url = args[0];
+        if (
+          typeof url === 'string' &&
+          url.includes('/public/widget/') &&
+          url.includes('/config')
+        ) {
+          const newsletterIdMatch = url.match(/\/public\/widget\/([^\/]+)\/config/);
+          if (newsletterIdMatch) {
+            const newsletterId = newsletterIdMatch[1];
+            const config = MOCK_CONFIGS[newsletterId];
+
+            if (config) {
+              console.log(`🔧 Mock API: Returning config for ${newsletterId}`, config);
+              return Promise.resolve({
+                ok: true,
+                status: 200,
+                json: () => Promise.resolve(config),
+              });
+            }
+          }
+        }
+
+        // Mock subscription endpoint
+        if (
+          typeof url === 'string' &&
+          url.includes('/public/newsletter/') &&
+          url.includes('/subscribe')
+        ) {
+          console.log('✅ Mock API: Subscription successful');
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () =>
+              Promise.resolve({
+                success: true,
+                message: 'Subscription successful!',
+                subscriptionId: 'mock-' + Date.now(),
+              }),
+          });
+        }
+
+        return originalFetch.apply(this, args);
+      };
+    </script>
+
+    <!-- Load SDK from local build -->
+    <script src="../packages/subscriptions/dist/nevent-subscriptions.umd.cjs"></script>
+
+    <script>
+      // Initialize widgets
+      const NEWSLETTERS = [
+        {
+          id: 'basic-newsletter',
+          containerId: 'widget-basic',
+        },
+        {
+          id: 'advanced-newsletter',
+          containerId: 'widget-advanced',
+        },
+        {
+          id: 'hints-newsletter',
+          containerId: 'widget-hints',
+        },
+      ];
+
+      const TENANT_ID = 'test-tenant-sdk';
+      const API_URL = 'https://api.nevent.es';
+
+      // Initialize all widgets
+      NEWSLETTERS.forEach((newsletter) => {
+        const widget = new NeventSubscriptions.NewsletterWidget({
+          newsletterId: newsletter.id,
+          tenantId: TENANT_ID,
+          apiUrl: API_URL,
+          containerId: newsletter.containerId,
+          debug: true,
+          companyName: 'Nevent Test',
+          privacyPolicyUrl: 'https://nevent.es/privacy',
+          onLoad: (w) => {
+            console.log(`✅ Widget loaded: ${newsletter.id}`);
+          },
+          onSuccess: (response) => {
+            console.log(`✅ Subscription successful for ${newsletter.id}:`, response);
+          },
+          onError: (error) => {
+            console.error(`❌ Error in ${newsletter.id}:`, error);
+          },
+        });
+
+        widget
+          .init()
+          .then(() => {
+            console.log(`🚀 Widget ${newsletter.id} initialized`);
+          })
+          .catch((error) => {
+            console.error(`❌ Failed to initialize ${newsletter.id}:`, error);
+          });
+      });
+    </script>
+  </body>
+</html>
