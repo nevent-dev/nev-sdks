@@ -1,5 +1,6 @@
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 export default defineConfig({
   build: {
@@ -26,12 +27,32 @@ export default defineConfig({
           }
           return assetInfo.name ?? 'asset';
         },
+        // Enable mangling and tree-shaking optimizations
+        manualChunks: undefined,
       },
+      // Enable tree-shaking
+      treeshake: {
+        preset: 'recommended',
+        moduleSideEffects: false,
+      },
+      plugins: [
+        // Bundle analyzer - run with ANALYZE=true npm run build
+        process.env.ANALYZE ? visualizer({
+          filename: './dist/stats.html',
+          open: true,
+          gzipSize: true,
+          brotliSize: true,
+        }) : undefined,
+      ].filter(Boolean),
     },
   },
   resolve: {
     alias: {
       '@nevent/core': resolve(__dirname, '../core/src/index.ts'),
     },
+  },
+  // Optimize dependencies
+  optimizeDeps: {
+    include: ['libphonenumber-js'],
   },
 });
