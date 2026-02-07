@@ -17,12 +17,14 @@ Este archivo documenta las newsletters de prueba creadas en MongoDB para testing
 **Descripción**: Newsletter minimalista para testing del SDK - Solo email
 
 **Características**:
+
 - ✅ Solo campo email requerido
 - 🎨 Tema: Light Blue (#3b82f6)
 - 📝 Font: Inter (Google Fonts)
 - 🎯 Campos habilitados: email únicamente
 
 **Estilos**:
+
 ```json
 {
   "backgroundColor": "#ffffff",
@@ -34,6 +36,7 @@ Este archivo documenta las newsletters de prueba creadas en MongoDB para testing
 ```
 
 **Uso en SDK**:
+
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
   newsletterId: '697fa7955712aef3f7b46e6a',
@@ -45,6 +48,7 @@ await widget.init();
 ```
 
 **Preview URL**:
+
 ```
 http://localhost:8080/public/widget/697fa7955712aef3f7b46e6a/config?tenantId=68383f4e0532b0378dcf7791
 ```
@@ -58,6 +62,7 @@ http://localhost:8080/public/widget/697fa7955712aef3f7b46e6a/config?tenantId=683
 **Descripción**: Newsletter con colores vibrantes y todos los campos para testing completo
 
 **Características**:
+
 - ✅ Todos los campos habilitados (email, firstName, lastName, phone, birthDate, gender, postalCode)
 - 🎨 Tema: Yellow/Amber (#f59e0b sobre #fef3c7)
 - 📝 Font: Poppins (Google Fonts)
@@ -65,6 +70,7 @@ http://localhost:8080/public/widget/697fa7955712aef3f7b46e6a/config?tenantId=683
 - ⚠️ Require marketing consent: true
 
 **Estilos**:
+
 ```json
 {
   "backgroundColor": "#fef3c7",
@@ -78,6 +84,7 @@ http://localhost:8080/public/widget/697fa7955712aef3f7b46e6a/config?tenantId=683
 ```
 
 **Uso en SDK**:
+
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
   newsletterId: '697fa7955712aef3f7b46e6b',
@@ -89,6 +96,7 @@ await widget.init();
 ```
 
 **Preview URL**:
+
 ```
 http://localhost:8080/public/widget/697fa7955712aef3f7b46e6b/config?tenantId=68383f4e0532b0378dcf7791
 ```
@@ -102,6 +110,7 @@ http://localhost:8080/public/widget/697fa7955712aef3f7b46e6b/config?tenantId=683
 **Descripción**: Newsletter con tema oscuro elegante y campos intermedios
 
 **Características**:
+
 - ✅ Campos habilitados: email, firstName, lastName, birthDate, postalCode
 - 🎨 Tema: Dark (#1f2937 con acentos verde #10b981)
 - 📝 Font: Playfair Display (títulos) + Inter (inputs)
@@ -109,6 +118,7 @@ http://localhost:8080/public/widget/697fa7955712aef3f7b46e6b/config?tenantId=683
 - 🌙 Dark mode friendly
 
 **Estilos**:
+
 ```json
 {
   "backgroundColor": "#1f2937",
@@ -123,6 +133,7 @@ http://localhost:8080/public/widget/697fa7955712aef3f7b46e6b/config?tenantId=683
 ```
 
 **Uso en SDK**:
+
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
   newsletterId: '697fa7955712aef3f7b46e6c',
@@ -134,6 +145,7 @@ await widget.init();
 ```
 
 **Preview URL**:
+
 ```
 http://localhost:8080/public/widget/697fa7955712aef3f7b46e6c/config?tenantId=68383f4e0532b0378dcf7791
 ```
@@ -171,6 +183,7 @@ mongosh nevent --eval '
 ## Testing
 
 ### Test Page 1: Básico
+
 ```
 file:///Users/samu/workspace/nevent/nev-sdks/examples/test-cdn.html
 ```
@@ -178,6 +191,7 @@ file:///Users/samu/workspace/nevent/nev-sdks/examples/test-cdn.html
 Usa configuraciones hardcodeadas en JavaScript.
 
 ### Test Page 2: Con Base de Datos (RECOMENDADO)
+
 ```
 file:///Users/samu/workspace/nevent/nev-sdks/examples/test-cdn-with-db.html
 ```
@@ -185,6 +199,7 @@ file:///Users/samu/workspace/nevent/nev-sdks/examples/test-cdn-with-db.html
 Carga las configuraciones reales desde MongoDB usando los IDs listados arriba.
 
 **Ventajas**:
+
 - ✅ Prueba el flujo completo de carga de configuración
 - ✅ Verifica que el API endpoint funciona correctamente
 - ✅ Valida que los estilos se aplican correctamente desde la DB
@@ -211,6 +226,7 @@ mongosh nevent --eval 'db.newsletters.deleteMany({tenantId: "68383f4e0532b0378dc
 ### No se carga la configuración desde DB
 
 1. Verificar que el endpoint del API está correcto:
+
    ```
    http://localhost:8080/public/widget/{newsletterId}/config?tenantId={tenantId}
    ```
