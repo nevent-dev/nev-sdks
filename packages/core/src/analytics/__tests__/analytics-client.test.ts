@@ -18,7 +18,8 @@ vi.mock('../context-collector', () => ({
 describe('AnalyticsClient', () => {
   let sendBeaconMock: ReturnType<typeof vi.fn>;
   let fetchMock: ReturnType<typeof vi.fn>;
-  let consoleDebugMock: ReturnType<typeof vi.fn>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let consoleDebugMock: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
