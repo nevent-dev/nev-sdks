@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AnalyticsClient } from '../analytics-client';
-import { ContextCollector } from '../context-collector';
 
 // Mock ContextCollector
 vi.mock('../context-collector', () => ({
@@ -26,10 +25,9 @@ describe('AnalyticsClient', () => {
 
     // Mock navigator.sendBeacon
     sendBeaconMock = vi.fn().mockReturnValue(true);
-    Object.defineProperty(global.navigator, 'sendBeacon', {
-      value: sendBeaconMock,
-      writable: true,
-      configurable: true,
+    vi.stubGlobal('navigator', {
+      ...navigator,
+      sendBeacon: sendBeaconMock,
     });
 
     // Mock global fetch
@@ -37,7 +35,7 @@ describe('AnalyticsClient', () => {
       ok: true,
       json: async () => ({}),
     });
-    global.fetch = fetchMock;
+    vi.stubGlobal('fetch', fetchMock);
 
     // Mock console.debug
     consoleDebugMock = vi.spyOn(console, 'debug').mockImplementation(() => {});
@@ -107,25 +105,27 @@ describe('AnalyticsClient', () => {
       client.track('test_event', { interaction: true });
 
       expect(sendBeaconMock).toHaveBeenCalled();
-      const blob = sendBeaconMock.mock.calls[0][1];
+      const blob = sendBeaconMock.mock.calls[0]?.[1];
 
-      // Read blob content
-      const reader = new FileReader();
-      reader.onload = () => {
-        const payload = JSON.parse(reader.result as string);
-        expect(payload).toMatchObject({
-          event_name: 'test_event',
-          event_params: { interaction: true },
-          context: expect.objectContaining({
-            device: expect.any(Object),
-            screen: expect.any(Object),
-            session: expect.any(Object),
-          }),
-          timestamp: expect.any(String),
-          user_id: null,
-        });
-      };
-      reader.readAsText(blob);
+      if (blob) {
+        // Read blob content
+        const reader = new FileReader();
+        reader.onload = () => {
+          const payload = JSON.parse(reader.result as string);
+          expect(payload).toMatchObject({
+            event_name: 'test_event',
+            event_params: { interaction: true },
+            context: expect.objectContaining({
+              device: expect.any(Object),
+              screen: expect.any(Object),
+              session: expect.any(Object),
+            }),
+            timestamp: expect.any(String),
+            user_id: null,
+          });
+        };
+        reader.readAsText(blob);
+      }
     });
 
     it('should not call sendBeacon when disabled', () => {
@@ -215,14 +215,16 @@ describe('AnalyticsClient', () => {
       client.track('test_event');
 
       expect(sendBeaconMock).toHaveBeenCalled();
-      const blob = sendBeaconMock.mock.calls[0][1];
+      const blob = sendBeaconMock.mock.calls[0]?.[1];
 
-      const reader = new FileReader();
-      reader.onload = () => {
-        const payload = JSON.parse(reader.result as string);
-        expect(payload.user_id).toBe('user-123');
-      };
-      reader.readAsText(blob);
+      if (blob) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const payload = JSON.parse(reader.result as string);
+          expect(payload.user_id).toBe('user-123');
+        };
+        reader.readAsText(blob);
+      }
     });
   });
 

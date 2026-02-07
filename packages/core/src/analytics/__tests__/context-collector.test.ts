@@ -4,22 +4,18 @@ import { ContextCollector } from '../context-collector';
 
 describe('ContextCollector', () => {
   let sessionStorageMock: Record<string, string>;
-  let matchMediaMock: ReturnType<typeof vi.fn>;
+  let matchMediaMock: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
     // Mock sessionStorage
     sessionStorageMock = {};
-    Object.defineProperty(global, 'sessionStorage', {
-      value: {
-        getItem: vi.fn((key: string) => sessionStorageMock[key] || null),
-        setItem: vi.fn((key: string, value: string) => {
-          sessionStorageMock[key] = value;
-        }),
-      },
-      writable: true,
-      configurable: true,
+    vi.stubGlobal('sessionStorage', {
+      getItem: vi.fn((key: string) => sessionStorageMock[key] || null),
+      setItem: vi.fn((key: string, value: string) => {
+        sessionStorageMock[key] = value;
+      }),
     });
 
     // Mock window.matchMedia
@@ -83,7 +79,7 @@ describe('ContextCollector', () => {
     });
 
     // Mock crypto.randomUUID
-    Object.defineProperty(global.crypto, 'randomUUID', {
+    Object.defineProperty(crypto, 'randomUUID', {
       value: vi.fn(() => 'test-uuid-123'),
       writable: true,
       configurable: true,
@@ -401,7 +397,7 @@ describe('ContextCollector', () => {
     });
 
     it('should fallback to Math.random pattern when crypto.randomUUID fails', () => {
-      Object.defineProperty(global.crypto, 'randomUUID', {
+      Object.defineProperty(crypto, 'randomUUID', {
         value: () => {
           throw new Error('Not available');
         },
