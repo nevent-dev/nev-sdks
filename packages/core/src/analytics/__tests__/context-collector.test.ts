@@ -106,8 +106,7 @@ describe('ContextCollector', () => {
   describe('device context', () => {
     it('should parse Windows user agent', () => {
       Object.defineProperty(navigator, 'userAgent', {
-        value:
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        value: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         writable: true,
         configurable: true,
       });
@@ -136,8 +135,7 @@ describe('ContextCollector', () => {
 
     it('should parse Android user agent', () => {
       Object.defineProperty(navigator, 'userAgent', {
-        value:
-          'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36',
+        value: 'Mozilla/5.0 (Linux; Android 11; Pixel 5) AppleWebKit/537.36',
         writable: true,
         configurable: true,
       });
