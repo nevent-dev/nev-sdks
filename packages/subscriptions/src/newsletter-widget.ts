@@ -450,6 +450,16 @@ export class NewsletterWidget {
     if (!this.container) {
       throw new Error('NewsletterWidget: Container element not found');
     }
+
+    // Add theme class
+    if (this.config.theme === 'dark') {
+      this.container.classList.add('nevent-widget--dark');
+    } else {
+      this.container.classList.add('nevent-widget--light');
+    }
+
+    // Add tenant data attribute
+    this.container.setAttribute('data-nev-tenant-id', this.config.tenantId);
   }
 
   /**
@@ -462,6 +472,8 @@ export class NewsletterWidget {
 
     this.form = document.createElement('form');
     this.form.className = 'nevent-widget-form';
+    this.form.id = 'nevent-form-' + this.config.newsletterId;
+    this.form.setAttribute('data-nev-newsletter-id', this.config.newsletterId);
 
     // Check if we should use dynamic rendering or legacy HTML
     if (this.fieldConfigurations && this.fieldConfigurations.length > 0) {
@@ -1030,6 +1042,8 @@ export class NewsletterWidget {
 
     if (submitButton) {
       submitButton.disabled = true;
+      submitButton.classList.add('nevent-submit-button--disabled');
+      submitButton.classList.add('nevent-submit-button--loading');
     }
   }
 
@@ -1050,6 +1064,8 @@ export class NewsletterWidget {
 
     if (submitButton) {
       submitButton.disabled = false;
+      submitButton.classList.remove('nevent-submit-button--disabled');
+      submitButton.classList.remove('nevent-submit-button--loading');
     }
   }
 
@@ -1075,6 +1091,8 @@ export class NewsletterWidget {
 
     if (submitButton) {
       submitButton.disabled = false;
+      submitButton.classList.remove('nevent-submit-button--disabled');
+      submitButton.classList.remove('nevent-submit-button--loading');
     }
   }
 

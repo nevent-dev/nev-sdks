@@ -82,6 +82,14 @@ export class FormRenderer {
     fieldContainer.className = 'nevent-field';
     fieldContainer.setAttribute('data-field-name', config.fieldName);
 
+    // Add field-type class
+    fieldContainer.classList.add('nevent-field--' + config.type);
+
+    // Add required modifier class
+    if (config.required) {
+      fieldContainer.classList.add('nevent-field--required');
+    }
+
     // Create label
     const label = this.createLabel(config);
     fieldContainer.appendChild(label);
@@ -101,11 +109,7 @@ export class FormRenderer {
 
     // Create error container (hidden by default)
     const errorContainer = document.createElement('span');
-    errorContainer.className = 'nevent-field-error';
-    errorContainer.style.display = 'none';
-    errorContainer.style.color = '#dc3545';
-    errorContainer.style.fontSize = '12px';
-    errorContainer.style.marginTop = '4px';
+    errorContainer.className = 'nevent-field-error nevent-field-error--hidden';
     fieldContainer.appendChild(errorContainer);
 
     return fieldContainer;
@@ -128,12 +132,8 @@ export class FormRenderer {
       const requiredSpan = document.createElement('span');
       requiredSpan.className = 'nevent-required';
       requiredSpan.textContent = ' *';
-      requiredSpan.style.color = '#dc3545';
       label.appendChild(requiredSpan);
     }
-
-    // Hide label (using display: none for now, can be customized)
-    label.style.display = 'none';
 
     return label;
   }
@@ -162,9 +162,33 @@ export class FormRenderer {
     input.className = 'nevent-input';
     input.placeholder = config.placeholder || config.displayName;
 
+    // Add field-type class to input
+    input.classList.add('nevent-input--' + this.mapFieldType(config.type));
+
+    // Initialize with empty state
+    input.classList.add('nevent-input--empty');
+
     if (config.required) {
       input.required = true;
     }
+
+    // Add focus/blur event listeners for state classes
+    input.addEventListener('focus', () => {
+      input.classList.add('nevent-input--focused');
+    });
+
+    input.addEventListener('blur', () => {
+      input.classList.remove('nevent-input--focused');
+
+      // Toggle empty/filled state
+      if (input.value.trim()) {
+        input.classList.add('nevent-input--filled');
+        input.classList.remove('nevent-input--empty');
+      } else {
+        input.classList.add('nevent-input--empty');
+        input.classList.remove('nevent-input--filled');
+      }
+    });
 
     return input;
   }
@@ -206,10 +230,6 @@ export class FormRenderer {
     const hint = document.createElement('span');
     hint.className = 'nevent-field-hint';
     hint.textContent = hintText;
-    hint.style.fontSize = '12px';
-    hint.style.color = '#6c757d';
-    hint.style.marginTop = '4px';
-    hint.style.display = 'block';
 
     return hint;
   }
@@ -392,12 +412,15 @@ export class FormRenderer {
       '.nevent-input'
     ) as HTMLInputElement;
     if (input) {
-      input.style.borderColor = '#dc3545';
+      input.classList.add('nevent-input--invalid');
     }
+
+    // Add error state to field container
+    fieldContainer.classList.add('nevent-field--error');
 
     if (errorContainer) {
       errorContainer.textContent = message;
-      errorContainer.style.display = 'block';
+      errorContainer.classList.remove('nevent-field-error--hidden');
     }
   }
 
@@ -411,15 +434,18 @@ export class FormRenderer {
       '.nevent-input'
     ) as HTMLInputElement;
     if (input) {
-      input.style.borderColor = '';
+      input.classList.remove('nevent-input--invalid');
     }
+
+    // Remove error state from field container
+    fieldContainer.classList.remove('nevent-field--error');
 
     const errorContainer = fieldContainer.querySelector(
       '.nevent-field-error'
     ) as HTMLSpanElement;
     if (errorContainer) {
       errorContainer.textContent = '';
-      errorContainer.style.display = 'none';
+      errorContainer.classList.add('nevent-field-error--hidden');
     }
   }
 

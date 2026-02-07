@@ -212,6 +212,25 @@ ${entries}
   margin-left: 2px;
 }
 
+/* Field label visibility - hidden by default, can be shown */
+.nevent-field-label {
+  display: none;
+  font-weight: var(--nev-font-weight-bold);
+  font-size: var(--nev-font-size-base);
+  color: var(--nev-text-color);
+  margin-bottom: 4px;
+}
+
+/* Show labels when widget configured with showLabels */
+.nevent-widget--show-labels .nevent-field-label {
+  display: block;
+}
+
+/* Required indicator */
+.nevent-required {
+  color: var(--nev-error-color);
+}
+
 /* Input Fields */
 .nevent-input {
   padding: var(--nev-input-padding);
@@ -224,21 +243,75 @@ ${entries}
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
+/* Focus state - keep pseudo-class as fallback */
 .nevent-input:focus {
   outline: none;
   border-color: var(--nev-input-focus-border-color);
   box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
 }
 
+/* Legacy error class - keep for backward compatibility */
 .nevent-input.error {
   border-color: var(--nev-input-error-border-color);
 }
 
+/* Disabled state - keep pseudo-class as fallback */
 .nevent-input:disabled {
   background: var(--nev-input-disabled-bg);
   color: var(--nev-disabled-color);
   cursor: not-allowed;
 }
+
+/* ===== FIELD TYPE MODIFIERS ===== */
+/* Developers can target specific field types */
+.nevent-field--email { }
+.nevent-field--tel { }
+.nevent-field--text { }
+.nevent-field--number { }
+.nevent-field--url { }
+.nevent-field--password { }
+.nevent-field--date { }
+.nevent-field--time { }
+.nevent-field--textarea { }
+.nevent-field--required { }
+
+/* ===== INPUT STATE MODIFIERS ===== */
+/* Focused state - class-based (takes precedence) */
+.nevent-input--focused {
+  outline: none;
+  border-color: var(--nev-input-focus-border-color);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+/* Invalid state - class-based */
+.nevent-input--invalid {
+  border-color: var(--nev-input-error-border-color) !important;
+}
+
+/* Disabled state - class-based */
+.nevent-input--disabled {
+  background: var(--nev-input-disabled-bg);
+  color: var(--nev-disabled-color);
+  cursor: not-allowed;
+}
+
+/* Empty state */
+.nevent-input--empty { }
+
+/* Filled state */
+.nevent-input--filled { }
+
+/* Input type modifiers */
+.nevent-input--email { }
+.nevent-input--tel { }
+.nevent-input--text { }
+.nevent-input--number { }
+.nevent-input--url { }
+.nevent-input--password { }
+.nevent-input--date { }
+.nevent-input--time { }
+.nevent-input--checkbox { }
+.nevent-input--radio { }
 
 /* Select */
 .nevent-select {
@@ -286,13 +359,26 @@ ${entries}
 .nevent-field-hint {
   font-size: var(--nev-font-size-small);
   color: var(--nev-secondary-color);
+  margin-top: 4px;
+  display: block;
 }
 
 /* Error Messages */
+/* Field error state */
+.nevent-field--error .nevent-field-error {
+  display: block;
+}
+
 .nevent-field-error {
+  display: none;
   font-size: var(--nev-font-size-small);
   color: var(--nev-error-color);
   font-weight: var(--nev-font-weight-normal);
+  margin-top: 4px;
+}
+
+.nevent-field-error--hidden {
+  display: none !important;
 }
 
 /* Submit Button */
@@ -314,6 +400,17 @@ ${entries}
 }
 
 .nevent-submit-button:disabled {
+  opacity: var(--nev-button-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* Submit button state modifiers */
+.nevent-submit-button--loading {
+  opacity: var(--nev-button-disabled-opacity);
+  cursor: wait;
+}
+
+.nevent-submit-button--disabled {
   opacity: var(--nev-button-disabled-opacity);
   cursor: not-allowed;
 }
