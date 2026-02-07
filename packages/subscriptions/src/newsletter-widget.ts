@@ -1,4 +1,9 @@
-import { EmailValidator, HttpClient, Logger, AnalyticsClient } from '@nevent/core';
+import {
+  EmailValidator,
+  HttpClient,
+  Logger,
+  AnalyticsClient,
+} from '@nevent/core';
 import type {
   CustomFont,
   FontsResponse,
@@ -223,11 +228,26 @@ export class NewsletterWidget {
             : this.config.messages,
           styles: serverConfig.styles
             ? {
-                global: { ...this.config.styles?.global, ...serverConfig.styles.global },
-                title: { ...this.config.styles?.title, ...serverConfig.styles.title },
-                subtitle: { ...this.config.styles?.subtitle, ...serverConfig.styles.subtitle },
-                input: { ...this.config.styles?.input, ...serverConfig.styles.input },
-                button: { ...this.config.styles?.button, ...serverConfig.styles.button },
+                global: {
+                  ...this.config.styles?.global,
+                  ...serverConfig.styles.global,
+                },
+                title: {
+                  ...this.config.styles?.title,
+                  ...serverConfig.styles.title,
+                },
+                subtitle: {
+                  ...this.config.styles?.subtitle,
+                  ...serverConfig.styles.subtitle,
+                },
+                input: {
+                  ...this.config.styles?.input,
+                  ...serverConfig.styles.input,
+                },
+                button: {
+                  ...this.config.styles?.button,
+                  ...serverConfig.styles.button,
+                },
               }
             : this.config.styles,
         };
@@ -1006,10 +1026,7 @@ export class NewsletterWidget {
   /**
    * Tracks analytics events
    */
-  private trackEvent(
-    eventName: string,
-    extra?: Record<string, unknown>
-  ): void {
+  private trackEvent(eventName: string, extra?: Record<string, unknown>): void {
     if (!this.config.analytics || !this.widgetTracker) {
       return;
     }

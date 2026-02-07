@@ -146,7 +146,10 @@ export class WidgetTracker {
           ...this.baseParams(),
           interaction: true,
         });
-        this.focusinTarget?.removeEventListener('focusin', this.focusinHandler!);
+        this.focusinTarget?.removeEventListener(
+          'focusin',
+          this.focusinHandler!
+        );
       }
     };
 
