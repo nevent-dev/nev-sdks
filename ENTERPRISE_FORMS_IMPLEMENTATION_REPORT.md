@@ -20,6 +20,7 @@ This report documents the implementation of the enterprise-grade forms system fo
 ✅ **CSS Variables infrastructure** (NEV-1326, 3/5 pts partial)
 
 🔄 **Deferred to future sprints:**
+
 - Custom components (NEV-1327, 8 pts)
 - Advanced validation (NEV-1328, 5 pts)
 - Nested fields (NEV-1329, 3 pts)
@@ -38,6 +39,7 @@ This report documents the implementation of the enterprise-grade forms system fo
 #### Implementation Details
 
 **Files Created:**
+
 1. `src/newsletter/types.ts` (+46 lines)
    - FieldConfiguration interface
    - ServerWidgetConfig interface
@@ -75,30 +77,32 @@ This report documents the implementation of the enterprise-grade forms system fo
 
 #### Field Types Supported
 
-| Type | Validation | Example Use Case |
-|------|-----------|------------------|
-| `text` | None | First Name, Last Name |
-| `email` | RFC 5322 + domain | Email Address (required) |
-| `tel` | E.164 format | Phone Number |
-| `number` | Numeric | Age, Quantity |
-| `url` | Valid URL with protocol | Website |
-| `password` | Min 6 chars | Account Password |
-| `textarea` | Max length | Comments, Bio |
-| `date` | ISO 8601 | Date of Birth |
-| `time` | HH:mm format | Preferred Contact Time |
-| `file` | File upload | Profile Picture, Resume |
+| Type       | Validation              | Example Use Case         |
+| ---------- | ----------------------- | ------------------------ |
+| `text`     | None                    | First Name, Last Name    |
+| `email`    | RFC 5322 + domain       | Email Address (required) |
+| `tel`      | E.164 format            | Phone Number             |
+| `number`   | Numeric                 | Age, Quantity            |
+| `url`      | Valid URL with protocol | Website                  |
+| `password` | Min 6 chars             | Account Password         |
+| `textarea` | Max length              | Comments, Bio            |
+| `date`     | ISO 8601                | Date of Birth            |
+| `time`     | HH:mm format            | Preferred Contact Time   |
+| `file`     | File upload             | Profile Picture, Resume  |
 
 #### API Integration
 
 **Endpoint:** `GET /public/widget/{id}/config`
 
 **Request:**
+
 ```http
 GET /public/widget/newsletter-123/config HTTP/1.1
 Host: api.nevent.io
 ```
 
 **Response:**
+
 ```json
 {
   "id": "newsletter-123",
@@ -202,6 +206,7 @@ $ npm run build
 #### Backward Compatibility
 
 ✅ **No breaking changes**
+
 - Widgets without `fieldConfigurations` fall back to email field
 - Existing `fieldsConfig` still supported
 - All existing tests passing
@@ -246,29 +251,34 @@ $ npm run build
 #### Features
 
 ✅ **Drag-and-Drop Reordering**
+
 - PrimeNG OrderList integration
 - Visual feedback on drag
 - Auto-update displayOrder
 
 ✅ **Inline Editing**
+
 - Display Name (max 100 chars)
 - Hint text (max 200 chars)
 - Character counters
 - Real-time validation
 
 ✅ **Field Management**
+
 - Add fields from dropdown (STANDARD + CUSTOM)
 - Remove fields (except email)
 - Required toggle
 - Field type badges
 
 ✅ **Live Preview**
+
 - Real-time form preview
 - Newsletter branding
 - Shows displayName, hint, required
 - Disabled inputs (preview only)
 
 ✅ **Validation**
+
 - Email field required
 - Email must be required
 - No duplicate fields
@@ -276,6 +286,7 @@ $ npm run build
 - Immediate feedback
 
 ✅ **i18n Support**
+
 - Full Spanish translation
 - Full English translation
 - Transloco integration
@@ -289,16 +300,16 @@ $ npm run build
   imports: [
     CommonModule,
     FormsModule,
-    OrderListModule,      // Drag-and-drop
-    SelectModule,         // Field selector
-    CheckboxModule,       // Required toggle
-    InputTextModule,      // Inline editing
-    ButtonModule,         // Actions
-    CardModule,           // Preview container
-    MessageModule,        // Validation errors
-    TooltipModule,        // Help text
-    TranslocoPipe         // i18n
-  ]
+    OrderListModule, // Drag-and-drop
+    SelectModule, // Field selector
+    CheckboxModule, // Required toggle
+    InputTextModule, // Inline editing
+    ButtonModule, // Actions
+    CardModule, // Preview container
+    MessageModule, // Validation errors
+    TooltipModule, // Help text
+    TranslocoPipe, // i18n
+  ],
 })
 export class NewsletterFieldConfigurationEditorComponent {
   @Input() newsletter?: Newsletter;
@@ -311,11 +322,21 @@ export class NewsletterFieldConfigurationEditorComponent {
   validationErrors: string[] = [];
 
   // Methods
-  onReorder(): void { /* Update displayOrder */ }
-  onAddField(): void { /* Add from dropdown */ }
-  onRemoveField(): void { /* Remove (except email) */ }
-  validate(): boolean { /* 6 validation rules */ }
-  onSave(): void { /* PUT to API */ }
+  onReorder(): void {
+    /* Update displayOrder */
+  }
+  onAddField(): void {
+    /* Add from dropdown */
+  }
+  onRemoveField(): void {
+    /* Remove (except email) */
+  }
+  validate(): boolean {
+    /* 6 validation rules */
+  }
+  onSave(): void {
+    /* PUT to API */
+  }
 }
 ```
 
@@ -397,12 +418,14 @@ $ npm run build
 #### Screenshots
 
 **Editor View:**
+
 - Left panel: Draggable field list with inline editing
 - Right panel: Live preview of form
 - Top: Save/Cancel buttons
 - Validation errors shown inline
 
 **Field Item:**
+
 ```
 ┌─────────────────────────────────────────────┐
 │ 📧 Email                        [STANDARD]  │
@@ -430,6 +453,7 @@ $ npm run build
 #### What Was Implemented
 
 ✅ **StyleManager Class** (`src/newsletter/styles/StyleManager.ts`, 560 lines)
+
 - 60+ CSS custom properties defined
 - CSSVariables TypeScript interface
 - XSS sanitization for all values
@@ -437,6 +461,7 @@ $ npm run build
 - Maps widget config to CSS variables
 
 ✅ **Documentation** (`docs/css-customization.md`, 361 lines)
+
 - Complete variable reference table
 - 5 customization methods
 - 5 real-world examples:
@@ -452,33 +477,40 @@ $ npm run build
 #### CSS Variables Defined
 
 **Colors (19 variables):**
+
 - Primary palette: `--nw-primary-color`, `--nw-primary-color-hover`, `--nw-primary-color-active`, `--nw-primary-text-color`
 - Secondary palette: `--nw-secondary-color`, `--nw-secondary-color-hover`, `--nw-secondary-text-color`
 - Semantic: `--nw-success-color`, `--nw-error-color`, `--nw-warning-color`, `--nw-info-color`
 - Neutrals: `--nw-text-color`, `--nw-text-color-secondary`, `--nw-border-color`, `--nw-background-color`, `--nw-surface-color`
 
 **Typography (8 variables):**
+
 - `--nw-font-family`, `--nw-font-size-base`, `--nw-font-size-sm`, `--nw-font-size-lg`
 - `--nw-font-weight-normal`, `--nw-font-weight-medium`, `--nw-font-weight-bold`
 - `--nw-line-height`
 
 **Spacing (5 variables):**
+
 - `--nw-spacing-xs`, `--nw-spacing-sm`, `--nw-spacing-md`, `--nw-spacing-lg`, `--nw-spacing-xl`
 
 **Form Elements (9 variables):**
+
 - Border colors: `--nw-input-border-color`, `--nw-input-border-color-focus`, `--nw-input-border-color-error`
 - Colors: `--nw-input-bg-color`, `--nw-input-text-color`, `--nw-input-placeholder-color`
 - Dimensions: `--nw-input-padding`, `--nw-input-border-radius`, `--nw-input-border-width`
 
 **Buttons (6 variables):**
+
 - `--nw-button-padding`, `--nw-button-border-radius`, `--nw-button-font-weight`
 - `--nw-button-text-transform`, `--nw-button-box-shadow`, `--nw-button-box-shadow-hover`
 
 **Labels/Hints (6 variables):**
+
 - `--nw-label-color`, `--nw-label-font-size`, `--nw-label-font-weight`, `--nw-label-margin-bottom`
 - `--nw-hint-color`, `--nw-hint-font-size`
 
 **Transitions (2 variables):**
+
 - `--nw-transition-duration`, `--nw-transition-timing`
 
 **Total: 60+ CSS variables**
@@ -492,11 +524,11 @@ const config = {
   styles: {
     button: {
       backgroundColor: '#ff6600',
-      color: '#ffffff'
+      color: '#ffffff',
     },
     fontFamily: 'Inter, sans-serif',
-    borderRadius: '12px'
-  }
+    borderRadius: '12px',
+  },
 };
 
 const css = StyleManager.generateStyles(config);
@@ -514,16 +546,19 @@ const css = StyleManager.generateStyles(config);
 #### What Was Deferred
 
 ❌ **Integration with newsletter-widget.ts**
+
 - Refactoring `generateCSS()` method
 - Replacing hardcoded values with variables
 - Testing with real widgets
 
 ❌ **Unit Tests**
+
 - StyleManager.sanitizeVariables() tests
 - Color manipulation tests
 - XSS attack prevention tests
 
 ❌ **Performance Benchmarks**
+
 - Before/after bundle size
 - Runtime performance
 
@@ -532,12 +567,14 @@ const css = StyleManager.generateStyles(config);
 **Decision:** Implement infrastructure first, integrate later
 
 **Reasons:**
+
 1. **Risk mitigation:** Refactoring existing generateCSS() could break backward compatibility
 2. **Parallel development:** Infrastructure can be reviewed while working on NEV-1327-1330
 3. **Time optimization:** NEV-1327-1330 are higher priority (custom components, validation)
 4. **Technical debt:** Better to have solid foundation than rushed integration
 
 **Impact:**
+
 - ✅ Documentation ready for users
 - ✅ StyleManager ready for future use
 - ✅ No blocking of other issues
@@ -554,6 +591,7 @@ const css = StyleManager.generateStyles(config);
 #### NEV-1327: Custom Components (8 pts)
 
 **Scope:**
+
 - DatePicker with calendar UI
 - PhoneInput with country selector + libphonenumber-js
 - FileUpload with drag-and-drop + preview
@@ -562,6 +600,7 @@ const css = StyleManager.generateStyles(config);
 **Estimated Lines of Code:** ~2,000
 
 **Dependencies:**
+
 ```json
 {
   "libphonenumber-js": "^1.10.0"
@@ -569,12 +608,14 @@ const css = StyleManager.generateStyles(config);
 ```
 
 **Complexity:**
+
 - DatePicker: 300+ lines (calendar logic, navigation, i18n)
 - PhoneInput: 250+ lines (country codes, validation, formatting)
 - FileUpload: 200+ lines (drag-and-drop, preview, validation)
 - Tests: 500+ lines
 
 **Why Deferred:**
+
 - Requires significant UI/UX design decisions
 - libphonenumber-js adds ~100 KB to bundle
 - Calendar requires extensive browser testing
@@ -583,6 +624,7 @@ const css = StyleManager.generateStyles(config);
 #### NEV-1328: Advanced Validation (5 pts)
 
 **Scope:**
+
 - Validator class (sync + async)
 - Custom validation functions
 - Type-specific rules (email, phone, URL, date)
@@ -592,6 +634,7 @@ const css = StyleManager.generateStyles(config);
 **Estimated Lines of Code:** ~800
 
 **Complexity:**
+
 - Regex patterns for each type
 - Async validation with debouncing
 - Error message i18n
@@ -599,6 +642,7 @@ const css = StyleManager.generateStyles(config);
 - 15+ unit tests
 
 **Why Deferred:**
+
 - Depends on NEV-1327 components
 - Async validation requires backend endpoints
 - Complex error state management
@@ -606,6 +650,7 @@ const css = StyleManager.generateStyles(config);
 #### NEV-1329: Nested Fields Support (3 pts)
 
 **Scope:**
+
 - Flatten/unflatten utilities
 - Dot notation support (`billingAddress.street`)
 - Auto-reconstruct nested objects on submit
@@ -614,6 +659,7 @@ const css = StyleManager.generateStyles(config);
 **Estimated Lines of Code:** ~400
 
 **Example:**
+
 ```typescript
 // Input
 { 'billingAddress.street': '123 Main St', 'billingAddress.city': 'NYC' }
@@ -623,6 +669,7 @@ const css = StyleManager.generateStyles(config);
 ```
 
 **Why Deferred:**
+
 - Lower priority than components/validation
 - Requires UX design for grouped fields
 - Backend schema changes needed
@@ -630,6 +677,7 @@ const css = StyleManager.generateStyles(config);
 #### NEV-1330: Performance Optimization (3 pts)
 
 **Scope:**
+
 - Webpack tree-shaking configuration
 - Lazy loading of custom components
 - Code splitting by module
@@ -637,6 +685,7 @@ const css = StyleManager.generateStyles(config);
 - Target: <50 KB gzipped
 
 **Dependencies:**
+
 ```json
 {
   "webpack-bundle-analyzer": "^4.10.0"
@@ -644,12 +693,14 @@ const css = StyleManager.generateStyles(config);
 ```
 
 **Complexity:**
+
 - Webpack config refactoring
 - Dynamic imports for components
 - Build pipeline changes
 - Performance benchmarking
 
 **Why Deferred:**
+
 - Should be done AFTER NEV-1327-1329
 - Needs baseline metrics first
 - Requires production deployment for real-world testing
@@ -660,17 +711,18 @@ const css = StyleManager.generateStyles(config);
 
 ### Code Statistics
 
-| Metric | NEV-1324 | NEV-1325 | NEV-1326 | Total |
-|--------|----------|----------|----------|-------|
-| **Lines Added** | 2,569 | 1,688 | 921 | **5,178** |
-| **Files Created** | 6 | 7 | 2 | **15** |
-| **Tests Written** | 480 | 678 | 0 | **1,158** |
-| **Test Assertions** | 28 | ~95 | 0 | **123** |
-| **Documentation** | 1,154 | 0 | 361 | **1,515** |
+| Metric              | NEV-1324 | NEV-1325 | NEV-1326 | Total     |
+| ------------------- | -------- | -------- | -------- | --------- |
+| **Lines Added**     | 2,569    | 1,688    | 921      | **5,178** |
+| **Files Created**   | 6        | 7        | 2        | **15**    |
+| **Tests Written**   | 480      | 678      | 0        | **1,158** |
+| **Test Assertions** | 28       | ~95      | 0        | **123**   |
+| **Documentation**   | 1,154    | 0        | 361      | **1,515** |
 
 ### Test Coverage
 
 **nev-sdks (NEV-1324):**
+
 ```
 File                       | % Stmts | % Branch | % Funcs | % Lines
 ---------------------------|---------|----------|---------|--------
@@ -682,6 +734,7 @@ TOTAL                      |   82.45 |    76.23 |   80.56 |   82.00
 ```
 
 **nev-admin-web (NEV-1325):**
+
 ```
 File                                                  | % Stmts | % Branch | % Funcs | % Lines
 ------------------------------------------------------|---------|----------|---------|--------
@@ -695,23 +748,27 @@ TOTAL                                                 |   91.05 |    86.09 |   8
 ### Build Artifacts
 
 **nev-sdks:**
+
 - ESM bundle: 34.2 KB (uncompressed)
 - UMD bundle: 23.8 KB (uncompressed)
 - Gzipped: ~8 KB
 
 **nev-admin-web:**
+
 - Main bundle: 12.46 MB (includes all Angular app)
 - Component chunk: ~15 KB (lazy loaded)
 
 ### Browser Compatibility
 
 ✅ **Supported:**
+
 - Chrome 90+
 - Firefox 88+
 - Safari 14+
 - Edge 90+
 
 ❌ **Not Supported:**
+
 - IE 11 (requires polyfills)
 
 ---
@@ -720,16 +777,16 @@ TOTAL                                                 |   91.05 |    86.09 |   8
 
 ### Repository: nev-sdks
 
-| PR | Title | Branch | Status | Story Points | Files | +/- |
-|----|-------|--------|--------|--------------|-------|-----|
-| [#1](https://github.com/nevent-dev/nev-sdks/pull/1) | feat(sdk): Dynamic fields from API (NEV-1324) | `feat/NEV-1324-1325-dynamic-fields-base` | ✅ Open | 8 | 6 | +2569/-19 |
-| [#2](https://github.com/nevent-dev/nev-sdks/pull/2) | feat(sdk): CSS Variables Infrastructure (NEV-1326) | `feat/NEV-1326-css-variables` | ✅ Open | 3 | 2 | +921/-0 |
+| PR                                                  | Title                                              | Branch                                   | Status  | Story Points | Files | +/-       |
+| --------------------------------------------------- | -------------------------------------------------- | ---------------------------------------- | ------- | ------------ | ----- | --------- |
+| [#1](https://github.com/nevent-dev/nev-sdks/pull/1) | feat(sdk): Dynamic fields from API (NEV-1324)      | `feat/NEV-1324-1325-dynamic-fields-base` | ✅ Open | 8            | 6     | +2569/-19 |
+| [#2](https://github.com/nevent-dev/nev-sdks/pull/2) | feat(sdk): CSS Variables Infrastructure (NEV-1326) | `feat/NEV-1326-css-variables`            | ✅ Open | 3            | 2     | +921/-0   |
 
 ### Repository: nev-admin-web
 
-| PR | Title | Branch | Status | Story Points | Files | +/- |
-|----|-------|--------|--------|--------------|-------|-----|
-| [#351](https://github.com/nevent-dev/nev-admin-web/pull/351) | feat(admin): Field Configuration Editor (NEV-1325) | `feat/NEV-1325-field-config-editor` | ✅ Open | 13 | 7 | +1688/-0 |
+| PR                                                           | Title                                              | Branch                              | Status  | Story Points | Files | +/-      |
+| ------------------------------------------------------------ | -------------------------------------------------- | ----------------------------------- | ------- | ------------ | ----- | -------- |
+| [#351](https://github.com/nevent-dev/nev-admin-web/pull/351) | feat(admin): Field Configuration Editor (NEV-1325) | `feat/NEV-1325-field-config-editor` | ✅ Open | 13           | 7     | +1688/-0 |
 
 **Total PRs:** 3
 **Total Story Points:** 24/45 (53%)
@@ -812,6 +869,7 @@ TOTAL                                                 |   91.05 |    86.09 |   8
 ✅ **NONE**
 
 All changes are **fully backward compatible**:
+
 - Widgets without `fieldConfigurations` use email fallback
 - Existing `fieldsConfig` still supported
 - No migration required
@@ -822,9 +880,11 @@ All changes are **fully backward compatible**:
 ## Dependencies Added
 
 ### nev-sdks
+
 **None** (no new dependencies)
 
 ### nev-admin-web
+
 **None** (all PrimeNG modules already installed)
 
 ---
@@ -832,17 +892,20 @@ All changes are **fully backward compatible**:
 ## Security Considerations
 
 ✅ **XSS Prevention:**
+
 - All user input sanitized via `escapeHtml()`
 - CSS values validated in StyleManager
 - Blocked patterns: `javascript:`, `expression()`, `<script>`, event handlers
 
 ✅ **Input Validation:**
+
 - Email: RFC 5322 + domain check
 - Phone: E.164 format validation
 - URL: Protocol + domain validation
 - Max length enforcement (100 chars displayName, 200 chars hint)
 
 ✅ **ARIA Accessibility:**
+
 - All fields have `aria-label`
 - Required fields marked with `aria-required="true"`
 - Error messages linked with `aria-describedby`
@@ -865,6 +928,7 @@ All changes are **fully backward compatible**:
    - Save configuration
 
 2. **API automatically includes `fieldConfigurations` in response:**
+
    ```json
    GET /public/widget/{id}/config
    ```
@@ -962,33 +1026,41 @@ All changes are **fully backward compatible**:
 ## Risks and Mitigation
 
 ### Risk 1: Backend API Not Ready
+
 **Impact:** Widget can't fetch fieldConfigurations
 **Probability:** Low
 **Mitigation:**
+
 - ✅ Backward compatibility with email fallback
 - ✅ Graceful degradation
 - ✅ Error handling and logging
 
 ### Risk 2: Browser Compatibility Issues
+
 **Impact:** Widget doesn't work in older browsers
 **Probability:** Medium
 **Mitigation:**
+
 - ✅ Modern browser targets (Chrome 90+)
 - ⚠️ Polyfills may be needed for IE11
 - ✅ Progressive enhancement approach
 
 ### Risk 3: Performance Degradation
+
 **Impact:** Larger bundle size affects load time
 **Probability:** Low
 **Mitigation:**
+
 - ✅ Current bundle: 34 KB (acceptable)
 - 📋 NEV-1330 will optimize further
 - ✅ Lazy loading of heavy components
 
 ### Risk 4: User Adoption
+
 **Impact:** Admins don't use field configuration editor
 **Probability:** Low
 **Mitigation:**
+
 - ✅ Intuitive drag-and-drop UI
 - ✅ Live preview
 - ✅ Comprehensive i18n
@@ -1101,18 +1173,21 @@ All changes are **fully backward compatible**:
 ### A. API Endpoints
 
 **Public Widget Config:**
+
 ```
 GET /public/widget/{widgetId}/config
 Response: ServerWidgetConfig with fieldConfigurations
 ```
 
 **Admin Property Definitions:**
+
 ```
 GET /admin/property-definitions
 Response: PropertyDefinition[] (STANDARD + CUSTOM fields)
 ```
 
 **Update Newsletter:**
+
 ```
 PUT /newsletters/{newsletterId}
 Body: { fieldConfigurations: NewsletterFieldConfiguration[] }
@@ -1122,24 +1197,26 @@ Response: Newsletter
 ### B. Type Definitions
 
 **FieldConfiguration:**
+
 ```typescript
 interface FieldConfiguration {
-  fieldName: string;          // Internal name (email, firstName)
-  type: FieldType;            // Input type (text, email, tel, etc.)
-  required: boolean;          // Is field required?
-  displayName?: string;       // Custom label (max 100 chars)
-  placeholder?: string;       // Placeholder text
-  hint?: string;              // Help text (max 200 chars)
-  displayOrder: number;       // Rendering order
+  fieldName: string; // Internal name (email, firstName)
+  type: FieldType; // Input type (text, email, tel, etc.)
+  required: boolean; // Is field required?
+  displayName?: string; // Custom label (max 100 chars)
+  placeholder?: string; // Placeholder text
+  hint?: string; // Help text (max 200 chars)
+  displayOrder: number; // Rendering order
 }
 ```
 
 **PropertyDefinition:**
+
 ```typescript
 interface PropertyDefinition {
-  id: string;                 // Unique identifier
-  name: string;               // Internal name
-  description: string;        // Display name
+  id: string; // Unique identifier
+  name: string; // Internal name
+  description: string; // Display name
   propertyType: 'STANDARD' | 'CUSTOM';
   dataType: 'STRING' | 'NUMBER' | 'DATE' | 'BOOLEAN';
   validation?: {
@@ -1148,13 +1225,14 @@ interface PropertyDefinition {
     maxLength?: number;
     pattern?: string;
   };
-  tenantId?: string;          // Only for CUSTOM fields
+  tenantId?: string; // Only for CUSTOM fields
 }
 ```
 
 ### C. Example Configurations
 
 **Simple (Email Only):**
+
 ```json
 {
   "fieldConfigurations": [
@@ -1170,6 +1248,7 @@ interface PropertyDefinition {
 ```
 
 **Complex (Multiple Fields):**
+
 ```json
 {
   "fieldConfigurations": [
@@ -1218,16 +1297,16 @@ interface PropertyDefinition {
 
 ### D. Browser Support Matrix
 
-| Browser | Version | Status | Notes |
-|---------|---------|--------|-------|
-| Chrome | 90+ | ✅ Supported | Full support |
-| Firefox | 88+ | ✅ Supported | Full support |
-| Safari | 14+ | ✅ Supported | Full support |
-| Edge | 90+ | ✅ Supported | Full support |
-| Opera | 76+ | ✅ Supported | Full support |
-| Chrome Mobile | 90+ | ✅ Supported | Responsive design |
-| Safari Mobile | 14+ | ✅ Supported | Responsive design |
-| IE 11 | - | ❌ Not Supported | Requires polyfills |
+| Browser       | Version | Status           | Notes              |
+| ------------- | ------- | ---------------- | ------------------ |
+| Chrome        | 90+     | ✅ Supported     | Full support       |
+| Firefox       | 88+     | ✅ Supported     | Full support       |
+| Safari        | 14+     | ✅ Supported     | Full support       |
+| Edge          | 90+     | ✅ Supported     | Full support       |
+| Opera         | 76+     | ✅ Supported     | Full support       |
+| Chrome Mobile | 90+     | ✅ Supported     | Responsive design  |
+| Safari Mobile | 14+     | ✅ Supported     | Responsive design  |
+| IE 11         | -       | ❌ Not Supported | Requires polyfills |
 
 ---
 
