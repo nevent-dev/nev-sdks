@@ -6,23 +6,25 @@ Este archivo documenta las newsletters de prueba creadas en MongoDB para testing
 
 - **Database**: `nevent`
 - **Collection**: `newsletters`
-- **Tenant ID**: `test-tenant-sdk`
+- **Tenant ID**: `68383f4e0532b0378dcf7791` (tenant real de testing)
 
 ## Newsletters Creadas
 
 ### 1. SDK Test - Minimalista
 
-**ID**: `697f9be729f8891a5cd890bb`
+**ID**: `697fa7955712aef3f7b46e6a`
 
 **Descripción**: Newsletter minimalista para testing del SDK - Solo email
 
 **Características**:
+
 - ✅ Solo campo email requerido
 - 🎨 Tema: Light Blue (#3b82f6)
 - 📝 Font: Inter (Google Fonts)
 - 🎯 Campos habilitados: email únicamente
 
 **Estilos**:
+
 ```json
 {
   "backgroundColor": "#ffffff",
@@ -34,30 +36,33 @@ Este archivo documenta las newsletters de prueba creadas en MongoDB para testing
 ```
 
 **Uso en SDK**:
+
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
-  newsletterId: '697f9be729f8891a5cd890bb',
-  tenantId: 'test-tenant-sdk',
-  apiUrl: 'https://api.nevent.es',
+  newsletterId: '697fa7955712aef3f7b46e6a',
+  tenantId: '68383f4e0532b0378dcf7791',
+  apiUrl: 'http://localhost:8080',
   containerId: 'my-container',
 });
 await widget.init();
 ```
 
 **Preview URL**:
+
 ```
-https://api.nevent.es/public/widget/697f9be729f8891a5cd890bb/config?tenantId=test-tenant-sdk
+http://localhost:8080/public/widget/697fa7955712aef3f7b46e6a/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
 
 ### 2. SDK Test - Moderna Vibrante
 
-**ID**: `697f9be729f8891a5cd890bc`
+**ID**: `697fa7955712aef3f7b46e6b`
 
 **Descripción**: Newsletter con colores vibrantes y todos los campos para testing completo
 
 **Características**:
+
 - ✅ Todos los campos habilitados (email, firstName, lastName, phone, birthDate, gender, postalCode)
 - 🎨 Tema: Yellow/Amber (#f59e0b sobre #fef3c7)
 - 📝 Font: Poppins (Google Fonts)
@@ -65,6 +70,7 @@ https://api.nevent.es/public/widget/697f9be729f8891a5cd890bb/config?tenantId=tes
 - ⚠️ Require marketing consent: true
 
 **Estilos**:
+
 ```json
 {
   "backgroundColor": "#fef3c7",
@@ -78,30 +84,33 @@ https://api.nevent.es/public/widget/697f9be729f8891a5cd890bb/config?tenantId=tes
 ```
 
 **Uso en SDK**:
+
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
-  newsletterId: '697f9be729f8891a5cd890bc',
-  tenantId: 'test-tenant-sdk',
-  apiUrl: 'https://api.nevent.es',
+  newsletterId: '697fa7955712aef3f7b46e6b',
+  tenantId: '68383f4e0532b0378dcf7791',
+  apiUrl: 'http://localhost:8080',
   containerId: 'my-container',
 });
 await widget.init();
 ```
 
 **Preview URL**:
+
 ```
-https://api.nevent.es/public/widget/697f9be729f8891a5cd890bc/config?tenantId=test-tenant-sdk
+http://localhost:8080/public/widget/697fa7955712aef3f7b46e6b/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
 
 ### 3. SDK Test - Elegante Oscura
 
-**ID**: `697f9be729f8891a5cd890bd`
+**ID**: `697fa7955712aef3f7b46e6c`
 
 **Descripción**: Newsletter con tema oscuro elegante y campos intermedios
 
 **Características**:
+
 - ✅ Campos habilitados: email, firstName, lastName, birthDate, postalCode
 - 🎨 Tema: Dark (#1f2937 con acentos verde #10b981)
 - 📝 Font: Playfair Display (títulos) + Inter (inputs)
@@ -109,6 +118,7 @@ https://api.nevent.es/public/widget/697f9be729f8891a5cd890bc/config?tenantId=tes
 - 🌙 Dark mode friendly
 
 **Estilos**:
+
 ```json
 {
   "backgroundColor": "#1f2937",
@@ -123,19 +133,21 @@ https://api.nevent.es/public/widget/697f9be729f8891a5cd890bc/config?tenantId=tes
 ```
 
 **Uso en SDK**:
+
 ```javascript
 const widget = new NeventSubscriptions.NewsletterWidget({
-  newsletterId: '697f9be729f8891a5cd890bd',
-  tenantId: 'test-tenant-sdk',
-  apiUrl: 'https://api.nevent.es',
+  newsletterId: '697fa7955712aef3f7b46e6c',
+  tenantId: '68383f4e0532b0378dcf7791',
+  apiUrl: 'http://localhost:8080',
   containerId: 'my-container',
 });
 await widget.init();
 ```
 
 **Preview URL**:
+
 ```
-https://api.nevent.es/public/widget/697f9be729f8891a5cd890bd/config?tenantId=test-tenant-sdk
+http://localhost:8080/public/widget/697fa7955712aef3f7b46e6c/config?tenantId=68383f4e0532b0378dcf7791
 ```
 
 ---
@@ -145,7 +157,7 @@ https://api.nevent.es/public/widget/697f9be729f8891a5cd890bd/config?tenantId=tes
 Para verificar que las newsletters existen:
 
 ```javascript
-mongosh nevent --eval 'db.newsletters.find({tenantId: "test-tenant-sdk"}).pretty()'
+mongosh nevent --eval 'db.newsletters.find({tenantId: "68383f4e0532b0378dcf7791"}).pretty()'
 ```
 
 O usando el agregador:
@@ -153,7 +165,7 @@ O usando el agregador:
 ```javascript
 mongosh nevent --eval '
   db.newsletters.aggregate([
-    { $match: { tenantId: "test-tenant-sdk" } },
+    { $match: { tenantId: "68383f4e0532b0378dcf7791" } },
     {
       $project: {
         _id: 1,
@@ -171,6 +183,7 @@ mongosh nevent --eval '
 ## Testing
 
 ### Test Page 1: Básico
+
 ```
 file:///Users/samu/workspace/nevent/nev-sdks/examples/test-cdn.html
 ```
@@ -178,6 +191,7 @@ file:///Users/samu/workspace/nevent/nev-sdks/examples/test-cdn.html
 Usa configuraciones hardcodeadas en JavaScript.
 
 ### Test Page 2: Con Base de Datos (RECOMENDADO)
+
 ```
 file:///Users/samu/workspace/nevent/nev-sdks/examples/test-cdn-with-db.html
 ```
@@ -185,6 +199,7 @@ file:///Users/samu/workspace/nevent/nev-sdks/examples/test-cdn-with-db.html
 Carga las configuraciones reales desde MongoDB usando los IDs listados arriba.
 
 **Ventajas**:
+
 - ✅ Prueba el flujo completo de carga de configuración
 - ✅ Verifica que el API endpoint funciona correctamente
 - ✅ Valida que los estilos se aplican correctamente desde la DB
@@ -195,7 +210,7 @@ Carga las configuraciones reales desde MongoDB usando los IDs listados arriba.
 Para eliminar las newsletters de prueba:
 
 ```javascript
-mongosh nevent --eval 'db.newsletters.deleteMany({tenantId: "test-tenant-sdk"})'
+mongosh nevent --eval 'db.newsletters.deleteMany({tenantId: "68383f4e0532b0378dcf7791"})'
 ```
 
 ## Notas
@@ -211,8 +226,9 @@ mongosh nevent --eval 'db.newsletters.deleteMany({tenantId: "test-tenant-sdk"})'
 ### No se carga la configuración desde DB
 
 1. Verificar que el endpoint del API está correcto:
+
    ```
-   https://api.nevent.es/public/widget/{newsletterId}/config?tenantId={tenantId}
+   http://localhost:8080/public/widget/{newsletterId}/config?tenantId={tenantId}
    ```
 
 2. Verificar que las newsletters existen en MongoDB

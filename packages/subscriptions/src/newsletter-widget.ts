@@ -1,4 +1,9 @@
-import { EmailValidator, HttpClient, Logger } from '@nevent/core';
+import {
+  EmailValidator,
+  HttpClient,
+  Logger,
+  AnalyticsClient,
+} from '@nevent/core';
 import type {
   CustomFont,
   FontsResponse,
@@ -7,6 +12,7 @@ import type {
   SubscriptionData,
   SubscriptionResponse,
 } from './types';
+import { WidgetTracker } from './newsletter/analytics/widget-tracker';
 
 /**
  * Nevent Newsletter Subscription Widget
@@ -40,6 +46,8 @@ export class NewsletterWidget {
   private loadedCustomFonts = new Set<string>();
   private httpClient: HttpClient | null = null;
   private logger: Logger;
+  private analyticsClient: AnalyticsClient | null = null;
+  private widgetTracker: WidgetTracker | null = null;
 
   /**
    * Creates a new newsletter widget instance
@@ -70,6 +78,7 @@ export class NewsletterWidget {
       this.findContainer();
       await this.loadWidgetConfig();
       this.initHttpClient();
+      this.initAnalytics();
       this.loadGoogleFonts();
       await this.loadCustomFonts();
       this.render();
@@ -137,6 +146,7 @@ export class NewsletterWidget {
         privacyText: 'Política de Privacidad',
       },
       analytics: true,
+      analyticsUrl: 'https://events.neventapis.com',
       resetOnSuccess: true,
       showLabels: false,
       animations: true,
@@ -216,6 +226,30 @@ export class NewsletterWidget {
           messages: serverConfig.messages
             ? { ...this.config.messages, ...serverConfig.messages }
             : this.config.messages,
+          styles: serverConfig.styles
+            ? {
+                global: {
+                  ...this.config.styles?.global,
+                  ...serverConfig.styles.global,
+                },
+                title: {
+                  ...this.config.styles?.title,
+                  ...serverConfig.styles.title,
+                },
+                subtitle: {
+                  ...this.config.styles?.subtitle,
+                  ...serverConfig.styles.subtitle,
+                },
+                input: {
+                  ...this.config.styles?.input,
+                  ...serverConfig.styles.input,
+                },
+                button: {
+                  ...this.config.styles?.button,
+                  ...serverConfig.styles.button,
+                },
+              }
+            : this.config.styles,
         };
 
         this.config = mergedConfig as Required<NewsletterConfig>;
@@ -236,6 +270,27 @@ export class NewsletterWidget {
   private initHttpClient(): void {
     const apiKey = this.config.token || '';
     this.httpClient = new HttpClient(this.config.apiUrl, apiKey);
+  }
+
+  /**
+   * Initializes analytics client and tracker
+   */
+  private initAnalytics(): void {
+    if (!this.config.analytics) {
+      return;
+    }
+
+    this.analyticsClient = new AnalyticsClient({
+      endpoint: this.config.analyticsUrl,
+      enabled: true,
+      debug: this.config.debug,
+    });
+
+    this.widgetTracker = new WidgetTracker(
+      this.analyticsClient,
+      this.config.newsletterId,
+      this.config.tenantId
+    );
   }
 
   /**
@@ -802,6 +857,14 @@ export class NewsletterWidget {
     }
 
     this.form.addEventListener('submit', this.handleSubmit.bind(this));
+
+    if (this.widgetTracker && this.container) {
+      this.widgetTracker.setupImpressionTracking(this.container);
+      if (this.form) {
+        this.widgetTracker.setupFormInteractionTracking(this.form);
+      }
+      this.widgetTracker.setupAbandonmentTracking();
+    }
   }
 
   /**
@@ -855,6 +918,8 @@ export class NewsletterWidget {
         this.config.onSubmit(subscriptionData);
       }
 
+      this.trackEvent('form_submit');
+
       const response = await this.httpClient.post<SubscriptionResponse>(
         `/public/newsletter/${this.config.newsletterId}/subscribe?tenantId=${this.config.tenantId}`,
         subscriptionData
@@ -887,7 +952,7 @@ export class NewsletterWidget {
         this.config.onError(error);
       }
 
-      this.trackEvent('subscription_error');
+      this.trackEvent('subscription_error', { error_message: errorMessage });
     } finally {
       this.isSubmitting = false;
     }
@@ -961,15 +1026,29 @@ export class NewsletterWidget {
   /**
    * Tracks analytics events
    */
-  private trackEvent(eventName: string): void {
-    if (!this.config.analytics) {
+  private trackEvent(eventName: string, extra?: Record<string, unknown>): void {
+    if (!this.config.analytics || !this.widgetTracker) {
       return;
     }
 
-    this.logger.debug('Track event:', eventName);
-
-    // Integration with analytics platforms would go here
-    // Example: Google Analytics, Segment, etc.
+    switch (eventName) {
+      case 'widget_loaded':
+        this.widgetTracker.trackWidgetLoaded();
+        break;
+      case 'form_submit':
+        this.widgetTracker.trackFormSubmit();
+        break;
+      case 'subscription_success':
+        this.widgetTracker.trackSubscriptionSuccess();
+        break;
+      case 'subscription_error':
+        this.widgetTracker.trackSubscriptionError(
+          extra?.error_message as string
+        );
+        break;
+      default:
+        break;
+    }
   }
 
   /**
