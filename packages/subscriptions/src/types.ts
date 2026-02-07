@@ -111,6 +111,7 @@ export interface NewsletterConfig {
 
   // Widget behavior
   analytics?: boolean;
+  analyticsUrl?: string;
   resetOnSuccess?: boolean;
   showLabels?: boolean;
   animations?: boolean;

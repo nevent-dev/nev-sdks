@@ -16,3 +16,18 @@ export { HttpClient } from './http-client';
 export { EmailValidator, FormValidator } from './validators';
 export { Logger } from './logger';
 export { Storage } from './storage';
+
+// Analytics exports
+export { AnalyticsClient } from './analytics/analytics-client';
+export { ContextCollector } from './analytics/context-collector';
+export type {
+  AnalyticsEvent,
+  AnalyticsEventParams,
+  AnalyticsContext,
+  AnalyticsClientConfig,
+  DeviceContext,
+  ScreenContext,
+  SessionContext,
+  NetworkContext,
+  PreferencesContext,
+} from './analytics/types';
