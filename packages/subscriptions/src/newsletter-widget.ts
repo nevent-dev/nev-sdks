@@ -584,7 +584,8 @@ export class NewsletterWidget {
         hint: null,
         required: true,
         type: 'email',
-        placeholder: this.config.fields.email?.placeholder || 'Enter your email',
+        placeholder:
+          this.config.fields.email?.placeholder || 'Enter your email',
       });
     }
 
