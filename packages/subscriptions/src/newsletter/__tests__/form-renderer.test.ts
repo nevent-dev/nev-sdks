@@ -811,6 +811,270 @@ describe('FormRenderer', () => {
     });
   });
 
+  describe('layoutElements support', () => {
+    it('should render elements in correct order based on order property', () => {
+      // This test simulates the widget's behavior with layoutElements
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'firstName',
+          displayName: 'First Name',
+          hint: null,
+          required: true,
+          type: 'text',
+        },
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email',
+        },
+      ];
+
+      // Simulate layoutElements from API (order: email first, then firstName)
+      const layoutElements = [
+        { type: 'field' as const, key: 'email', width: 100 as const, order: 1 },
+        {
+          type: 'field' as const,
+          key: 'firstName',
+          width: 100 as const,
+          order: 2,
+        },
+        {
+          type: 'legalTerms' as const,
+          key: 'legalTerms',
+          width: 100 as const,
+          order: 3,
+        },
+        {
+          type: 'submitButton' as const,
+          key: 'submitButton',
+          width: 100 as const,
+          order: 4,
+        },
+      ];
+
+      // Sort by order
+      const sortedElements = [...layoutElements].sort(
+        (a, b) => a.order - b.order
+      );
+
+      const renderer = new FormRenderer(fieldConfigurations);
+
+      sortedElements.forEach((layoutElement) => {
+        if (layoutElement.type === 'field') {
+          const fieldConfig = fieldConfigurations.find(
+            (f) => f.fieldName === layoutElement.key
+          );
+          if (fieldConfig) {
+            const configWithWidth = {
+              ...fieldConfig,
+              width: layoutElement.width,
+            };
+            const fieldElement = renderer.renderField(configWithWidth);
+            container.appendChild(fieldElement);
+          }
+        }
+      });
+
+      const fields = container.querySelectorAll('.nevent-field');
+      expect(fields.length).toBe(2);
+
+      // Email should be rendered first (order: 1)
+      expect((fields[0] as HTMLElement).getAttribute('data-field-name')).toBe(
+        'email'
+      );
+
+      // firstName should be rendered second (order: 2)
+      expect((fields[1] as HTMLElement).getAttribute('data-field-name')).toBe(
+        'firstName'
+      );
+    });
+
+    it('should apply correct width to GDPR checkbox from layoutElement', () => {
+      // Simulate GDPR element with 50% width
+      const gdprElement = document.createElement('div');
+      gdprElement.className = 'nevent-gdpr';
+      gdprElement.style.width = 'calc(50% - 12px)';
+      gdprElement.style.boxSizing = 'border-box';
+      gdprElement.style.minWidth = '0';
+
+      container.appendChild(gdprElement);
+
+      expect(gdprElement.style.width).toBe('calc(50% - 12px)');
+      expect(gdprElement.style.boxSizing).toBe('border-box');
+    });
+
+    it('should apply correct width to submit button from layoutElement', () => {
+      // Simulate submit button with 50% width
+      const submitContainer = document.createElement('div');
+      submitContainer.className = 'nevent-submit-button-container';
+      submitContainer.style.width = 'calc(50% - 12px)';
+      submitContainer.style.boxSizing = 'border-box';
+      submitContainer.style.minWidth = '0';
+
+      container.appendChild(submitContainer);
+
+      expect(submitContainer.style.width).toBe('calc(50% - 12px)');
+      expect(submitContainer.style.boxSizing).toBe('border-box');
+    });
+
+    it('should render GDPR and submit button side-by-side at 50% each', () => {
+      // Simulate two elements at 50% width each
+      const gdprElement = document.createElement('div');
+      gdprElement.className = 'nevent-gdpr';
+      gdprElement.style.width = 'calc(50% - 12px)';
+      gdprElement.style.boxSizing = 'border-box';
+      gdprElement.style.minWidth = '0';
+
+      const submitContainer = document.createElement('div');
+      submitContainer.className = 'nevent-submit-button-container';
+      submitContainer.style.width = 'calc(50% - 12px)';
+      submitContainer.style.boxSizing = 'border-box';
+      submitContainer.style.minWidth = '0';
+
+      // Make container flex
+      container.style.display = 'flex';
+      container.style.flexWrap = 'wrap';
+      container.style.gap = '12px';
+
+      container.appendChild(gdprElement);
+      container.appendChild(submitContainer);
+
+      expect(gdprElement.style.width).toBe('calc(50% - 12px)');
+      expect(submitContainer.style.width).toBe('calc(50% - 12px)');
+      expect(container.style.display).toBe('flex');
+      expect(container.style.flexWrap).toBe('wrap');
+    });
+
+    it('should fallback to default layout when no layoutElements provided', () => {
+      // Backward compatibility: no layoutElements = default layout
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email',
+          width: 50,
+        },
+        {
+          fieldName: 'firstName',
+          displayName: 'First Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          width: 50,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      // Default layout: render all fields
+      const fields = container.querySelectorAll('.nevent-field');
+      expect(fields.length).toBe(2);
+
+      // Fields should respect their configured widths
+      expect((fields[0] as HTMLElement).style.width).toBe('calc(50% - 12px)');
+      expect((fields[1] as HTMLElement).style.width).toBe('calc(50% - 12px)');
+    });
+
+    it('should handle mixed widths: field 50% + field 50% + legalTerms 50% + submitButton 50%', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email',
+        },
+        {
+          fieldName: 'firstName',
+          displayName: 'First Name',
+          hint: null,
+          required: true,
+          type: 'text',
+        },
+      ];
+
+      const layoutElements = [
+        { type: 'field' as const, key: 'email', width: 50 as const, order: 1 },
+        {
+          type: 'field' as const,
+          key: 'firstName',
+          width: 50 as const,
+          order: 2,
+        },
+        {
+          type: 'legalTerms' as const,
+          key: 'legalTerms',
+          width: 50 as const,
+          order: 3,
+        },
+        {
+          type: 'submitButton' as const,
+          key: 'submitButton',
+          width: 50 as const,
+          order: 4,
+        },
+      ];
+
+      const sortedElements = [...layoutElements].sort(
+        (a, b) => a.order - b.order
+      );
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      container.style.display = 'flex';
+      container.style.flexWrap = 'wrap';
+      container.style.gap = '12px';
+
+      sortedElements.forEach((layoutElement) => {
+        if (layoutElement.type === 'field') {
+          const fieldConfig = fieldConfigurations.find(
+            (f) => f.fieldName === layoutElement.key
+          );
+          if (fieldConfig) {
+            const configWithWidth = {
+              ...fieldConfig,
+              width: layoutElement.width,
+            };
+            const fieldElement = renderer.renderField(configWithWidth);
+            container.appendChild(fieldElement);
+          }
+        } else if (layoutElement.type === 'legalTerms') {
+          const gdprElement = document.createElement('div');
+          gdprElement.className = 'nevent-gdpr';
+          gdprElement.style.width = `calc(${layoutElement.width}% - 12px)`;
+          gdprElement.style.boxSizing = 'border-box';
+          gdprElement.style.minWidth = '0';
+          container.appendChild(gdprElement);
+        } else if (layoutElement.type === 'submitButton') {
+          const submitContainer = document.createElement('div');
+          submitContainer.className = 'nevent-submit-button-container';
+          submitContainer.style.width = `calc(${layoutElement.width}% - 12px)`;
+          submitContainer.style.boxSizing = 'border-box';
+          submitContainer.style.minWidth = '0';
+          container.appendChild(submitContainer);
+        }
+      });
+
+      const allElements = container.children;
+      expect(allElements.length).toBe(4);
+
+      // All elements should have 50% width
+      const element0 = allElements[0] as HTMLElement | undefined;
+      const element1 = allElements[1] as HTMLElement | undefined;
+      const element2 = allElements[2] as HTMLElement | undefined;
+      const element3 = allElements[3] as HTMLElement | undefined;
+
+      expect(element0?.style.width).toBe('calc(50% - 12px)');
+      expect(element1?.style.width).toBe('calc(50% - 12px)');
+      expect(element2?.style.width).toBe('calc(50% - 12px)');
+      expect(element3?.style.width).toBe('calc(50% - 12px)');
+    });
+  });
+
   describe('LIST/select field rendering', () => {
     it('should render a select element for list type fields', () => {
       const configs: FieldConfiguration[] = [
