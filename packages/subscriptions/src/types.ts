@@ -56,6 +56,7 @@ export interface FieldConfiguration {
   type: FieldType;
   options?: FieldOption[];
   placeholder?: string;
+  width?: 25 | 50 | 75 | 100;
   metadata?: Record<string, unknown>;
   validatorConfiguration?: {
     type: string;

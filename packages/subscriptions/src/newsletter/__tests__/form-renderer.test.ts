@@ -488,6 +488,174 @@ describe('FormRenderer', () => {
     });
   });
 
+  describe('Field Width Layout', () => {
+    it('should apply width 50% to field with width config', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email',
+          width: 50,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const field = container.querySelector('.nevent-field') as HTMLElement;
+      expect(field.style.width).toBe('calc(50% - 12px)');
+      expect(field.style.boxSizing).toBe('border-box');
+    });
+
+    it('should apply width 100% to field without width config (default)', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const field = container.querySelector('.nevent-field') as HTMLElement;
+      expect(field.style.width).toBe('100%');
+      expect(field.style.boxSizing).toBe('border-box');
+    });
+
+    it('should apply width 25% to field correctly', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'firstName',
+          displayName: 'First Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          width: 25,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const field = container.querySelector('.nevent-field') as HTMLElement;
+      expect(field.style.width).toBe('calc(25% - 12px)');
+    });
+
+    it('should apply width 75% to field correctly', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'address',
+          displayName: 'Address',
+          hint: null,
+          required: false,
+          type: 'text',
+          width: 75,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const field = container.querySelector('.nevent-field') as HTMLElement;
+      expect(field.style.width).toBe('calc(75% - 12px)');
+    });
+
+    it('should render two fields with 50% width each in a row', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'firstName',
+          displayName: 'First Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          width: 50,
+        },
+        {
+          fieldName: 'lastName',
+          displayName: 'Last Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          width: 50,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const fields = container.querySelectorAll('.nevent-field');
+      expect(fields.length).toBe(2);
+
+      // Both fields should have 50% width
+      expect((fields[0] as HTMLElement).style.width).toBe('calc(50% - 12px)');
+      expect((fields[1] as HTMLElement).style.width).toBe('calc(50% - 12px)');
+    });
+
+    it('should apply flex-wrap styles to container', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      expect(container.style.display).toBe('flex');
+      expect(container.style.flexWrap).toBe('wrap');
+      expect(container.style.gap).toBe('12px');
+    });
+
+    it('should render mixed width fields correctly', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email',
+          width: 100,
+        },
+        {
+          fieldName: 'firstName',
+          displayName: 'First Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          width: 50,
+        },
+        {
+          fieldName: 'lastName',
+          displayName: 'Last Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          width: 50,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const fields = container.querySelectorAll('.nevent-field');
+      expect(fields.length).toBe(3);
+
+      expect((fields[0] as HTMLElement).style.width).toBe('100%');
+      expect((fields[1] as HTMLElement).style.width).toBe('calc(50% - 12px)');
+      expect((fields[2] as HTMLElement).style.width).toBe('calc(50% - 12px)');
+    });
+  });
+
   describe('LIST/select field rendering', () => {
     it('should render a select element for list type fields', () => {
       const configs: FieldConfiguration[] = [

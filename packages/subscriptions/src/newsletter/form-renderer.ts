@@ -60,6 +60,11 @@ export class FormRenderer {
   public render(container: HTMLElement): void {
     this.fieldElements.clear();
 
+    // Apply flex-wrap layout styles to container
+    container.style.display = 'flex';
+    container.style.flexWrap = 'wrap';
+    container.style.gap = '12px';
+
     // Fallback to default email field if no configurations provided
     if (!this.fieldConfigurations || this.fieldConfigurations.length === 0) {
       this.renderDefaultEmailField(container);
@@ -91,6 +96,15 @@ export class FormRenderer {
     if (config.required) {
       fieldContainer.classList.add('nevent-field--required');
     }
+
+    // Apply width from configuration (default: 100%)
+    const width = config.width || 100;
+    if (width < 100) {
+      fieldContainer.style.width = `calc(${width}% - 12px)`;
+    } else {
+      fieldContainer.style.width = '100%';
+    }
+    fieldContainer.style.boxSizing = 'border-box';
 
     // Create label
     const label = this.createLabel(config);

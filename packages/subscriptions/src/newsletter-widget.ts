@@ -821,6 +821,10 @@ export class NewsletterWidget {
         border-radius: ${borderRadius}px;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         box-sizing: border-box;
+        width: 100%;
+        max-width: 100%;
+        margin: 0 auto;
+        overflow: visible;
       }
 
       .nevent-title {
@@ -834,6 +838,17 @@ export class NewsletterWidget {
         margin: 0 0 16px 0;
         font-size: ${styles?.subtitle?.fontSize || '14px'};
         color: ${styles?.subtitle?.color || '#666'};
+      }
+
+      .nevent-fields-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      .nevent-fields-container .nevent-field {
+        box-sizing: border-box;
+        min-width: 0;
       }
 
       .nevent-field {
@@ -918,6 +933,10 @@ export class NewsletterWidget {
 
         .nevent-text-section,
         .nevent-fields-section {
+          width: 100% !important;
+        }
+
+        .nevent-fields-container .nevent-field {
           width: 100% !important;
         }
       }
