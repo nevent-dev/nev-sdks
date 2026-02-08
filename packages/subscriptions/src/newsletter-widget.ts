@@ -1080,6 +1080,13 @@ export class NewsletterWidget {
         cursor: not-allowed;
       }
 
+      .nevent-field-hint {
+        display: block;
+        margin-top: 4px;
+        font-size: 12px;
+        color: #888;
+      }
+
       .nevent-status-message {
         padding: 12px;
         border-radius: 4px;

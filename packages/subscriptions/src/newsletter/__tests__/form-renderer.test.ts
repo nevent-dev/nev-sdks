@@ -1075,6 +1075,204 @@ describe('FormRenderer', () => {
     });
   });
 
+  describe('Custom Field Labels, Placeholders, and Hints (NEV-1337)', () => {
+    it('should render custom label from displayName', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Your Email Address',
+          hint: null,
+          required: true,
+          type: 'email',
+          placeholder: 'Enter email',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const label = container.querySelector('.nevent-field-label');
+      expect(label).toBeTruthy();
+      expect(label?.textContent).toContain('Your Email Address');
+    });
+
+    it('should render custom placeholder', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'firstName',
+          displayName: 'Full Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          placeholder: 'Enter your full name here',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const input = container.querySelector(
+        'input[name="firstName"]'
+      ) as HTMLInputElement;
+      expect(input.placeholder).toBe('Enter your full name here');
+    });
+
+    it('should fallback to displayName when placeholder is not provided', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'lastName',
+          displayName: 'Last Name',
+          hint: null,
+          required: false,
+          type: 'text',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const input = container.querySelector(
+        'input[name="lastName"]'
+      ) as HTMLInputElement;
+      expect(input.placeholder).toBe('Last Name');
+    });
+
+    it('should render hint text when provided', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: 'We will never share your email with anyone',
+          required: true,
+          type: 'email',
+          placeholder: 'Enter your email',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const hint = container.querySelector(
+        '.nevent-field-hint'
+      ) as HTMLSpanElement;
+      expect(hint).toBeTruthy();
+      expect(hint.textContent).toBe(
+        'We will never share your email with anyone'
+      );
+      expect(hint.tagName).toBe('SPAN');
+    });
+
+    it('should not render hint element when hint is null', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const hint = container.querySelector('.nevent-field-hint');
+      expect(hint).toBeFalsy();
+    });
+
+    it('should not render hint element when hint is empty string', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: '',
+          required: true,
+          type: 'email',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const hint = container.querySelector('.nevent-field-hint');
+      expect(hint).toBeFalsy();
+    });
+
+    it('should apply custom placeholder to select/list fields', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'category',
+          displayName: 'Select Category',
+          hint: null,
+          required: true,
+          type: 'list',
+          placeholder: 'Choose an option',
+          validatorConfiguration: {
+            type: 'ENUM',
+            config: { allowedValues: ['A', 'B'] },
+          },
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const select = container.querySelector('select') as HTMLSelectElement;
+      const placeholderOption = select.querySelector(
+        'option[disabled]'
+      ) as HTMLOptionElement;
+      expect(placeholderOption.textContent).toBe('Choose an option');
+    });
+
+    it('should apply custom placeholder to textarea fields', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'bio',
+          displayName: 'Biography',
+          hint: null,
+          required: false,
+          type: 'textarea',
+          placeholder: 'Tell us about yourself',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const textarea = container.querySelector(
+        'textarea[name="bio"]'
+      ) as HTMLTextAreaElement;
+      expect(textarea.placeholder).toBe('Tell us about yourself');
+    });
+
+    it('should render all three customizations together', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email Address',
+          hint: 'Your email is safe with us',
+          required: true,
+          type: 'email',
+          placeholder: 'name@example.com',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const label = container.querySelector('.nevent-field-label');
+      expect(label?.textContent).toContain('Email Address');
+
+      const input = container.querySelector(
+        'input[name="email"]'
+      ) as HTMLInputElement;
+      expect(input.placeholder).toBe('name@example.com');
+
+      const hint = container.querySelector('.nevent-field-hint');
+      expect(hint?.textContent).toBe('Your email is safe with us');
+    });
+  });
+
   describe('LIST/select field rendering', () => {
     it('should render a select element for list type fields', () => {
       const configs: FieldConfiguration[] = [
