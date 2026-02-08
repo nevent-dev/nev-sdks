@@ -573,6 +573,21 @@ export class NewsletterWidget {
     fieldsContainer.className = 'nevent-fields-container';
     this.form.appendChild(fieldsContainer);
 
+    // Ensure email field exists (required for form submission)
+    const hasEmailField = this.fieldConfigurations.some(
+      (f) => f.type === 'email' || f.fieldName === 'email'
+    );
+    if (!hasEmailField) {
+      this.fieldConfigurations.unshift({
+        fieldName: 'email',
+        displayName: 'Email Address',
+        hint: null,
+        required: true,
+        type: 'email',
+        placeholder: this.config.fields.email?.placeholder || 'Enter your email',
+      });
+    }
+
     this.formRenderer = new FormRenderer(this.fieldConfigurations);
     this.formRenderer.render(fieldsContainer);
 

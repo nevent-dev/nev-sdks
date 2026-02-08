@@ -656,6 +656,161 @@ describe('FormRenderer', () => {
     });
   });
 
+  describe('Defensive Email Field Injection', () => {
+    it('should ensure email field exists when missing from configurations', () => {
+      // Simulate server returning fieldConfigurations without email field
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'firstName',
+          displayName: 'First Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          placeholder: 'Enter your name',
+        },
+      ];
+
+      // Inject email field if missing (simulating widget behavior)
+      const hasEmailField = fieldConfigurations.some(
+        (f) => f.type === 'email' || f.fieldName === 'email'
+      );
+      if (!hasEmailField) {
+        fieldConfigurations.unshift({
+          fieldName: 'email',
+          displayName: 'Email Address',
+          hint: null,
+          required: true,
+          type: 'email',
+          placeholder: 'Enter your email',
+        });
+      }
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      // Verify email field was injected and rendered first
+      const fields = container.querySelectorAll('.nevent-field');
+      expect(fields.length).toBe(2);
+
+      const emailInput = container.querySelector(
+        'input[name="email"]'
+      ) as HTMLInputElement;
+      expect(emailInput).toBeTruthy();
+      expect(emailInput.type).toBe('email');
+      expect(emailInput.required).toBe(true);
+      expect(emailInput.placeholder).toBe('Enter your email');
+
+      // Verify form can be submitted with email
+      emailInput.value = 'test@example.com';
+      const firstNameInput = container.querySelector(
+        'input[name="firstName"]'
+      ) as HTMLInputElement;
+      firstNameInput.value = 'John';
+
+      expect(renderer.validateFields()).toBe(true);
+
+      const formData = renderer.getFormData();
+      expect(formData.email).toBe('test@example.com');
+      expect(formData.firstName).toBe('John');
+    });
+
+    it('should not duplicate email field if already present', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email Address',
+          hint: null,
+          required: true,
+          type: 'email',
+          placeholder: 'Enter your email',
+        },
+        {
+          fieldName: 'firstName',
+          displayName: 'First Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          placeholder: 'Enter your name',
+        },
+      ];
+
+      // Inject email field if missing (simulating widget behavior)
+      const hasEmailField = fieldConfigurations.some(
+        (f) => f.type === 'email' || f.fieldName === 'email'
+      );
+      if (!hasEmailField) {
+        fieldConfigurations.unshift({
+          fieldName: 'email',
+          displayName: 'Email Address',
+          hint: null,
+          required: true,
+          type: 'email',
+          placeholder: 'Enter your email',
+        });
+      }
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      // Should still have exactly 2 fields (email not duplicated)
+      const fields = container.querySelectorAll('.nevent-field');
+      expect(fields.length).toBe(2);
+
+      const emailInputs = container.querySelectorAll('input[name="email"]');
+      expect(emailInputs.length).toBe(1);
+    });
+
+    it('should detect email field by fieldName=email', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'email',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'text', // type is text, but fieldName is email
+          placeholder: 'Email',
+        },
+      ];
+
+      const hasEmailField = fieldConfigurations.some(
+        (f) => f.type === 'email' || f.fieldName === 'email'
+      );
+
+      expect(hasEmailField).toBe(true);
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const fields = container.querySelectorAll('.nevent-field');
+      expect(fields.length).toBe(1);
+    });
+
+    it('should detect email field by type=email', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'userEmail',
+          displayName: 'Email',
+          hint: null,
+          required: true,
+          type: 'email', // type is email, fieldName is different
+          placeholder: 'Email',
+        },
+      ];
+
+      const hasEmailField = fieldConfigurations.some(
+        (f) => f.type === 'email' || f.fieldName === 'email'
+      );
+
+      expect(hasEmailField).toBe(true);
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const fields = container.querySelectorAll('.nevent-field');
+      expect(fields.length).toBe(1);
+    });
+  });
+
   describe('LIST/select field rendering', () => {
     it('should render a select element for list type fields', () => {
       const configs: FieldConfiguration[] = [
