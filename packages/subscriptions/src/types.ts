@@ -16,6 +16,57 @@ export interface FieldConfig {
 }
 
 /**
+ * Field type for dynamic form fields
+ */
+export type FieldType =
+  | 'text'
+  | 'email'
+  | 'tel'
+  | 'number'
+  | 'url'
+  | 'password'
+  | 'select'
+  | 'list'
+  | 'checkbox'
+  | 'radio'
+  | 'textarea'
+  | 'date'
+  | 'time'
+  | 'file';
+
+/**
+ * Field option for select, radio, and checkbox inputs
+ */
+export interface FieldOption {
+  value: string | number;
+  label: string;
+  disabled?: boolean;
+  selected?: boolean;
+  checked?: boolean;
+}
+
+/**
+ * Dynamic field configuration from API
+ */
+export interface FieldConfiguration {
+  fieldName: string;
+  displayName: string;
+  hint?: string | null;
+  required: boolean;
+  type: FieldType;
+  options?: FieldOption[];
+  placeholder?: string;
+  metadata?: Record<string, unknown>;
+  validatorConfiguration?: {
+    type: string;
+    config?: {
+      allowedValues?: string[];
+      [key: string]: unknown;
+    };
+  };
+}
+
+/**
  * Font configuration
  */
 export interface FontConfig {
@@ -152,6 +203,7 @@ export interface ServerWidgetConfig {
   privacyPolicyUrl?: string;
   title?: string;
   subtitle?: string;
+  fieldConfigurations?: FieldConfiguration[];
 }
 
 /**

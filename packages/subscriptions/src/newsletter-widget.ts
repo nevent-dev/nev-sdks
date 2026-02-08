@@ -6,6 +6,7 @@ import {
 } from '@nevent/core';
 import type {
   CustomFont,
+  FieldConfiguration,
   FontsResponse,
   NewsletterConfig,
   ServerWidgetConfig,
@@ -13,6 +14,7 @@ import type {
   SubscriptionResponse,
 } from './types';
 import { WidgetTracker } from './newsletter/analytics/widget-tracker';
+import { FormRenderer } from './newsletter/form-renderer';
 
 /**
  * Nevent Newsletter Subscription Widget
@@ -48,6 +50,8 @@ export class NewsletterWidget {
   private logger: Logger;
   private analyticsClient: AnalyticsClient | null = null;
   private widgetTracker: WidgetTracker | null = null;
+  private formRenderer: FormRenderer | null = null;
+  private fieldConfigurations: FieldConfiguration[] = [];
 
   /**
    * Creates a new newsletter widget instance
@@ -254,10 +258,28 @@ export class NewsletterWidget {
 
         this.config = mergedConfig as Required<NewsletterConfig>;
         this.logger.debug('Widget configuration loaded from server');
+
+        // Store fieldConfigurations if provided by API
+        if (
+          serverConfig.fieldConfigurations &&
+          serverConfig.fieldConfigurations.length > 0
+        ) {
+          this.fieldConfigurations = serverConfig.fieldConfigurations;
+          this.logger.debug(
+            'Dynamic field configurations loaded from API:',
+            this.fieldConfigurations
+          );
+        } else {
+          this.fieldConfigurations = this.getDefaultFieldConfigurations();
+          this.logger.debug(
+            'Using default field configurations (backward compatibility)'
+          );
+        }
       } else {
         this.logger.warn(
           'Could not load widget configuration from server, using defaults'
         );
+        this.fieldConfigurations = this.getDefaultFieldConfigurations();
       }
     } catch (error) {
       this.logger.warn('Error loading widget configuration:', error);
@@ -448,6 +470,25 @@ export class NewsletterWidget {
   }
 
   /**
+   * Returns default field configurations for backward compatibility
+   *
+   * @returns Array of default field configurations
+   */
+  private getDefaultFieldConfigurations(): FieldConfiguration[] {
+    return [
+      {
+        fieldName: 'email',
+        displayName: 'Email Address',
+        hint: null,
+        required: true,
+        type: 'email',
+        placeholder:
+          this.config.fields.email?.placeholder || 'Enter your email',
+      },
+    ];
+  }
+
+  /**
    * Finds the container element for the widget
    */
   private findContainer(): void {
@@ -472,7 +513,13 @@ export class NewsletterWidget {
 
     this.form = document.createElement('form');
     this.form.className = 'nevent-widget-form';
-    this.form.innerHTML = this.buildFormHTML();
+
+    // Use dynamic form rendering if fieldConfigurations exist
+    if (this.fieldConfigurations && this.fieldConfigurations.length > 0) {
+      this.renderDynamicForm();
+    } else {
+      this.form.innerHTML = this.buildFormHTML();
+    }
 
     // Apply animations
     if (this.config.animations) {
@@ -507,6 +554,35 @@ export class NewsletterWidget {
     }
 
     return this.buildColumnLayout();
+  }
+
+  /**
+   * Renders dynamic form using FormRenderer
+   */
+  private renderDynamicForm(): void {
+    if (!this.form) return;
+
+    const titleSubtitleContainer = document.createElement('div');
+    titleSubtitleContainer.innerHTML = `
+      ${this.buildTitle()}
+      ${this.buildSubtitle()}
+    `;
+    this.form.appendChild(titleSubtitleContainer);
+
+    const fieldsContainer = document.createElement('div');
+    fieldsContainer.className = 'nevent-fields-container';
+    this.form.appendChild(fieldsContainer);
+
+    this.formRenderer = new FormRenderer(this.fieldConfigurations);
+    this.formRenderer.render(fieldsContainer);
+
+    const gdprAndSubmitContainer = document.createElement('div');
+    gdprAndSubmitContainer.innerHTML = `
+      ${this.buildGDPRCheckbox()}
+      ${this.buildSubmitButton()}
+      <div class="nevent-status-message" style="display: none;"></div>
+    `;
+    this.form.appendChild(gdprAndSubmitContainer);
   }
 
   /**
@@ -877,6 +953,12 @@ export class NewsletterWidget {
       return;
     }
 
+    // Validate dynamic form if using FormRenderer
+    if (this.formRenderer) {
+      const isValid = this.formRenderer.validateFields();
+      if (!isValid) return;
+    }
+
     // Validate form
     const formData = new FormData(this.form);
     const email = formData.get('email') as string;
@@ -897,22 +979,62 @@ export class NewsletterWidget {
     this.showLoading();
 
     try {
-      const firstName = formData.get('firstName') as string;
-      const lastName = formData.get('lastName') as string;
-      const postalCode = formData.get('postalCode') as string;
-      const birthDate = formData.get('birthDate') as string;
+      let subscriptionData: SubscriptionData;
 
-      const subscriptionData: SubscriptionData = {
-        email: email.trim(),
-        ...(firstName && { firstName }),
-        ...(lastName && { lastName }),
-        ...(postalCode && { postalCode }),
-        ...(birthDate && { birthDate }),
-        consent: {
-          marketing: true,
-          timestamp: new Date().toISOString(),
-        },
-      };
+      if (this.formRenderer) {
+        // Get data from dynamic form
+        const dynamicFormData = this.formRenderer.getFormData();
+        subscriptionData = {
+          email: dynamicFormData.email?.trim() || email.trim(),
+          ...(dynamicFormData.firstName && {
+            firstName: dynamicFormData.firstName,
+          }),
+          ...(dynamicFormData.lastName && {
+            lastName: dynamicFormData.lastName,
+          }),
+          ...(dynamicFormData.postalCode && {
+            postalCode: dynamicFormData.postalCode,
+          }),
+          ...(dynamicFormData.birthDate && {
+            birthDate: dynamicFormData.birthDate,
+          }),
+          // Include any additional custom fields
+          ...Object.fromEntries(
+            Object.entries(dynamicFormData).filter(
+              ([key]) =>
+                ![
+                  'email',
+                  'firstName',
+                  'lastName',
+                  'postalCode',
+                  'birthDate',
+                ].includes(key)
+            )
+          ),
+          consent: {
+            marketing: true,
+            timestamp: new Date().toISOString(),
+          },
+        };
+      } else {
+        // Legacy form data collection
+        const firstName = formData.get('firstName') as string;
+        const lastName = formData.get('lastName') as string;
+        const postalCode = formData.get('postalCode') as string;
+        const birthDate = formData.get('birthDate') as string;
+
+        subscriptionData = {
+          email: email.trim(),
+          ...(firstName && { firstName }),
+          ...(lastName && { lastName }),
+          ...(postalCode && { postalCode }),
+          ...(birthDate && { birthDate }),
+          consent: {
+            marketing: true,
+            timestamp: new Date().toISOString(),
+          },
+        };
+      }
 
       if (this.config.onSubmit) {
         this.config.onSubmit(subscriptionData);
@@ -934,7 +1056,12 @@ export class NewsletterWidget {
       }
 
       if (this.config.resetOnSuccess) {
-        setTimeout(() => this.form?.reset(), 3000);
+        setTimeout(() => {
+          this.form?.reset();
+          if (this.formRenderer) {
+            this.formRenderer.reset();
+          }
+        }, 3000);
       }
 
       this.trackEvent('subscription_success');
