@@ -76,6 +76,22 @@ export interface FontConfig {
 }
 
 /**
+ * Layout element type for unified form layout
+ */
+export type LayoutElementType = 'field' | 'legalTerms' | 'submitButton';
+
+/**
+ * Layout element configuration
+ * Defines width, order, and type for form elements
+ */
+export interface LayoutElement {
+  type: LayoutElementType;
+  key: string; // for 'field': matches fieldName; for others: 'legalTerms' or 'submitButton'
+  width: 25 | 50 | 75 | 100;
+  order: number;
+}
+
+/**
  * Widget style configuration
  */
 export interface WidgetStyles {
@@ -87,6 +103,7 @@ export interface WidgetStyles {
     containerHeight?: string;
     columnsDistribution?: string;
     font?: FontConfig;
+    layoutElements?: LayoutElement[];
   };
   title?: {
     hidden?: boolean;

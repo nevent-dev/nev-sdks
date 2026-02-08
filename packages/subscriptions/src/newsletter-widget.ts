@@ -8,6 +8,7 @@ import type {
   CustomFont,
   FieldConfiguration,
   FontsResponse,
+  LayoutElement,
   NewsletterConfig,
   ServerWidgetConfig,
   SubscriptionData,
@@ -52,6 +53,7 @@ export class NewsletterWidget {
   private widgetTracker: WidgetTracker | null = null;
   private formRenderer: FormRenderer | null = null;
   private fieldConfigurations: FieldConfiguration[] = [];
+  private layoutElements: LayoutElement[] = [];
 
   /**
    * Creates a new newsletter widget instance
@@ -273,6 +275,18 @@ export class NewsletterWidget {
           this.fieldConfigurations = this.getDefaultFieldConfigurations();
           this.logger.debug(
             'Using default field configurations (backward compatibility)'
+          );
+        }
+
+        // Store layoutElements if provided by API
+        if (
+          serverConfig.styles?.global?.layoutElements &&
+          serverConfig.styles.global.layoutElements.length > 0
+        ) {
+          this.layoutElements = serverConfig.styles.global.layoutElements;
+          this.logger.debug(
+            'Layout elements loaded from API:',
+            this.layoutElements
           );
         }
       } else {
@@ -557,21 +571,18 @@ export class NewsletterWidget {
   }
 
   /**
-   * Renders dynamic form using FormRenderer
+   * Renders dynamic form using FormRenderer and layoutElements
    */
   private renderDynamicForm(): void {
     if (!this.form) return;
 
+    // Title and subtitle remain outside the flex container
     const titleSubtitleContainer = document.createElement('div');
     titleSubtitleContainer.innerHTML = `
       ${this.buildTitle()}
       ${this.buildSubtitle()}
     `;
     this.form.appendChild(titleSubtitleContainer);
-
-    const fieldsContainer = document.createElement('div');
-    fieldsContainer.className = 'nevent-fields-container';
-    this.form.appendChild(fieldsContainer);
 
     // Ensure email field exists (required for form submission)
     const hasEmailField = this.fieldConfigurations.some(
@@ -589,16 +600,80 @@ export class NewsletterWidget {
       });
     }
 
-    this.formRenderer = new FormRenderer(this.fieldConfigurations);
-    this.formRenderer.render(fieldsContainer);
+    // Create unified flex container for ALL elements
+    const fieldsContainer = document.createElement('div');
+    fieldsContainer.className = 'nevent-fields-container';
+    this.form.appendChild(fieldsContainer);
 
-    const gdprAndSubmitContainer = document.createElement('div');
-    gdprAndSubmitContainer.innerHTML = `
-      ${this.buildGDPRCheckbox()}
-      ${this.buildSubmitButton()}
-      <div class="nevent-status-message" style="display: none;"></div>
-    `;
-    this.form.appendChild(gdprAndSubmitContainer);
+    // Initialize FormRenderer for field rendering
+    this.formRenderer = new FormRenderer(this.fieldConfigurations);
+
+    // Check if layoutElements exist
+    if (this.layoutElements && this.layoutElements.length > 0) {
+      this.renderLayoutBasedForm(fieldsContainer);
+    } else {
+      this.renderDefaultLayout(fieldsContainer);
+    }
+
+    // Status message
+    const statusMessage = document.createElement('div');
+    statusMessage.className = 'nevent-status-message';
+    statusMessage.style.display = 'none';
+    this.form.appendChild(statusMessage);
+  }
+
+  /**
+   * Renders form using layoutElements for order and width
+   */
+  private renderLayoutBasedForm(container: HTMLElement): void {
+    // Sort layoutElements by order property
+    const sortedElements = [...this.layoutElements].sort(
+      (a, b) => a.order - b.order
+    );
+
+    sortedElements.forEach((layoutElement) => {
+      const { type, key, width } = layoutElement;
+
+      if (type === 'field') {
+        // Render field from fieldConfigurations
+        const fieldConfig = this.fieldConfigurations.find(
+          (f) => f.fieldName === key
+        );
+        if (fieldConfig) {
+          // Override width from layoutElement
+          const configWithWidth = { ...fieldConfig, width };
+          const fieldElement = this.formRenderer!.renderField(configWithWidth);
+          container.appendChild(fieldElement);
+        }
+      } else if (type === 'legalTerms') {
+        // Render GDPR checkbox with width
+        const gdprElement = this.buildGDPRElement(width);
+        container.appendChild(gdprElement);
+      } else if (type === 'submitButton') {
+        // Render submit button with width
+        const submitElement = this.buildSubmitButtonElement(width);
+        container.appendChild(submitElement);
+      }
+    });
+  }
+
+  /**
+   * Renders form with default layout (backward compatibility)
+   */
+  private renderDefaultLayout(container: HTMLElement): void {
+    // Render all fields at their configured widths
+    this.fieldConfigurations.forEach((fieldConfig) => {
+      const fieldElement = this.formRenderer!.renderField(fieldConfig);
+      container.appendChild(fieldElement);
+    });
+
+    // GDPR at 100%
+    const gdprElement = this.buildGDPRElement(100);
+    container.appendChild(gdprElement);
+
+    // Submit button at 100%
+    const submitElement = this.buildSubmitButtonElement(100);
+    container.appendChild(submitElement);
   }
 
   /**
@@ -792,6 +867,80 @@ export class NewsletterWidget {
   }
 
   /**
+   * Builds GDPR checkbox as DOM element with configurable width
+   *
+   * @param width - Width percentage (25, 50, 75, or 100)
+   * @returns HTMLElement containing GDPR checkbox
+   */
+  private buildGDPRElement(width: 25 | 50 | 75 | 100): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'nevent-gdpr';
+
+    // Apply width styling
+    if (width < 100) {
+      container.style.width = `calc(${width}% - 12px)`;
+    } else {
+      container.style.width = '100%';
+    }
+    container.style.boxSizing = 'border-box';
+    container.style.minWidth = '0';
+
+    let gdprText = this.config.messages.gdprText || '';
+
+    // Replace placeholders
+    if (this.config.companyName) {
+      gdprText = gdprText.replace('[COMPANY_NAME]', this.config.companyName);
+    }
+
+    if (this.config.privacyPolicyUrl) {
+      const privacyLink = `<a href="${this.escapeHtml(this.config.privacyPolicyUrl)}" target="_blank" rel="noopener noreferrer">${this.config.messages.privacyText}</a>`;
+      gdprText = gdprText.replace('[PRIVACY_POLICY_LINK]', privacyLink);
+    }
+
+    container.innerHTML = `
+      <label class="nevent-gdpr-label">
+        <input
+          type="checkbox"
+          name="gdprConsent"
+          class="nevent-gdpr-checkbox"
+          required
+        />
+        <span class="nevent-gdpr-text">${gdprText}</span>
+      </label>
+    `;
+
+    return container;
+  }
+
+  /**
+   * Builds submit button as DOM element with configurable width
+   *
+   * @param width - Width percentage (25, 50, 75, or 100)
+   * @returns HTMLElement containing submit button
+   */
+  private buildSubmitButtonElement(width: 25 | 50 | 75 | 100): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'nevent-submit-button-container';
+
+    // Apply width styling
+    if (width < 100) {
+      container.style.width = `calc(${width}% - 12px)`;
+    } else {
+      container.style.width = '100%';
+    }
+    container.style.boxSizing = 'border-box';
+    container.style.minWidth = '0';
+
+    const button = document.createElement('button');
+    button.type = 'submit';
+    button.className = 'nevent-submit-button';
+    button.textContent = this.config.messages.submit || 'Submit';
+
+    container.appendChild(button);
+    return container;
+  }
+
+  /**
    * Injects widget styles
    */
   private injectStyles(): void {
@@ -863,6 +1012,12 @@ export class NewsletterWidget {
       }
 
       .nevent-fields-container .nevent-field {
+        box-sizing: border-box;
+        min-width: 0;
+      }
+
+      .nevent-fields-container .nevent-gdpr,
+      .nevent-fields-container .nevent-submit-button-container {
         box-sizing: border-box;
         min-width: 0;
       }
