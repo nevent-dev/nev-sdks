@@ -377,6 +377,52 @@ describe('FormRenderer', () => {
       expect(formData.email).toBe('test@example.com');
       expect(formData.firstName).toBe('John');
     });
+
+    it('should return "true" for checked checkbox fields', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'accepts_newsletter',
+          displayName: 'Accepts Newsletter',
+          hint: null,
+          required: false,
+          type: 'checkbox',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const checkbox = container.querySelector(
+        'input[name="accepts_newsletter"]'
+      ) as HTMLInputElement;
+      checkbox.checked = true;
+
+      const formData = renderer.getFormData();
+      expect(formData.accepts_newsletter).toBe('true');
+    });
+
+    it('should return "false" for unchecked checkbox fields', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'accepts_newsletter',
+          displayName: 'Accepts Newsletter',
+          hint: null,
+          required: false,
+          type: 'checkbox',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const checkbox = container.querySelector(
+        'input[name="accepts_newsletter"]'
+      ) as HTMLInputElement;
+      checkbox.checked = false;
+
+      const formData = renderer.getFormData();
+      expect(formData.accepts_newsletter).toBe('false');
+    });
   });
 
   describe('Reset', () => {
@@ -415,6 +461,30 @@ describe('FormRenderer', () => {
 
       expect(emailInput.value).toBe('');
       expect(firstNameInput.value).toBe('');
+    });
+
+    it('should reset checkbox fields to unchecked', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'accepts_newsletter',
+          displayName: 'Accepts Newsletter',
+          hint: null,
+          required: false,
+          type: 'checkbox',
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const checkbox = container.querySelector(
+        'input[name="accepts_newsletter"]'
+      ) as HTMLInputElement;
+      checkbox.checked = true;
+
+      renderer.reset();
+
+      expect(checkbox.checked).toBe(false);
     });
   });
 

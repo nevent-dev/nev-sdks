@@ -613,7 +613,11 @@ export class FormRenderer {
     const formData: Record<string, string> = {};
 
     this.fieldElements.forEach((input, fieldName) => {
-      formData[fieldName] = input.value;
+      if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+        formData[fieldName] = String(input.checked);
+      } else {
+        formData[fieldName] = input.value;
+      }
     });
 
     return formData;
@@ -624,7 +628,11 @@ export class FormRenderer {
    */
   public reset(): void {
     this.fieldElements.forEach((input) => {
-      input.value = '';
+      if (input instanceof HTMLInputElement && input.type === 'checkbox') {
+        input.checked = false;
+      } else {
+        input.value = '';
+      }
 
       // Clear errors
       const fieldContainer = input.closest('.nevent-field') as HTMLElement;
