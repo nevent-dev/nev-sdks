@@ -17,6 +17,7 @@ import { WidgetTracker } from './newsletter/analytics/widget-tracker';
 import { FormRenderer } from './newsletter/form-renderer';
 import { adaptFieldConfigurations } from './newsletter/field-adapter';
 import { injectSchemaOrg } from './newsletter/schema-injector';
+import { injectSeoTags } from './newsletter/seo-injector';
 
 /**
  * Nevent Newsletter Subscription Widget
@@ -91,6 +92,7 @@ export class NewsletterWidget {
         companyName: this.config.companyName,
         privacyPolicyUrl: this.config.privacyPolicyUrl,
       });
+      injectSeoTags();
       this.initHttpClient();
       this.initAnalytics();
       this.loadGoogleFonts();
