@@ -16,6 +16,7 @@ import type {
 import { WidgetTracker } from './newsletter/analytics/widget-tracker';
 import { FormRenderer } from './newsletter/form-renderer';
 import { adaptFieldConfigurations } from './newsletter/field-adapter';
+import { injectSchemaOrg } from './newsletter/schema-injector';
 
 /**
  * Nevent Newsletter Subscription Widget
@@ -83,6 +84,13 @@ export class NewsletterWidget {
     try {
       this.findContainer();
       await this.loadWidgetConfig();
+      injectSchemaOrg({
+        newsletterId: this.config.newsletterId,
+        title: this.config.title,
+        description: this.config.subtitle,
+        companyName: this.config.companyName,
+        privacyPolicyUrl: this.config.privacyPolicyUrl,
+      });
       this.initHttpClient();
       this.initAnalytics();
       this.loadGoogleFonts();
@@ -621,7 +629,10 @@ export class NewsletterWidget {
     this.form.appendChild(fieldsContainer);
 
     // Initialize FormRenderer for field rendering (pass styles for labelHidden/hintHidden)
-    this.formRenderer = new FormRenderer(this.fieldConfigurations, this.config.styles);
+    this.formRenderer = new FormRenderer(
+      this.fieldConfigurations,
+      this.config.styles
+    );
 
     // Check if layoutElements exist
     if (this.layoutElements && this.layoutElements.length > 0) {

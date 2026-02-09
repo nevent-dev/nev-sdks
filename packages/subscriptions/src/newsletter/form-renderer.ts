@@ -39,7 +39,10 @@ export class FormRenderer {
    * @param fieldConfigurations - Array of field configurations from API
    * @param widgetStyles - Optional widget styles configuration for labelHidden/hintHidden
    */
-  constructor(fieldConfigurations: FieldConfiguration[] = [], widgetStyles: WidgetStyles | null = null) {
+  constructor(
+    fieldConfigurations: FieldConfiguration[] = [],
+    widgetStyles: WidgetStyles | null = null
+  ) {
     this.fieldConfigurations = fieldConfigurations;
     this.widgetStyles = widgetStyles;
   }
