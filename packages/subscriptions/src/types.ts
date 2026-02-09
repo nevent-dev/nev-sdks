@@ -68,11 +68,19 @@ export interface FieldConfiguration {
 }
 
 /**
+ * Font type enum
+ */
+export type FontType = 'GOOGLE_FONT' | 'CUSTOM_FONT';
+
+/**
  * Font configuration
  */
 export interface FontConfig {
   family?: string;
   category?: string;
+  type?: FontType;
+  customFontId?: string;
+  files?: Record<string, string>;
 }
 
 /**
@@ -119,20 +127,32 @@ export interface WidgetStyles {
     font?: FontConfig;
   };
   input?: {
+    font?: FontConfig;
     fontFamily?: string;
+    labelFont?: FontConfig;
+    labelFontSize?: string;
+    labelColor?: string;
+    placeholderFont?: FontConfig;
     placeholderFontFamily?: string;
     backgroundColor?: string;
     borderColor?: string;
+    borderWidth?: string;
     borderRadius?: string;
     padding?: string;
+    height?: string;
+    textColor?: string;
   };
   button?: {
+    font?: FontConfig;
     fontFamily?: string;
     backgroundColor?: string;
     hoverBackgroundColor?: string;
     textColor?: string;
+    borderColor?: string;
+    borderWidth?: string;
     borderRadius?: string;
     padding?: string;
+    height?: string;
   };
   layout?: {
     value?: LayoutDirection;

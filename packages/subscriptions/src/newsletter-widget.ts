@@ -7,7 +7,6 @@ import {
 import type {
   CustomFont,
   FieldConfiguration,
-  FontsResponse,
   LayoutElement,
   NewsletterConfig,
   ServerWidgetConfig,
@@ -86,7 +85,7 @@ export class NewsletterWidget {
       this.initHttpClient();
       this.initAnalytics();
       this.loadGoogleFonts();
-      await this.loadCustomFonts();
+      this.loadCustomFonts();
       this.render();
       this.attachEvents();
       this.trackEvent('widget_loaded');
@@ -336,16 +335,50 @@ export class NewsletterWidget {
     const googleFonts = new Set<string>();
     const styles = this.config.styles;
 
-    // Collect all Google Fonts from configuration
-    if (styles?.global?.font?.family) {
+    // Collect all Google Fonts from configuration (filter by type)
+    if (
+      styles?.global?.font?.family &&
+      styles.global.font.type === 'GOOGLE_FONT'
+    ) {
       googleFonts.add(styles.global.font.family);
     }
-    if (styles?.title?.font?.family) {
+    if (
+      styles?.title?.font?.family &&
+      styles.title.font.type === 'GOOGLE_FONT'
+    ) {
       googleFonts.add(styles.title.font.family);
     }
-    if (styles?.subtitle?.font?.family) {
+    if (
+      styles?.subtitle?.font?.family &&
+      styles.subtitle.font.type === 'GOOGLE_FONT'
+    ) {
       googleFonts.add(styles.subtitle.font.family);
     }
+    if (
+      styles?.input?.font?.family &&
+      styles.input.font.type === 'GOOGLE_FONT'
+    ) {
+      googleFonts.add(styles.input.font.family);
+    }
+    if (
+      styles?.button?.font?.family &&
+      styles.button.font.type === 'GOOGLE_FONT'
+    ) {
+      googleFonts.add(styles.button.font.family);
+    }
+    if (
+      styles?.input?.labelFont?.family &&
+      styles.input.labelFont.type === 'GOOGLE_FONT'
+    ) {
+      googleFonts.add(styles.input.labelFont.family);
+    }
+    if (
+      styles?.input?.placeholderFont?.family &&
+      styles.input.placeholderFont.type === 'GOOGLE_FONT'
+    ) {
+      googleFonts.add(styles.input.placeholderFont.family);
+    }
+    // Support legacy fontFamily properties (backward compatibility)
     if (styles?.input?.fontFamily) {
       googleFonts.add(styles.input.fontFamily);
     }
@@ -389,59 +422,35 @@ export class NewsletterWidget {
   }
 
   /**
-   * Loads custom fonts from server
+   * Loads custom fonts from config styles
    */
-  private async loadCustomFonts(): Promise<void> {
-    try {
-      const customFontFamilies = new Set<string>();
-      const styles = this.config.styles;
+  private loadCustomFonts(): void {
+    const styles = this.config.styles;
+    const fontSections = [
+      styles?.global?.font,
+      styles?.title?.font,
+      styles?.subtitle?.font,
+      styles?.input?.font,
+      styles?.input?.labelFont,
+      styles?.input?.placeholderFont,
+      styles?.button?.font,
+    ].filter(Boolean);
 
-      // Collect custom font families
-      if (styles?.global?.font?.family) {
-        customFontFamilies.add(styles.global.font.family);
+    for (const font of fontSections) {
+      if (font && font.type === 'CUSTOM_FONT' && font.files && font.family) {
+        this.injectCustomFont({
+          id: font.customFontId || font.family,
+          family: font.family,
+          files: font.files,
+        });
       }
-      if (styles?.title?.font?.family) {
-        customFontFamilies.add(styles.title.font.family);
-      }
-      if (styles?.subtitle?.font?.family) {
-        customFontFamilies.add(styles.subtitle.font.family);
-      }
+    }
 
-      if (customFontFamilies.size === 0) {
-        return;
-      }
-
-      // Fetch available custom fonts
-      const url = `${this.config.apiUrl}/public/widget/fonts?tenantId=${this.config.tenantId}`;
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: { Accept: 'application/json' },
-      });
-
-      if (!response.ok) {
-        this.logger.warn('Could not load custom fonts from server');
-        return;
-      }
-
-      const fontsData = (await response.json()) as FontsResponse;
-      const customFonts = fontsData.customFonts || [];
-
-      // Inject each custom font
-      customFontFamilies.forEach((family) => {
-        if (family && family !== 'inherit') {
-          const customFont = customFonts.find((font) => font.family === family);
-          if (customFont) {
-            this.injectCustomFont(customFont);
-          }
-        }
-      });
-
+    if (this.loadedCustomFonts.size > 0) {
       this.logger.debug(
         'Custom fonts loaded:',
         Array.from(this.loadedCustomFonts)
       );
-    } catch (error) {
-      this.logger.warn('Error loading custom fonts:', error);
     }
   }
 
@@ -975,6 +984,42 @@ export class NewsletterWidget {
     const primaryColor = this.config.primaryColor;
     const borderRadius = this.extractNumericValue(this.config.borderRadius);
 
+    // Build font-family cascades with fallbacks
+    const globalFontFamily =
+      styles?.global?.font?.family && styles.global.font.type !== 'CUSTOM_FONT'
+        ? `'${styles.global.font.family}', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
+        : styles?.global?.font?.family
+          ? `'${styles.global.font.family}', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
+          : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+    const titleFontFamily = styles?.title?.font?.family
+      ? `'${styles.title.font.family}', ${globalFontFamily}`
+      : globalFontFamily;
+
+    const subtitleFontFamily = styles?.subtitle?.font?.family
+      ? `'${styles.subtitle.font.family}', ${globalFontFamily}`
+      : globalFontFamily;
+
+    const inputFontFamily = styles?.input?.font?.family
+      ? `'${styles.input.font.family}', ${globalFontFamily}`
+      : styles?.input?.fontFamily
+        ? `'${styles.input.fontFamily}', ${globalFontFamily}`
+        : globalFontFamily;
+
+    const buttonFontFamily = styles?.button?.font?.family
+      ? `'${styles.button.font.family}', ${globalFontFamily}`
+      : styles?.button?.fontFamily
+        ? `'${styles.button.fontFamily}', ${globalFontFamily}`
+        : globalFontFamily;
+
+    const labelFontFamily = styles?.input?.labelFont?.family
+      ? `'${styles.input.labelFont.family}', ${globalFontFamily}`
+      : globalFontFamily;
+
+    const placeholderFontFamily = styles?.input?.placeholderFont?.family
+      ? `'${styles.input.placeholderFont.family}', ${globalFontFamily}`
+      : globalFontFamily;
+
     return `
       .nevent-widget-form {
         display: flex;
@@ -982,9 +1027,9 @@ export class NewsletterWidget {
         gap: ${global.spacingBetweenElements || '12px'};
         padding: ${global.innerPadding || '20px'};
         background: ${backgroundColor};
-        border: 1px solid #e0e0e0;
+        border: none;
         border-radius: ${borderRadius}px;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-family: ${globalFontFamily};
         box-sizing: border-box;
         width: 100%;
         max-width: 100%;
@@ -997,12 +1042,14 @@ export class NewsletterWidget {
         font-size: ${styles?.title?.fontSize || '24px'};
         font-weight: ${styles?.title?.fontWeight || '600'};
         color: ${styles?.title?.color || '#333'};
+        font-family: ${titleFontFamily};
       }
 
       .nevent-subtitle {
         margin: 0 0 16px 0;
         font-size: ${styles?.subtitle?.fontSize || '14px'};
         color: ${styles?.subtitle?.color || '#666'};
+        font-family: ${subtitleFontFamily};
       }
 
       .nevent-fields-container {
@@ -1027,13 +1074,29 @@ export class NewsletterWidget {
         flex-direction: column;
       }
 
+      .nevent-field-label {
+        font-size: ${styles?.input?.labelFontSize || '14px'};
+        color: ${styles?.input?.labelColor || '#333'};
+        font-family: ${labelFontFamily};
+        margin-bottom: 4px;
+        font-weight: 500;
+      }
+
       .nevent-input {
         padding: ${styles?.input?.padding || '12px'};
-        border: 1px solid ${styles?.input?.borderColor || '#ddd'};
+        border: ${this.generateBorderCSS(styles?.input?.borderWidth, styles?.input?.borderColor, primaryColor)};
         border-radius: ${styles?.input?.borderRadius || '4px'};
         background: ${styles?.input?.backgroundColor || '#fff'};
+        color: ${styles?.input?.textColor || 'inherit'};
+        font-family: ${inputFontFamily};
         font-size: 14px;
+        ${styles?.input?.height ? `height: ${styles.input.height};` : ''}
         transition: border-color 0.2s;
+      }
+
+      .nevent-input::placeholder {
+        font-family: ${placeholderFontFamily};
+        color: #999;
       }
 
       .nevent-input:focus {
@@ -1063,16 +1126,18 @@ export class NewsletterWidget {
         padding: ${styles?.button?.padding || '12px 24px'};
         background: ${styles?.button?.backgroundColor || primaryColor};
         color: ${styles?.button?.textColor || '#fff'};
-        border: none;
+        border: ${this.generateBorderCSS(styles?.button?.borderWidth, styles?.button?.borderColor, primaryColor)};
         border-radius: ${styles?.button?.borderRadius || '4px'};
+        font-family: ${buttonFontFamily};
         font-size: 16px;
         font-weight: 600;
+        ${styles?.button?.height ? `height: ${styles.button.height};` : ''}
         cursor: pointer;
-        transition: background-color 0.2s;
+        transition: filter 0.2s, background-color 0.2s;
       }
 
       .nevent-submit-button:hover {
-        background: ${styles?.button?.hoverBackgroundColor || '#0056b3'};
+        ${styles?.button?.hoverBackgroundColor ? `background: ${styles.button.hoverBackgroundColor};` : 'filter: brightness(0.9);'}
       }
 
       .nevent-submit-button:disabled {
@@ -1385,6 +1450,47 @@ export class NewsletterWidget {
 
     const parsed = parseInt(value, 10);
     return isNaN(parsed) ? 0 : parsed;
+  }
+
+  /**
+   * Generates valid CSS border shorthand property
+   *
+   * Handles three scenarios:
+   * 1. Both borderWidth and borderColor are set: use provided values
+   * 2. Only borderColor is set: default borderWidth to '1px'
+   * 3. borderWidth is 'none' or '0': ignore borderColor, return 'none'
+   * 4. Neither is set: return 'none'
+   *
+   * @param borderWidth - CSS border width (e.g., '2px', 'none', '0')
+   * @param borderColor - CSS border color (e.g., '#color', undefined)
+   * @param fallbackColor - Fallback color if neither is provided
+   * @returns Valid CSS border property value
+   */
+  private generateBorderCSS(
+    borderWidth: string | undefined,
+    borderColor: string | undefined,
+    fallbackColor: string
+  ): string {
+    // If borderWidth is explicitly 'none' or '0', return 'none' (ignore borderColor)
+    if (borderWidth === 'none' || borderWidth === '0') {
+      return 'none';
+    }
+
+    // If neither borderWidth nor borderColor is set, return 'none'
+    if (!borderWidth && !borderColor) {
+      return 'none';
+    }
+
+    // If only borderColor is set, default borderWidth to '1px'
+    const width = borderWidth || '1px';
+
+    // If only borderWidth is set (no color), return just the width with 'solid' style
+    if (!borderColor) {
+      return `${width} solid ${fallbackColor}`;
+    }
+
+    // Both are set, return complete border
+    return `${width} solid ${borderColor}`;
   }
 
   /**
