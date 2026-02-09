@@ -1273,6 +1273,155 @@ describe('FormRenderer', () => {
     });
   });
 
+  describe('Field Adapter integration (NEV-1340)', () => {
+    it('should handle adapted API fields with dataType TEXT as text input', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'company_name',
+          propertyDefinitionId: 'company_name',
+          displayName: 'Company Name',
+          hint: null,
+          required: false,
+          type: 'text',
+          placeholder: 'Enter company',
+          width: 60,
+          displayOrder: 1,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const input = container.querySelector(
+        'input[name="company_name"]'
+      ) as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.type).toBe('text');
+    });
+
+    it('should handle adapted API fields with SELECT options (value+label)', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'category',
+          propertyDefinitionId: 'category',
+          displayName: 'Category',
+          hint: null,
+          required: true,
+          type: 'select',
+          options: [
+            { value: 'tech', label: 'Technology' },
+            { value: 'sports', label: 'Sports' },
+          ],
+          displayOrder: 2,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const select = container.querySelector('select') as HTMLSelectElement;
+      expect(select).toBeTruthy();
+      const options = select.querySelectorAll('option');
+      expect(options.length).toBe(3); // placeholder + 2
+      expect(options[1]!.value).toBe('tech');
+      expect(options[1]!.textContent).toBe('Technology');
+    });
+
+    it('should handle adapted API fields with BOOLEAN as checkbox', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'accepts_newsletter',
+          propertyDefinitionId: 'accepts_newsletter',
+          displayName: 'Accepts Newsletter',
+          hint: null,
+          required: false,
+          type: 'checkbox',
+          displayOrder: 3,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const input = container.querySelector(
+        'input[name="accepts_newsletter"]'
+      ) as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.type).toBe('checkbox');
+    });
+
+    it('should handle adapted API fields with DATE as date input', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'birth_date',
+          propertyDefinitionId: 'birth_date',
+          displayName: 'Birth Date',
+          hint: null,
+          required: false,
+          type: 'date',
+          displayOrder: 4,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const input = container.querySelector(
+        'input[name="birth_date"]'
+      ) as HTMLInputElement;
+      expect(input).toBeTruthy();
+      expect(input.type).toBe('date');
+    });
+
+    it('should handle flexible width values (1-100)', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'name',
+          propertyDefinitionId: 'name',
+          displayName: 'Name',
+          hint: null,
+          required: true,
+          type: 'text',
+          width: 60,
+          displayOrder: 1,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const field = container.querySelector('.nevent-field') as HTMLElement;
+      expect(field.style.width).toBe('calc(60% - 12px)');
+    });
+
+    it('should render propertyDefinitionId as fieldName', () => {
+      const fieldConfigurations: FieldConfiguration[] = [
+        {
+          fieldName: 'custom_prop_123',
+          propertyDefinitionId: 'custom_prop_123',
+          displayName: 'Custom Property',
+          hint: null,
+          required: false,
+          type: 'text',
+          displayOrder: 1,
+        },
+      ];
+
+      const renderer = new FormRenderer(fieldConfigurations);
+      renderer.render(container);
+
+      const field = container.querySelector(
+        '[data-field-name="custom_prop_123"]'
+      );
+      expect(field).toBeTruthy();
+
+      const input = container.querySelector(
+        'input[name="custom_prop_123"]'
+      ) as HTMLInputElement;
+      expect(input).toBeTruthy();
+    });
+  });
+
   describe('LIST/select field rendering', () => {
     it('should render a select element for list type fields', () => {
       const configs: FieldConfiguration[] = [

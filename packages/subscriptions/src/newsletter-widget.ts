@@ -15,6 +15,7 @@ import type {
 } from './types';
 import { WidgetTracker } from './newsletter/analytics/widget-tracker';
 import { FormRenderer } from './newsletter/form-renderer';
+import { adaptFieldConfigurations } from './newsletter/field-adapter';
 
 /**
  * Nevent Newsletter Subscription Widget
@@ -260,12 +261,14 @@ export class NewsletterWidget {
         this.config = mergedConfig as Required<NewsletterConfig>;
         this.logger.debug('Widget configuration loaded from server');
 
-        // Store fieldConfigurations if provided by API
+        // Store fieldConfigurations if provided by API (adapt from raw API format)
         if (
           serverConfig.fieldConfigurations &&
           serverConfig.fieldConfigurations.length > 0
         ) {
-          this.fieldConfigurations = serverConfig.fieldConfigurations;
+          this.fieldConfigurations = adaptFieldConfigurations(
+            serverConfig.fieldConfigurations
+          );
           this.logger.debug(
             'Dynamic field configurations loaded from API:',
             this.fieldConfigurations
@@ -595,7 +598,10 @@ export class NewsletterWidget {
 
     // Ensure email field exists (required for form submission)
     const hasEmailField = this.fieldConfigurations.some(
-      (f) => f.type === 'email' || f.fieldName === 'email'
+      (f) =>
+        f.type === 'email' ||
+        f.fieldName === 'email' ||
+        f.propertyDefinitionId?.toLowerCase().includes('email')
     );
     if (!hasEmailField) {
       this.fieldConfigurations.unshift({
@@ -881,7 +887,7 @@ export class NewsletterWidget {
    * @param width - Width percentage (25, 50, 75, or 100)
    * @returns HTMLElement containing GDPR checkbox
    */
-  private buildGDPRElement(width: 25 | 50 | 75 | 100): HTMLElement {
+  private buildGDPRElement(width: number): HTMLElement {
     const container = document.createElement('div');
     container.className = 'nevent-gdpr';
 
@@ -927,7 +933,7 @@ export class NewsletterWidget {
    * @param width - Width percentage (25, 50, 75, or 100)
    * @returns HTMLElement containing submit button
    */
-  private buildSubmitButtonElement(width: 25 | 50 | 75 | 100): HTMLElement {
+  private buildSubmitButtonElement(width: number): HTMLElement {
     const container = document.createElement('div');
     container.className = 'nevent-submit-button-container';
 
@@ -1246,33 +1252,26 @@ export class NewsletterWidget {
       if (this.formRenderer) {
         // Get data from dynamic form
         const dynamicFormData = this.formRenderer.getFormData();
+        const emailValue = dynamicFormData.email?.trim() || email.trim();
+
+        // Build properties: { propertyDefinitionId: value } (exclude email)
+        const properties: Record<string, string> = {};
+        this.fieldConfigurations.forEach((config) => {
+          if (
+            config.propertyDefinitionId &&
+            config.type !== 'email' &&
+            config.fieldName !== 'email'
+          ) {
+            const value = dynamicFormData[config.fieldName];
+            if (value) {
+              properties[config.propertyDefinitionId] = value;
+            }
+          }
+        });
+
         subscriptionData = {
-          email: dynamicFormData.email?.trim() || email.trim(),
-          ...(dynamicFormData.firstName && {
-            firstName: dynamicFormData.firstName,
-          }),
-          ...(dynamicFormData.lastName && {
-            lastName: dynamicFormData.lastName,
-          }),
-          ...(dynamicFormData.postalCode && {
-            postalCode: dynamicFormData.postalCode,
-          }),
-          ...(dynamicFormData.birthDate && {
-            birthDate: dynamicFormData.birthDate,
-          }),
-          // Include any additional custom fields
-          ...Object.fromEntries(
-            Object.entries(dynamicFormData).filter(
-              ([key]) =>
-                ![
-                  'email',
-                  'firstName',
-                  'lastName',
-                  'postalCode',
-                  'birthDate',
-                ].includes(key)
-            )
-          ),
+          email: emailValue,
+          ...(Object.keys(properties).length > 0 ? { properties } : {}),
           consent: {
             marketing: true,
             timestamp: new Date().toISOString(),
@@ -1280,17 +1279,8 @@ export class NewsletterWidget {
         };
       } else {
         // Legacy form data collection
-        const firstName = formData.get('firstName') as string;
-        const lastName = formData.get('lastName') as string;
-        const postalCode = formData.get('postalCode') as string;
-        const birthDate = formData.get('birthDate') as string;
-
         subscriptionData = {
           email: email.trim(),
-          ...(firstName && { firstName }),
-          ...(lastName && { lastName }),
-          ...(postalCode && { postalCode }),
-          ...(birthDate && { birthDate }),
           consent: {
             marketing: true,
             timestamp: new Date().toISOString(),
