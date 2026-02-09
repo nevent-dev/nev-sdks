@@ -16,6 +16,33 @@ export interface FieldConfig {
 }
 
 /**
+ * API data types from backend contract
+ */
+export type ApiDataType =
+  | 'TEXT'
+  | 'NUMBER'
+  | 'DATE'
+  | 'BOOLEAN'
+  | 'SELECT'
+  | 'LIST';
+
+/**
+ * Raw field configuration from backend API (GET /public/widget/{id}/config)
+ */
+export interface ApiFieldConfiguration {
+  propertyDefinitionId: string;
+  enabled: boolean;
+  required: boolean;
+  displayOrder: number;
+  width?: number;
+  displayName: string | null;
+  hint: string | null;
+  placeholder: string | null;
+  dataType: ApiDataType;
+  options?: Array<{ value: string; label: string } | string> | null;
+}
+
+/**
  * Field type for dynamic form fields
  */
 export type FieldType =
@@ -50,13 +77,15 @@ export interface FieldOption {
  */
 export interface FieldConfiguration {
   fieldName: string;
+  propertyDefinitionId?: string;
   displayName: string;
   hint?: string | null;
   required: boolean;
   type: FieldType;
   options?: FieldOption[];
   placeholder?: string;
-  width?: 25 | 50 | 75 | 100;
+  width?: number;
+  displayOrder?: number;
   metadata?: Record<string, unknown>;
   validatorConfiguration?: {
     type: string;
@@ -95,7 +124,7 @@ export type LayoutElementType = 'field' | 'legalTerms' | 'submitButton';
 export interface LayoutElement {
   type: LayoutElementType;
   key: string; // for 'field': matches fieldName; for others: 'legalTerms' or 'submitButton'
-  width: 25 | 50 | 75 | 100;
+  width: number;
   order: number;
 }
 
@@ -241,7 +270,7 @@ export interface ServerWidgetConfig {
   privacyPolicyUrl?: string;
   title?: string;
   subtitle?: string;
-  fieldConfigurations?: FieldConfiguration[];
+  fieldConfigurations?: ApiFieldConfiguration[];
 }
 
 /**
@@ -265,10 +294,7 @@ export interface FontsResponse {
  */
 export interface SubscriptionData {
   email: string;
-  firstName?: string;
-  lastName?: string;
-  postalCode?: string;
-  birthDate?: string;
+  properties?: Record<string, string>;
   consent: ConsentData;
 }
 
