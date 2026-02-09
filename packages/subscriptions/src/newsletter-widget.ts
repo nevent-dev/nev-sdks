@@ -620,8 +620,8 @@ export class NewsletterWidget {
     fieldsContainer.className = 'nevent-fields-container';
     this.form.appendChild(fieldsContainer);
 
-    // Initialize FormRenderer for field rendering
-    this.formRenderer = new FormRenderer(this.fieldConfigurations);
+    // Initialize FormRenderer for field rendering (pass styles for labelHidden/hintHidden)
+    this.formRenderer = new FormRenderer(this.fieldConfigurations, this.config.styles);
 
     // Check if layoutElements exist
     if (this.layoutElements && this.layoutElements.length > 0) {
