@@ -44,6 +44,9 @@ Thumbs.db
 *.temp
 .cache/
 
+# Manual test files
+tests/
+
 # Changesets
 .changeset/*.md
 !.changeset/README.md
