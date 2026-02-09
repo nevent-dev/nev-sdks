@@ -5,6 +5,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   deploy:
     name: Deploy to neventapps.com
@@ -104,64 +107,31 @@ jobs:
 
       - name: Create GitHub Release
         if: steps.check-version.outputs.exists == 'false'
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          release_name: Release v${{ steps.version.outputs.version }}
-          body: |
-            ## Nevent Subscriptions SDK v${{ steps.version.outputs.version }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          gh release create "v${VERSION}" \
+            --title "Release v${VERSION}" \
+            --notes "## Nevent Subscriptions SDK v${VERSION}
 
-            ### CDN URLs (Production)
+          ### CDN URLs (Production)
 
-            **Versioned (recommended for production - immutable):**
-            ```html
-            <script src="https://neventapps.com/subs/v${{ steps.version.outputs.version }}/nevent-subscriptions.umd.cjs"></script>
-            ```
+          **Versioned (recommended for production - immutable):**
+          \`\`\`html
+          <script src=\"https://neventapps.com/subs/v${VERSION}/nevent-subscriptions.umd.cjs\"></script>
+          \`\`\`
 
-            **Latest (auto-updates to newest version):**
-            ```html
-            <script src="https://neventapps.com/subs/latest/nevent-subscriptions.umd.cjs"></script>
-            ```
+          **Latest (auto-updates to newest version):**
+          \`\`\`html
+          <script src=\"https://neventapps.com/subs/latest/nevent-subscriptions.umd.cjs\"></script>
+          \`\`\`
 
-            ### Quick Integration Example
+          ### Module Formats
 
-            ```html
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Newsletter Subscription</title>
-            </head>
-            <body>
-              <div id="newsletter-widget"></div>
-
-              <script src="https://neventapps.com/subs/v${{ steps.version.outputs.version }}/nevent-subscriptions.umd.cjs"></script>
-              <script>
-                const widget = new NeventSubscriptions.NewsletterWidget({
-                  newsletterId: 'your-newsletter-id',
-                  tenantId: 'your-tenant-id',
-                  containerId: 'newsletter-widget'
-                });
-                widget.init();
-              </script>
-            </body>
-            </html>
-            ```
-
-            ### Module Formats
-
-            - **UMD (Browser):** `nevent-subscriptions.umd.cjs`
-            - **ES Module:** `nevent-subscriptions.js`
-            - **TypeScript:** `index.d.ts`
-
-            ### Documentation
-
-            - [Installation Guide](https://github.com/nevent/nev-sdks#installation)
-            - [API Reference](https://github.com/nevent/nev-sdks/tree/main/packages/subscriptions)
-            - [Deployment Guide](https://github.com/nevent/nev-sdks/blob/main/docs/DEPLOYMENT.md)
-          draft: false
-          prerelease: false
+          - **UMD (Browser):** \`nevent-subscriptions.umd.cjs\`
+          - **ES Module:** \`nevent-subscriptions.js\`
+          - **TypeScript:** \`index.d.ts\`"
 
       - name: Deployment summary
         if: steps.check-version.outputs.exists == 'false'
