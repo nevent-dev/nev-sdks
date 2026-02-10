@@ -1,4 +1,4 @@
-import type { FieldConfiguration, FieldType } from '../types';
+import type { FieldConfiguration, FieldType, WidgetStyles } from '../types';
 
 /**
  * FormRenderer: Dynamic form rendering engine
@@ -31,14 +31,20 @@ export class FormRenderer {
     string,
     HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
   > = new Map();
+  private widgetStyles: WidgetStyles | null = null;
 
   /**
    * Creates a new FormRenderer instance
    *
    * @param fieldConfigurations - Array of field configurations from API
+   * @param widgetStyles - Optional widget styles configuration for labelHidden/hintHidden
    */
-  constructor(fieldConfigurations: FieldConfiguration[] = []) {
+  constructor(
+    fieldConfigurations: FieldConfiguration[] = [],
+    widgetStyles: WidgetStyles | null = null
+  ) {
     this.fieldConfigurations = fieldConfigurations;
+    this.widgetStyles = widgetStyles;
   }
 
   /**
@@ -50,6 +56,15 @@ export class FormRenderer {
     fieldConfigurations: FieldConfiguration[]
   ): void {
     this.fieldConfigurations = fieldConfigurations;
+  }
+
+  /**
+   * Sets widget styles (useful for updating after API call)
+   *
+   * @param widgetStyles - Widget styles configuration
+   */
+  public setWidgetStyles(widgetStyles: WidgetStyles | null): void {
+    this.widgetStyles = widgetStyles;
   }
 
   /**
@@ -106,9 +121,11 @@ export class FormRenderer {
     }
     fieldContainer.style.boxSizing = 'border-box';
 
-    // Create label
+    // Create label (only if not hidden)
     const label = this.createLabel(config);
-    fieldContainer.appendChild(label);
+    if (label) {
+      fieldContainer.appendChild(label);
+    }
 
     // Create input based on type
     const input = this.createInput(config);
@@ -117,8 +134,9 @@ export class FormRenderer {
     // Store reference to input element
     this.fieldElements.set(config.fieldName, input);
 
-    // Create hint text if provided
-    if (config.hint) {
+    // Create hint text if provided and not hidden
+    const hintHidden = this.widgetStyles?.input?.hintHidden ?? false;
+    if (config.hint && !hintHidden) {
       const hint = this.createHint(config.hint);
       fieldContainer.appendChild(hint);
     }
@@ -135,9 +153,16 @@ export class FormRenderer {
    * Creates a label element for the field
    *
    * @param config - Field configuration
-   * @returns HTMLLabelElement
+   * @returns HTMLLabelElement or null if label is hidden
    */
-  private createLabel(config: FieldConfiguration): HTMLLabelElement {
+  private createLabel(config: FieldConfiguration): HTMLLabelElement | null {
+    // Check if labels should be hidden via widget styles
+    const labelHidden = this.widgetStyles?.input?.labelHidden ?? false;
+
+    if (labelHidden) {
+      return null;
+    }
+
     const label = document.createElement('label');
     label.className = 'nevent-field-label';
     label.htmlFor = `nevent-field-${config.fieldName}`;
