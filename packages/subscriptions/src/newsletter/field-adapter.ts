@@ -21,7 +21,7 @@ export function adaptFieldConfigurations(
     .sort((a, b) => a.displayOrder - b.displayOrder)
     .map((f) => {
       const adapted: FieldConfiguration = {
-        fieldName: f.propertyDefinitionId,
+        fieldName: f.semanticKey || f.propertyDefinitionId,
         propertyDefinitionId: f.propertyDefinitionId,
         displayName: f.displayName || f.propertyDefinitionId,
         hint: f.hint,

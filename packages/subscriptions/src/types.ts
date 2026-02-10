@@ -38,6 +38,7 @@ export interface ApiFieldConfiguration {
   displayName: string | null;
   hint: string | null;
   placeholder: string | null;
+  semanticKey?: string;
   dataType: ApiDataType;
   options?: Array<{ value: string; label: string } | string> | null;
 }
