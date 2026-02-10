@@ -17,9 +17,7 @@ describe('SEO Injector', () => {
    */
   function cleanupSeoElements(): void {
     // Remove link elements (dns-prefetch, preconnect)
-    const links = document.head.querySelectorAll(
-      'link[id^="nevent-seo-"]'
-    );
+    const links = document.head.querySelectorAll('link[id^="nevent-seo-"]');
     links.forEach((link) => link.remove());
 
     // Remove meta generator
@@ -277,9 +275,13 @@ describe('SEO Injector', () => {
 
       // Both should coexist
       const schemaExists = document.getElementById('nevent-jsonld-test-123');
-      const dnsPrefetchExists = document.getElementById('nevent-seo-dns-prefetch');
+      const dnsPrefetchExists = document.getElementById(
+        'nevent-seo-dns-prefetch'
+      );
       const preconnectExists = document.getElementById('nevent-seo-preconnect');
-      const metaGeneratorExists = document.getElementById('nevent-seo-generator');
+      const metaGeneratorExists = document.getElementById(
+        'nevent-seo-generator'
+      );
 
       expect(schemaExists).toBeTruthy();
       expect(dnsPrefetchExists).toBeTruthy();
