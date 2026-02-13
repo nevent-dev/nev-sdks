@@ -659,14 +659,30 @@ export class NewsletterWidget {
       (a, b) => a.order - b.order
     );
 
+    // Pre-compute field-only layout elements for order-based fallback matching
+    const fieldLayoutElements = sortedElements.filter(
+      (e) => e.type === 'field'
+    );
+
     sortedElements.forEach((layoutElement) => {
       const { type, key, width } = layoutElement;
 
       if (type === 'field') {
-        // Render field from fieldConfigurations
-        const fieldConfig = this.fieldConfigurations.find(
+        // Primary: match by fieldName (semanticKey)
+        let fieldConfig = this.fieldConfigurations.find(
           (f) => f.fieldName === key
         );
+
+        // Fallback: match by position when semanticKey is unavailable
+        // This handles cases where backend doesn't return semanticKey,
+        // causing fieldName to be a MongoDB ObjectId instead
+        if (!fieldConfig) {
+          const fieldIndex = fieldLayoutElements.indexOf(layoutElement);
+          if (fieldIndex >= 0 && fieldIndex < this.fieldConfigurations.length) {
+            fieldConfig = this.fieldConfigurations[fieldIndex];
+          }
+        }
+
         if (fieldConfig) {
           // Override width from layoutElement
           const configWithWidth = { ...fieldConfig, width };

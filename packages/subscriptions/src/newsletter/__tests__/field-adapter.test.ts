@@ -372,4 +372,128 @@ describe('adaptFieldConfigurations', () => {
     const result = adaptFieldConfigurations(apiFields);
     expect(result[0]!.displayOrder).toBe(5);
   });
+
+  it('should use semanticKey for fieldName when provided', () => {
+    const apiFields: ApiFieldConfiguration[] = [
+      {
+        propertyDefinitionId: '507f1f77bcf86cd799439011',
+        semanticKey: 'email',
+        enabled: true,
+        required: true,
+        displayOrder: 1,
+        displayName: 'Email Address',
+        hint: null,
+        placeholder: null,
+        dataType: 'TEXT',
+      },
+    ];
+
+    const result = adaptFieldConfigurations(apiFields);
+    expect(result[0]!.fieldName).toBe('email');
+    expect(result[0]!.propertyDefinitionId).toBe('507f1f77bcf86cd799439011');
+  });
+
+  it('should fallback to propertyDefinitionId when semanticKey is missing', () => {
+    const apiFields: ApiFieldConfiguration[] = [
+      {
+        propertyDefinitionId: '507f1f77bcf86cd799439011',
+        enabled: true,
+        required: true,
+        displayOrder: 1,
+        displayName: 'Custom Field',
+        hint: null,
+        placeholder: null,
+        dataType: 'TEXT',
+      },
+    ];
+
+    const result = adaptFieldConfigurations(apiFields);
+    expect(result[0]!.fieldName).toBe('507f1f77bcf86cd799439011');
+    expect(result[0]!.propertyDefinitionId).toBe('507f1f77bcf86cd799439011');
+  });
+
+  it('should fallback to propertyDefinitionId when semanticKey is empty string', () => {
+    const apiFields: ApiFieldConfiguration[] = [
+      {
+        propertyDefinitionId: 'custom_prop_456',
+        semanticKey: '',
+        enabled: true,
+        required: false,
+        displayOrder: 1,
+        displayName: 'Custom Property',
+        hint: null,
+        placeholder: null,
+        dataType: 'TEXT',
+      },
+    ];
+
+    const result = adaptFieldConfigurations(apiFields);
+    expect(result[0]!.fieldName).toBe('custom_prop_456');
+    expect(result[0]!.propertyDefinitionId).toBe('custom_prop_456');
+  });
+
+  it('should handle mix of fields with and without semanticKey', () => {
+    const apiFields: ApiFieldConfiguration[] = [
+      {
+        propertyDefinitionId: '507f1f77bcf86cd799439011',
+        semanticKey: 'email',
+        enabled: true,
+        required: true,
+        displayOrder: 1,
+        displayName: 'Email',
+        hint: null,
+        placeholder: null,
+        dataType: 'TEXT',
+      },
+      {
+        propertyDefinitionId: '507f1f77bcf86cd799439012',
+        semanticKey: 'firstName',
+        enabled: true,
+        required: true,
+        displayOrder: 2,
+        displayName: 'First Name',
+        hint: null,
+        placeholder: null,
+        dataType: 'TEXT',
+      },
+      {
+        propertyDefinitionId: '507f1f77bcf86cd799439013',
+        enabled: true,
+        required: false,
+        displayOrder: 3,
+        displayName: 'Custom Field',
+        hint: null,
+        placeholder: null,
+        dataType: 'TEXT',
+      },
+    ];
+
+    const result = adaptFieldConfigurations(apiFields);
+    expect(result[0]!.fieldName).toBe('email');
+    expect(result[0]!.propertyDefinitionId).toBe('507f1f77bcf86cd799439011');
+    expect(result[1]!.fieldName).toBe('firstName');
+    expect(result[1]!.propertyDefinitionId).toBe('507f1f77bcf86cd799439012');
+    expect(result[2]!.fieldName).toBe('507f1f77bcf86cd799439013');
+    expect(result[2]!.propertyDefinitionId).toBe('507f1f77bcf86cd799439013');
+  });
+
+  it('should use semanticKey for semantic keys like administrativeAreaLevel2', () => {
+    const apiFields: ApiFieldConfiguration[] = [
+      {
+        propertyDefinitionId: '507f1f77bcf86cd799439014',
+        semanticKey: 'administrativeAreaLevel2',
+        enabled: true,
+        required: false,
+        displayOrder: 1,
+        displayName: 'Province',
+        hint: null,
+        placeholder: null,
+        dataType: 'TEXT',
+      },
+    ];
+
+    const result = adaptFieldConfigurations(apiFields);
+    expect(result[0]!.fieldName).toBe('administrativeAreaLevel2');
+    expect(result[0]!.propertyDefinitionId).toBe('507f1f77bcf86cd799439014');
+  });
 });
