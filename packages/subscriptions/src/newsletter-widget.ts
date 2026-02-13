@@ -660,7 +660,9 @@ export class NewsletterWidget {
     );
 
     // Pre-compute field-only layout elements for order-based fallback matching
-    const fieldLayoutElements = sortedElements.filter(e => e.type === 'field');
+    const fieldLayoutElements = sortedElements.filter(
+      (e) => e.type === 'field'
+    );
 
     sortedElements.forEach((layoutElement) => {
       const { type, key, width } = layoutElement;
