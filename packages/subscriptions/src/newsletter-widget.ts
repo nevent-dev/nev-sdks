@@ -301,6 +301,9 @@ export class NewsletterWidget {
             this.layoutElements
           );
         }
+
+        // Enrich field configs with semantic keys from layout elements
+        this.enrichFieldConfigsFromLayout();
       } else {
         this.logger.warn(
           'Could not load widget configuration from server, using defaults'
@@ -310,6 +313,34 @@ export class NewsletterWidget {
     } catch (error) {
       this.logger.warn('Error loading widget configuration:', error);
     }
+  }
+
+  /**
+   * Enriches field configurations with semantic keys from layout elements.
+   * When backend doesn't return semanticKey, fieldName defaults to propertyDefinitionId.
+   * Layout elements contain the expected semantic keys, so we match by displayOrder position.
+   */
+  private enrichFieldConfigsFromLayout(): void {
+    if (!this.layoutElements || this.layoutElements.length === 0) return;
+    if (!this.fieldConfigurations || this.fieldConfigurations.length === 0)
+      return;
+
+    const fieldLayouts = this.layoutElements
+      .filter((e) => e.type === 'field')
+      .sort((a, b) => a.order - b.order);
+
+    const sortedConfigs = [...this.fieldConfigurations].sort(
+      (a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0)
+    );
+
+    fieldLayouts.forEach((layout, index) => {
+      if (index < sortedConfigs.length) {
+        const config = sortedConfigs[index];
+        if (config && config.fieldName === config.propertyDefinitionId) {
+          config.fieldName = layout.key;
+        }
+      }
+    });
   }
 
   /**
@@ -654,47 +685,26 @@ export class NewsletterWidget {
    * Renders form using layoutElements for order and width
    */
   private renderLayoutBasedForm(container: HTMLElement): void {
-    // Sort layoutElements by order property
     const sortedElements = [...this.layoutElements].sort(
       (a, b) => a.order - b.order
-    );
-
-    // Pre-compute field-only layout elements for order-based fallback matching
-    const fieldLayoutElements = sortedElements.filter(
-      (e) => e.type === 'field'
     );
 
     sortedElements.forEach((layoutElement) => {
       const { type, key, width } = layoutElement;
 
       if (type === 'field') {
-        // Primary: match by fieldName (semanticKey)
-        let fieldConfig = this.fieldConfigurations.find(
+        const fieldConfig = this.fieldConfigurations.find(
           (f) => f.fieldName === key
         );
-
-        // Fallback: match by position when semanticKey is unavailable
-        // This handles cases where backend doesn't return semanticKey,
-        // causing fieldName to be a MongoDB ObjectId instead
-        if (!fieldConfig) {
-          const fieldIndex = fieldLayoutElements.indexOf(layoutElement);
-          if (fieldIndex >= 0 && fieldIndex < this.fieldConfigurations.length) {
-            fieldConfig = this.fieldConfigurations[fieldIndex];
-          }
-        }
-
         if (fieldConfig) {
-          // Override width from layoutElement
           const configWithWidth = { ...fieldConfig, width };
           const fieldElement = this.formRenderer!.renderField(configWithWidth);
           container.appendChild(fieldElement);
         }
       } else if (type === 'legalTerms') {
-        // Render GDPR checkbox with width
         const gdprElement = this.buildGDPRElement(width);
         container.appendChild(gdprElement);
       } else if (type === 'submitButton') {
-        // Render submit button with width
         const submitElement = this.buildSubmitButtonElement(width);
         container.appendChild(submitElement);
       }
@@ -1158,6 +1168,7 @@ export class NewsletterWidget {
       }
 
       .nevent-submit-button {
+        width: 100%;
         padding: ${styles?.button?.padding || '12px 24px'};
         background: ${styles?.button?.backgroundColor || primaryColor};
         color: ${styles?.button?.textColor || '#fff'};
