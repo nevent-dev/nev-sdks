@@ -38,6 +38,7 @@ export interface ApiFieldConfiguration {
   displayName: string | null;
   hint: string | null;
   placeholder: string | null;
+  semanticKey?: string;
   dataType: ApiDataType;
   options?: Array<{ value: string; label: string } | string> | null;
 }
@@ -161,6 +162,7 @@ export interface WidgetStyles {
     labelFont?: FontConfig;
     labelFontSize?: string;
     labelColor?: string;
+    labelHidden?: boolean;
     placeholderFont?: FontConfig;
     placeholderFontFamily?: string;
     backgroundColor?: string;
@@ -170,6 +172,7 @@ export interface WidgetStyles {
     padding?: string;
     height?: string;
     textColor?: string;
+    hintHidden?: boolean;
   };
   button?: {
     font?: FontConfig;
