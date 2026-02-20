@@ -20,8 +20,15 @@ export default defineConfig({
       external: [],
       output: {
         globals: {},
+        compact: true,
       },
     },
+  },
+  esbuild: {
+    drop: ['debugger'],
+    pure: ['console.log', 'console.debug'],
+    legalComments: 'none',
+    treeShaking: true,
   },
   resolve: {
     alias: {

@@ -5,6 +5,7 @@
   "author": "Nevent Team",
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/nevent-chatbot.umd.cjs",
   "module": "./dist/nevent-chatbot.js",
   "types": "./dist/index.d.ts",

@@ -53,6 +53,9 @@ jobs:
       - name: Build packages
         run: npm run build
 
+      - name: Generate SRI hashes
+        run: npm run sri
+
       - name: Extract versions
         id: version
         run: |
