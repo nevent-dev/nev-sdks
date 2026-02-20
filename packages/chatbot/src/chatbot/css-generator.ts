@@ -893,7 +893,7 @@ export class CSSGenerator {
       `position:relative;` +
       `overflow:visible;` +
       `padding:0;` +
-      `outline:none;` +
+      // Do NOT set outline:none — :focus-visible rules in generateAccessibilityStyles() handle focus (WCAG 2.4.7)
       `transform:scale(0);` +
       `transition:transform var(--nev-cb-transition-slow) cubic-bezier(0.175,0.885,0.32,1.275),box-shadow var(--nev-cb-transition-normal);` +
       `}` +
@@ -1357,7 +1357,7 @@ export class CSSGenerator {
       `font-family:var(--nev-cb-font-family);` +
       `color:var(--nev-cb-input-color);` +
       `background-color:var(--nev-cb-input-bg);` +
-      `outline:none;` +
+      // Do NOT set outline:none — :focus-visible rules handle visible focus indication (WCAG 2.4.7)
       `overflow-y:hidden;` +
       `max-height:80px;` +
       `min-height:20px;` +
@@ -1940,6 +1940,12 @@ export class CSSGenerator {
       `@keyframes nevent-chatbot-qr-exit{` +
       `from{opacity:1;transform:translateY(0);}` +
       `to{opacity:0;transform:translateY(8px);}` +
+      `}` +
+      // Streaming cursor blink animation.
+      // Used by the streaming message cursor to indicate ongoing bot response.
+      `@keyframes nevent-chatbot-blink{` +
+      `0%,100%{opacity:1;}` +
+      `50%{opacity:0;}` +
       `}`
     );
   }
@@ -2003,15 +2009,24 @@ export class CSSGenerator {
   private generateAccessibilityStyles(): string {
     return (
       // -----------------------------------------------------------------------
-      // Focus visible: suppress browser default on mouse, show ring on keyboard
+      // Focus visible (WCAG 2.4.7 — Focus Visible)
+      //
+      // Strategy: use :focus-visible for keyboard-only focus rings.
+      // We suppress the browser default outline ONLY on mouse/touch interaction
+      // via :focus:not(:focus-visible), keeping the outline for keyboard users.
       // -----------------------------------------------------------------------
-      // Suppress default outline for all interactive elements (we provide our own)
-      `.nevent-chatbot-bubble:focus,` +
-      `.nevent-chatbot-header-button:focus,` +
-      `.nevent-chatbot-send-button:focus,` +
-      `.nevent-chatbot-quick-reply-button:focus,` +
-      `.nevent-chatbot-scroll-button:focus,` +
-      `.nevent-chatbot-input-field:focus{outline:none;}` +
+
+      // Suppress default outline only when focus was NOT from keyboard
+      `.nevent-chatbot-bubble:focus:not(:focus-visible),` +
+      `.nevent-chatbot-header-button:focus:not(:focus-visible),` +
+      `.nevent-chatbot-send-button:focus:not(:focus-visible),` +
+      `.nevent-chatbot-quick-reply-button:focus:not(:focus-visible),` +
+      `.nevent-chatbot-scroll-button:focus:not(:focus-visible),` +
+      `.nevent-chatbot-card-action:focus:not(:focus-visible),` +
+      `.nevent-chatbot-action-button:focus:not(:focus-visible),` +
+      `.nevent-chatbot-carousel-nav:focus:not(:focus-visible),` +
+      `.nevent-chatbot-rich-image:focus:not(:focus-visible),` +
+      `.nevent-chatbot-input-field:focus:not(:focus-visible){outline:none;}` +
 
       // Show a clear ring only when focus arrived via keyboard (:focus-visible)
       `.nevent-chatbot-bubble:focus-visible{` +
@@ -2040,7 +2055,34 @@ export class CSSGenerator {
       `outline-offset:2px;` +
       `}` +
 
-      // Input textarea uses border+shadow focus (already defined), no outline needed
+      // Card action buttons/links — focus ring for keyboard users
+      `.nevent-chatbot-card-action:focus-visible{` +
+      `outline:2px solid var(--nev-cb-color-primary);` +
+      `outline-offset:-2px;` +
+      `background-color:color-mix(in srgb,var(--nev-cb-color-primary) 8%,transparent);` +
+      `}` +
+
+      // Standalone action buttons (button group) — focus ring
+      `.nevent-chatbot-action-button:focus-visible{` +
+      `outline:2px solid var(--nev-cb-color-primary);` +
+      `outline-offset:2px;` +
+      `border-color:var(--nev-cb-color-primary);` +
+      `}` +
+
+      // Carousel navigation arrows — focus ring
+      `.nevent-chatbot-carousel-nav:focus-visible{` +
+      `outline:2px solid var(--nev-cb-color-primary);` +
+      `outline-offset:2px;` +
+      `}` +
+
+      // Standalone rich image (acts as a link) — focus ring
+      `.nevent-chatbot-rich-image:focus-visible{` +
+      `outline:2px solid var(--nev-cb-color-primary);` +
+      `outline-offset:2px;` +
+      `}` +
+
+      // Input textarea uses border+shadow focus (already defined in generateInputStyles),
+      // suppress the browser default outline for a cleaner appearance
       `.nevent-chatbot-input-field:focus-visible{` +
       `border-color:var(--nev-cb-input-focus-border);` +
       `box-shadow:0 0 0 3px color-mix(in srgb,var(--nev-cb-input-focus-border) 25%,transparent);` +
@@ -2048,32 +2090,52 @@ export class CSSGenerator {
       `}` +
 
       // -----------------------------------------------------------------------
-      // Reduced motion (SC 2.3.3 / prefers-reduced-motion)
+      // Reduced motion (WCAG SC 2.3.3 / prefers-reduced-motion)
       // Disables all CSS transitions, animations, and transforms for users who
       // have enabled "Reduce Motion" in their OS accessibility preferences.
+      // Also disables smooth scroll behavior for instant navigation.
       // -----------------------------------------------------------------------
       `@media (prefers-reduced-motion:reduce){` +
+      // Bubble: no bounce entrance, no hover scale transition
       `.nevent-chatbot-bubble{` +
       `transition:none!important;` +
       `transform:scale(1)!important;` +
       `}` +
       `.nevent-chatbot-bubble-icon{transition:none!important;}` +
+      // Window: no slide-in/out animation
       `.nevent-chatbot-window{` +
       `transition:none!important;` +
       `transform:none!important;` +
       `}` +
+      // Typing indicator: no fade, no dot bounce
       `.nevent-chatbot-typing{transition:none!important;}` +
       `.nevent-chatbot-typing-dot{animation:none!important;}` +
+      // Loading spinner: no rotation
       `.nevent-chatbot-loading-spinner{animation:none!important;}` +
+      // Input and buttons: no transitions
       `.nevent-chatbot-input-field{transition:none!important;}` +
       `.nevent-chatbot-send-button{transition:none!important;}` +
       `.nevent-chatbot-quick-reply-button{transition:none!important;animation:none!important;}` +
       `.nevent-chatbot-header-button{transition:none!important;}` +
+      // Streaming cursor blink: disable animation
+      `.nevent-chatbot-streaming-cursor{animation:none!important;}` +
+      // Rich content transitions
+      `.nevent-chatbot-rich-image{transition:none!important;}` +
+      `.nevent-chatbot-card-action{transition:none!important;}` +
+      `.nevent-chatbot-action-button{transition:none!important;}` +
+      `.nevent-chatbot-carousel-nav{transition:none!important;}` +
+      // Connection banner transitions
+      `.nevent-chatbot-connection-banner{transition:none!important;}` +
+      `.nevent-chatbot-connection-banner-spinner{animation:none!important;}` +
+      // Disable smooth scrolling — use instant for all scroll containers
+      `.nevent-chatbot-messages{scroll-behavior:auto!important;}` +
+      `.nevent-chatbot-carousel{scroll-behavior:auto!important;}` +
       `}` +
 
       // -----------------------------------------------------------------------
       // Visually-hidden utility (SC 1.3.1)
-      // Use this class for screen-reader-only text (e.g. keyboard hints).
+      // Use this class for screen-reader-only text (e.g. keyboard hints,
+      // status announcements like "Message sent", "Bot is typing").
       // -----------------------------------------------------------------------
       `.nevent-chatbot-sr-only{` +
       `position:absolute!important;` +

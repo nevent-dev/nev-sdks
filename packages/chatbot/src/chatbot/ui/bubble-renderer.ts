@@ -135,9 +135,11 @@ export class BubbleRenderer {
     this.applyCloseIconStyles(false);
 
     // Badge — aria-live so screen readers announce new message counts.
-    // role="status" is polite; aria-atomic ensures the whole count is read.
+    // role="status" is the implicit role for aria-live="polite"; set explicitly
+    // for screen readers that require it. aria-atomic ensures the whole count is read.
     this.badge = document.createElement('span');
     this.badge.className = 'nevent-chatbot-badge';
+    this.badge.setAttribute('role', 'status');
     this.badge.setAttribute('aria-live', 'polite');
     this.badge.setAttribute('aria-atomic', 'true');
     this.applyBadgeStyles();

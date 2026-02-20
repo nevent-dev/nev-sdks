@@ -122,6 +122,13 @@ export class MessageRenderer {
   /** Scroll-to-bottom floating button */
   private scrollButton: HTMLButtonElement | null = null;
 
+  /**
+   * Screen-reader-only live region for announcing status changes
+   * (e.g. "Message sent", "New message from bot"). Hidden visually
+   * but read aloud by assistive technology (WCAG 4.1.3).
+   */
+  private srAnnouncer: HTMLElement | null = null;
+
   /** Track the last rendered date for date separator logic */
   private lastRenderedDate: string | null = null;
 
@@ -191,6 +198,16 @@ export class MessageRenderer {
       height: '100%',
       boxSizing: 'border-box',
     });
+
+    // Screen-reader announcer — invisible live region for status updates.
+    // Uses aria-live="assertive" for important status changes like error messages,
+    // and is updated programmatically when messages are sent or received.
+    this.srAnnouncer = document.createElement('div');
+    this.srAnnouncer.className = 'nevent-chatbot-sr-only';
+    this.srAnnouncer.setAttribute('role', 'status');
+    this.srAnnouncer.setAttribute('aria-live', 'polite');
+    this.srAnnouncer.setAttribute('aria-atomic', 'true');
+    this.container.appendChild(this.srAnnouncer);
 
     // Listen for scroll events to toggle scroll-to-bottom button
     this.container.addEventListener('scroll', () => {
@@ -483,6 +500,10 @@ export class MessageRenderer {
     wrapper.classList.remove('nevent-chatbot-message--streaming');
 
     if (status === 'error') {
+      // Mark as an alert for screen readers (WCAG 4.1.3 — Status Messages)
+      wrapper.setAttribute('role', 'alert');
+      wrapper.setAttribute('aria-live', 'assertive');
+
       // Add a visible error indicator to the bubble
       const bubble = wrapper.querySelector<HTMLElement>('.nevent-chatbot-message-bubble');
       if (bubble) {
@@ -541,6 +562,28 @@ export class MessageRenderer {
         }
       }
     }
+  }
+
+  /**
+   * Announces a message to screen readers via the visually-hidden live region.
+   *
+   * The announcement text is set, then cleared after a short delay so that
+   * repeated identical messages are still announced (AT ignores unchanged
+   * live region content).
+   *
+   * @param text - The announcement text for assistive technology
+   */
+  announce(text: string): void {
+    if (!this.srAnnouncer) return;
+
+    this.srAnnouncer.textContent = text;
+
+    // Clear after a delay so repeated identical messages are announced
+    setTimeout(() => {
+      if (this.srAnnouncer) {
+        this.srAnnouncer.textContent = '';
+      }
+    }, 1000);
   }
 
   /**
@@ -660,6 +703,14 @@ export class MessageRenderer {
 
     if (this.container) {
       this.container.innerHTML = '';
+
+      // Re-create the screen-reader announcer after clearing
+      this.srAnnouncer = document.createElement('div');
+      this.srAnnouncer.className = 'nevent-chatbot-sr-only';
+      this.srAnnouncer.setAttribute('role', 'status');
+      this.srAnnouncer.setAttribute('aria-live', 'polite');
+      this.srAnnouncer.setAttribute('aria-atomic', 'true');
+      this.container.appendChild(this.srAnnouncer);
     }
     this.messageElements.clear();
     this.quickReplyContainer = null;
@@ -853,6 +904,7 @@ export class MessageRenderer {
     this.messageElements.clear();
     this.quickReplyContainer = null;
     this.scrollButton = null;
+    this.srAnnouncer = null;
     this.lastRenderedDate = null;
     this.directMessageCount = 0;
   }

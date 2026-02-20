@@ -82,12 +82,6 @@ import { TypingRenderer } from './chatbot/ui/typing-renderer';
 // Constants
 // ============================================================================
 
-/**
- * Minimum interval between user messages in milliseconds.
- * Client-side rate limiting to prevent accidental spam.
- */
-const MIN_MESSAGE_INTERVAL_MS = 1000;
-
 // ============================================================================
 // Helpers
 // ============================================================================
@@ -258,8 +252,8 @@ export class ChatbotWidget {
   /** User-provided container element (inline mode) or null (floating mode) */
   private container: HTMLElement | null = null;
 
-  /** Timestamp of the last sent message (for client-side rate limiting) */
-  private lastMessageTimestamp = 0;
+  /** Timer ID for the rate-limit cooldown countdown (auto-re-enables input) */
+  private rateLimitTimer: ReturnType<typeof setTimeout> | null = null;
 
   /** State change subscription cleanup function */
   private stateUnsubscribe: (() => void) | null = null;
@@ -545,6 +539,7 @@ export class ChatbotWidget {
         mergedConfig.debug,
         this.authManager ?? undefined,
         backendContextOptions,
+        mergedConfig.rateLimit,
       );
 
       // Step 6b: Initialize StreamingClient when the server feature flag is enabled.
@@ -932,14 +927,38 @@ export class ChatbotWidget {
     const trimmedText = text.trim();
     if (!trimmedText) return;
 
-    // Client-side rate limiting
-    const now = Date.now();
-    if (now - this.lastMessageTimestamp < MIN_MESSAGE_INTERVAL_MS) {
-      this.logger.debug('Rate limited — message sent too quickly');
-      this.showInlineError(this.i18n.t('rateLimitError'));
-      return;
+    // Client-side rate limiting via ConversationService's RateLimiter.
+    // If the limit is exceeded, show a countdown message and temporarily
+    // disable input until the cooldown expires.
+    try {
+      this.conversationService!.checkRateLimit();
+    } catch (rateLimitError) {
+      if (
+        rateLimitError !== null &&
+        typeof rateLimitError === 'object' &&
+        'code' in rateLimitError &&
+        (rateLimitError as { code: string }).code === 'RATE_LIMITED'
+      ) {
+        const details = (rateLimitError as { details?: { retryAfterMs?: number } }).details;
+        const retryAfterMs = details?.retryAfterMs ?? 5000;
+        const retrySeconds = Math.ceil(retryAfterMs / 1000);
+
+        this.logger.debug('Rate limited — cooldown active', { retryAfterMs });
+
+        // Show countdown message in the chat window
+        this.showInlineError(
+          this.i18n.format('rateLimitCountdown', { seconds: retrySeconds }),
+        );
+
+        // Disable input during cooldown and re-enable when it expires
+        this.inputRenderer?.setDisabled(true);
+        this.scheduleRateLimitRecovery(retryAfterMs);
+
+        return;
+      }
+      // Re-throw non-rate-limit errors
+      throw rateLimitError;
     }
-    this.lastMessageTimestamp = now;
 
     const config = this.configManager.getConfig();
     const state = this.stateManager.getState();
@@ -1034,7 +1053,7 @@ export class ChatbotWidget {
           };
 
       this.showInlineError(
-        chatbotError.code === 'RATE_LIMIT_EXCEEDED'
+        (chatbotError.code === 'RATE_LIMIT_EXCEEDED' || chatbotError.code === 'RATE_LIMITED')
           ? this.i18n.t('rateLimitError')
           : this.i18n.t('messageSendError'),
       );
@@ -1345,6 +1364,15 @@ export class ChatbotWidget {
       this.stateManager.reset();
       this.stateManager.clearPersisted();
 
+      // Reset the rate limiter so the user starts fresh
+      this.conversationService?.resetRateLimit();
+
+      // Cancel any active rate-limit cooldown timer
+      if (this.rateLimitTimer !== null) {
+        clearTimeout(this.rateLimitTimer);
+        this.rateLimitTimer = null;
+      }
+
       // Clear message UI
       this.messageRenderer?.clear();
 
@@ -1399,6 +1427,12 @@ export class ChatbotWidget {
       if (this.autoOpenTimer !== null) {
         clearTimeout(this.autoOpenTimer);
         this.autoOpenTimer = null;
+      }
+
+      // Cancel rate-limit recovery timer
+      if (this.rateLimitTimer !== null) {
+        clearTimeout(this.rateLimitTimer);
+        this.rateLimitTimer = null;
       }
 
       // Persist state one final time before teardown
@@ -2092,6 +2126,40 @@ export class ChatbotWidget {
   }
 
   // --------------------------------------------------------------------------
+  // Private: Rate Limit Recovery
+  // --------------------------------------------------------------------------
+
+  /**
+   * Schedules re-enabling of the input after a rate-limit cooldown expires.
+   *
+   * Cancels any previously scheduled recovery timer to prevent stacking.
+   * After the cooldown, re-enables the input field and restores focus so
+   * the user can resume typing.
+   *
+   * @param delayMs - Time in milliseconds until the input should be re-enabled
+   */
+  private scheduleRateLimitRecovery(delayMs: number): void {
+    // Cancel any existing recovery timer to prevent stacking
+    if (this.rateLimitTimer !== null) {
+      clearTimeout(this.rateLimitTimer);
+    }
+
+    this.rateLimitTimer = setTimeout(
+      this.errorBoundary.guardTimer(() => {
+        this.rateLimitTimer = null;
+
+        // Only re-enable if the widget is not loading (another request in-flight)
+        // and not in an offline/reconnecting state
+        if (!this.stateManager.getState().isLoading) {
+          this.inputRenderer?.setDisabled(false);
+          this.inputRenderer?.focus();
+        }
+      }, 'rateLimitRecovery'),
+      delayMs,
+    );
+  }
+
+  // --------------------------------------------------------------------------
   // Private: Connection Status UI
   // --------------------------------------------------------------------------
 
@@ -2240,6 +2308,12 @@ export class ChatbotWidget {
    * Called from the catch block of init() to ensure no orphaned DOM elements.
    */
   private cleanupPartialInit(): void {
+    // Cancel rate-limit recovery timer if it was started before the failure.
+    if (this.rateLimitTimer !== null) {
+      clearTimeout(this.rateLimitTimer);
+      this.rateLimitTimer = null;
+    }
+
     // Destroy connection manager if it was initialised before the failure.
     if (this.connectionStatusUnsubscribe) {
       this.connectionStatusUnsubscribe();

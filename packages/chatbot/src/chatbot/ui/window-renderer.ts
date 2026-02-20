@@ -453,16 +453,9 @@ export class WindowRenderer {
       button.style.opacity = '0.8';
       button.style.backgroundColor = 'transparent';
     });
-    // Keyboard focus ring — visible outline for keyboard users (WCAG 2.4.7)
-    button.addEventListener('focus', () => {
-      button.style.outline = '2px solid rgba(255,255,255,0.9)';
-      button.style.outlineOffset = '2px';
-      button.style.opacity = '1';
-    });
-    button.addEventListener('blur', () => {
-      button.style.outline = 'none';
-      button.style.opacity = '0.8';
-    });
+    // Focus visibility is handled by CSS :focus-visible rules in CSSGenerator.
+    // No inline JS focus/blur handlers needed — they interfere with :focus-visible
+    // by setting outline:none on blur which overrides the CSS selector (WCAG 2.4.7).
     button.addEventListener('click', onClick);
 
     return button;

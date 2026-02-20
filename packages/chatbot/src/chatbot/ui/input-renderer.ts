@@ -370,7 +370,7 @@ export class InputRenderer {
       fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       color: s?.textColor ?? '#333333',
       backgroundColor: s?.backgroundColor ?? '#ffffff',
-      outline: 'none',
+      // Do NOT set outline:none — let CSS :focus-visible rules handle focus indication (WCAG 2.4.7)
       overflowY: 'hidden',
       maxHeight: '80px',
       minHeight: '20px',
