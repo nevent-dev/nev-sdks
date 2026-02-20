@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatbot - Basic CDN Example</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      color: #111827;
+    }
+    h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+    p  { color: #6B7280; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+  <h1>My Event Page</h1>
+  <p>Welcome to our festival! Ask our AI assistant anything about tickets, schedule, or venue.</p>
+
+  <!--
+    @nevent/chatbot — Basic CDN integration
+    ========================================
+    1. Include the UMD bundle from the CDN.
+    2. Create a ChatbotWidget with your chatbotId and tenantId.
+    3. Call init() — the floating bubble appears bottom-right automatically.
+
+    Replace 'your-chatbot-id' and 'your-tenant-id' with real values
+    from the Nevent platform dashboard.
+  -->
+  <script src="https://cdn.nevent.es/chatbot/nevent-chatbot.umd.cjs"></script>
+  <script>
+    const chatbot = new NeventChatbot.ChatbotWidget({
+      chatbotId: 'your-chatbot-id',
+      tenantId: 'your-tenant-id',
+    });
+
+    chatbot.init();
+  </script>
+
+</body>
+</html>
