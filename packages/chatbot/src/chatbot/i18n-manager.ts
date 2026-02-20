@@ -1,15 +1,23 @@
 /**
  * I18nManager - Internationalization manager for chatbot UI strings
  *
- * Provides localized strings for the chatbot widget UI elements.
- * Supports Spanish (es), English (en), Catalan (ca), and Portuguese (pt).
+ * Extends `@nevent/core`'s {@link CoreI18nManager} with chatbot-specific
+ * functionality while delegating locale management and translation lookups
+ * to the core implementation.
  *
- * Translation loading is lazy: only the requested locale is loaded into memory.
- * Custom translations can be provided to override defaults.
+ * Chatbot-specific additions:
+ * - **`format(key, params)`**: Interpolates `{param}` placeholders in
+ *   translated strings (chatbot uses `{n}` syntax, not core's `{{n}}`).
+ * - **`setOverrides(overrides)`**: Allows the host application to override
+ *   specific translations at runtime (e.g., custom branding).
+ * - **`detectLocale()`**: Returns `SupportedLocale` (typed union) instead
+ *   of core's plain `string` return type.
+ *
+ * Supports Spanish (es), English (en), Catalan (ca), and Portuguese (pt).
  *
  * @remarks
  * Default locale: 'es' (Spanish)
- * Fallback chain: requested locale -> 'es' -> hardcoded defaults
+ * Fallback chain: requested locale -> 'es' -> key name itself
  *
  * @example
  * ```typescript
@@ -23,6 +31,7 @@
  * ```
  */
 
+import { I18nManager as CoreI18nManager } from '@nevent/core';
 import type { SupportedLocale, ChatbotTranslations } from '../types';
 
 // ============================================================================
@@ -49,6 +58,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     messageSendError: 'No se pudo enviar el mensaje. Inténtalo de nuevo.',
     connectionError: 'Error de conexión. Reintentando...',
     rateLimitError: 'Demasiados mensajes. Espera un momento.',
+    rateLimitCountdown: 'Demasiados mensajes. Espera {seconds} segundos.',
     poweredBy: 'Powered by Nevent',
     newConversation: 'Nueva conversación',
     closeChat: 'Cerrar chat',
@@ -77,6 +87,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     messageSendError: 'Failed to send message. Please try again.',
     connectionError: 'Connection error. Retrying...',
     rateLimitError: 'Too many messages. Please wait a moment.',
+    rateLimitCountdown: 'Too many messages. Please wait {seconds} seconds.',
     poweredBy: 'Powered by Nevent',
     newConversation: 'New conversation',
     closeChat: 'Close chat',
@@ -105,6 +116,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     messageSendError: "No s'ha pogut enviar el missatge. Torna-ho a intentar.",
     connectionError: 'Error de connexió. Reintentant...',
     rateLimitError: 'Massa missatges. Espera un moment.',
+    rateLimitCountdown: 'Massa missatges. Espera {seconds} segons.',
     poweredBy: 'Powered by Nevent',
     newConversation: 'Nova conversació',
     closeChat: 'Tancar el xat',
@@ -133,6 +145,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     messageSendError: 'Não foi possível enviar a mensagem. Tente novamente.',
     connectionError: 'Erro de conexão. Tentando novamente...',
     rateLimitError: 'Muitas mensagens. Aguarde um momento.',
+    rateLimitCountdown: 'Muitas mensagens. Aguarde {seconds} segundos.',
     poweredBy: 'Powered by Nevent',
     newConversation: 'Nova conversa',
     closeChat: 'Fechar chat',
@@ -165,9 +178,11 @@ const DEFAULT_LOCALE: SupportedLocale = 'es';
 /**
  * Manages internationalization for the chatbot widget.
  *
- * Handles locale selection, string retrieval, template interpolation,
- * and user-provided translation overrides. Supports browser locale
- * auto-detection via `I18nManager.detectLocale()`.
+ * Extends core's `I18nManager<ChatbotTranslations>` for locale management
+ * and translation lookups, while adding chatbot-specific features:
+ * - `format()` for `{param}` interpolation (distinct from core's `{{param}}`)
+ * - `setOverrides()` for runtime translation overrides
+ * - `detectLocale()` returning typed `SupportedLocale`
  *
  * @example
  * ```typescript
@@ -187,20 +202,10 @@ const DEFAULT_LOCALE: SupportedLocale = 'es';
  * i18n.setOverrides({ poweredBy: 'Powered by My Company' });
  * ```
  */
-export class I18nManager {
-  /** Currently active locale code */
-  private locale: SupportedLocale;
-
-  /**
-   * Complete translation map for all supported locales.
-   * Translations are always fully loaded — no lazy loading needed given
-   * the small size of the translation tables.
-   */
-  private readonly translations: Record<SupportedLocale, ChatbotTranslations>;
-
+export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
   /**
    * User-provided overrides that take precedence over built-in translations.
-   * Partial — only the keys the consumer wants to override need to be provided.
+   * Partial -- only the keys the consumer wants to override need to be provided.
    */
   private overrides: Partial<ChatbotTranslations>;
 
@@ -219,13 +224,22 @@ export class I18nManager {
    * ```
    */
   constructor(locale?: SupportedLocale) {
-    this.translations = TRANSLATIONS;
+    // Pass all translations and the default locale to core's I18nManager.
+    // Core sets currentLocale = defaultLocale ('es') initially.
+    super(TRANSLATIONS, DEFAULT_LOCALE);
+
     this.overrides = {};
-    this.locale = locale ?? I18nManager.detectLocale();
+
+    // If an explicit locale was provided, switch to it.
+    // If not, auto-detect from the browser and switch if it's a supported locale.
+    const resolvedLocale = locale ?? I18nManager.detectLocale();
+    if (resolvedLocale !== DEFAULT_LOCALE) {
+      super.setLocale(resolvedLocale);
+    }
   }
 
   // --------------------------------------------------------------------------
-  // Locale Management
+  // Locale Management (overrides for SupportedLocale typing)
   // --------------------------------------------------------------------------
 
   /**
@@ -242,8 +256,8 @@ export class I18nManager {
    * i18n.t('sendButton'); // 'Send'
    * ```
    */
-  setLocale(locale: SupportedLocale): void {
-    this.locale = locale;
+  override setLocale(locale: SupportedLocale): void {
+    super.setLocale(locale);
   }
 
   /**
@@ -257,12 +271,12 @@ export class I18nManager {
    * i18n.getLocale(); // 'en'
    * ```
    */
-  getLocale(): SupportedLocale {
-    return this.locale;
+  override getLocale(): SupportedLocale {
+    return super.getLocale() as SupportedLocale;
   }
 
   // --------------------------------------------------------------------------
-  // String Retrieval
+  // String Retrieval (with override support)
   // --------------------------------------------------------------------------
 
   /**
@@ -270,7 +284,7 @@ export class I18nManager {
    *
    * User-provided overrides (set via `setOverrides()`) take precedence over
    * built-in translations. If neither is found, falls back to the Spanish
-   * default, then to the key name itself as a last resort.
+   * default (handled by core), then to the key name itself as a last resort.
    *
    * @param key - A key from the `ChatbotTranslations` interface
    * @returns The translated string for the current locale
@@ -285,27 +299,19 @@ export class I18nManager {
    *
    * @see format For strings with interpolation placeholders
    */
-  t(key: keyof ChatbotTranslations): string {
+  override t(key: keyof ChatbotTranslations): string {
     // 1. User override takes highest priority
     if (this.overrides[key] !== undefined) {
       return this.overrides[key] as string;
     }
 
-    // 2. Active locale translation
-    const localeTranslations = this.translations[this.locale];
-    if (localeTranslations[key] !== undefined) {
-      return localeTranslations[key];
-    }
-
-    // 3. Spanish fallback (the default locale always has all keys)
-    const spanishFallback = this.translations[DEFAULT_LOCALE][key];
-    if (spanishFallback !== undefined) {
-      return spanishFallback;
-    }
-
-    // 4. Last resort: return the key itself
-    return key;
+    // 2. Delegate to core's t() which handles locale lookup + fallback
+    return super.t(key);
   }
+
+  // --------------------------------------------------------------------------
+  // Chatbot-Specific: Interpolation
+  // --------------------------------------------------------------------------
 
   /**
    * Retrieves a translated string with interpolated parameters.
@@ -338,13 +344,13 @@ export class I18nManager {
   }
 
   // --------------------------------------------------------------------------
-  // Translation Overrides
+  // Chatbot-Specific: Translation Overrides
   // --------------------------------------------------------------------------
 
   /**
    * Sets user-provided translation overrides.
    *
-   * Overrides are merged with any existing overrides — calling this method
+   * Overrides are merged with any existing overrides -- calling this method
    * multiple times is additive. Overrides take precedence over all built-in
    * translations regardless of locale.
    *
@@ -370,7 +376,7 @@ export class I18nManager {
   }
 
   // --------------------------------------------------------------------------
-  // Static Utilities
+  // Static: Locale Detection (typed for SupportedLocale)
   // --------------------------------------------------------------------------
 
   /**
@@ -397,7 +403,7 @@ export class I18nManager {
    * I18nManager.detectLocale(); // 'es' (default fallback)
    * ```
    */
-  static detectLocale(): SupportedLocale {
+  static override detectLocale(): SupportedLocale {
     // Guard: navigator may not exist in SSR environments
     if (typeof navigator === 'undefined' || !navigator.language) {
       return DEFAULT_LOCALE;

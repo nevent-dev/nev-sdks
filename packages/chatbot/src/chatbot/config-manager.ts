@@ -64,6 +64,8 @@ const DEFAULTS: Omit<Required<ChatbotConfig>, 'chatbotId' | 'tenantId'> = {
   source: undefined as unknown as string,
   ticketId: undefined as unknown as string,
   userContext: undefined as unknown as { lat: number; lng: number },
+  // Rate limit defaults — undefined means use RateLimiter defaults
+  rateLimit: undefined as unknown as { maxRequests?: number; windowMs?: number; cooldownMs?: number },
   // Auth defaults — undefined means public (anonymous) mode
   auth: undefined as unknown as AuthConfig,
   onOpen: () => {},

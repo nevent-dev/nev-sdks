@@ -753,6 +753,10 @@ describe('ConversationService', () => {
     });
 
     it('should use fallback message for unknown error types', async () => {
+      // When fetch rejects with a non-standard type (e.g. a plain string),
+      // HttpClient normalises it to a generic 'Network request failed' ApiError.
+      // ConversationService then maps that to the domain error code while
+      // preserving the HttpClient's message.
       vi.stubGlobal(
         'fetch',
         vi.fn().mockRejectedValue('string error')
@@ -764,9 +768,8 @@ describe('ConversationService', () => {
       } catch (error) {
         const chatbotError = error as ChatbotError;
         expect(chatbotError.code).toBe('CONFIG_LOAD_FAILED');
-        expect(chatbotError.message).toBe(
-          'Failed to load chatbot configuration'
-        );
+        // HttpClient wraps unknown throw values with a generic message
+        expect(chatbotError.message).toBe('Network request failed');
       }
     });
   });

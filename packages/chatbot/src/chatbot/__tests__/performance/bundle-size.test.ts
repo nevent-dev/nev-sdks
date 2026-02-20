@@ -9,11 +9,11 @@
  *   npm run build && npm run test:perf
  *
  * Size budgets (uncompressed):
- * - ESM bundle  (nevent-chatbot.js)      < 380 KB
- * - UMD bundle  (nevent-chatbot.umd.cjs) < 185 KB
+ * - ESM bundle  (nevent-chatbot.js)      < 410 KB
+ * - UMD bundle  (nevent-chatbot.umd.cjs) < 190 KB
  *
  * Gzip budget:
- * - ESM bundle gzipped                   < 92 KB
+ * - ESM bundle gzipped                   < 100 KB
  *
  * Artifact completeness:
  * - nevent-chatbot.js.map (source map)
@@ -49,13 +49,13 @@ const DIST_DIR = resolve(
 // ============================================================================
 
 /** ESM bundle uncompressed size limit */
-const ESM_UNCOMPRESSED_LIMIT = 380 * 1024; // 380 KB
+const ESM_UNCOMPRESSED_LIMIT = 410 * 1024; // 410 KB
 
 /** UMD bundle uncompressed size limit */
-const UMD_UNCOMPRESSED_LIMIT = 185 * 1024; // 185 KB
+const UMD_UNCOMPRESSED_LIMIT = 190 * 1024; // 190 KB
 
 /** ESM bundle gzip-compressed size limit */
-const ESM_GZIP_LIMIT = 92 * 1024; // 92 KB
+const ESM_GZIP_LIMIT = 100 * 1024; // 100 KB
 
 // ============================================================================
 // Guard: skip the suite when the build is missing

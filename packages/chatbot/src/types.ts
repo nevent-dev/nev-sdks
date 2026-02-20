@@ -742,6 +742,36 @@ export interface ChatbotConfig {
     lng: number;
   };
 
+  // === Rate Limiting ===
+  /**
+   * Client-side rate limiter configuration.
+   *
+   * Controls how many messages the user can send within a time window
+   * before being temporarily throttled. This is a client-side safety net
+   * to prevent accidental spam; the backend enforces its own limits
+   * independently.
+   *
+   * When omitted, sensible defaults are used (10 messages per minute,
+   * 5-second cooldown after hitting the limit).
+   *
+   * @example
+   * ```typescript
+   * rateLimit: {
+   *   maxRequests: 5,      // 5 messages per window
+   *   windowMs: 30000,     // 30-second window
+   *   cooldownMs: 10000,   // 10-second cooldown
+   * }
+   * ```
+   */
+  rateLimit?: {
+    /** Maximum messages per time window. Default: 10 */
+    maxRequests?: number;
+    /** Time window in milliseconds. Default: 60000 (1 minute) */
+    windowMs?: number;
+    /** Cooldown after hitting the limit in milliseconds. Default: 5000 (5 seconds) */
+    cooldownMs?: number;
+  };
+
   // === Authentication ===
   /**
    * Authentication configuration for identified user sessions.
@@ -972,6 +1002,7 @@ export type ChatbotErrorCode =
   | 'MESSAGE_SEND_FAILED'
   | 'MESSAGE_LOAD_FAILED'
   | 'RATE_LIMIT_EXCEEDED'
+  | 'RATE_LIMITED'
   | 'INVALID_CONFIG'
   | 'CONTAINER_NOT_FOUND'
   | 'INITIALIZATION_FAILED'
@@ -1070,7 +1101,7 @@ export interface PersistedConversationState {
  * Complete set of translatable strings for the chatbot UI.
  * Each supported locale provides a full implementation of this interface.
  */
-export interface ChatbotTranslations {
+export interface ChatbotTranslations extends Record<string, string> {
   /** Input placeholder text (e.g., "Type a message...") */
   inputPlaceholder: string;
   /** Send button accessible label */
@@ -1091,6 +1122,8 @@ export interface ChatbotTranslations {
   connectionError: string;
   /** Error message shown when rate limit is hit */
   rateLimitError: string;
+  /** Rate limit error with countdown (uses {seconds} placeholder) */
+  rateLimitCountdown: string;
   /** "Powered by Nevent" branding text */
   poweredBy: string;
   /** New conversation button text */

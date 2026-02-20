@@ -46,6 +46,8 @@ import type {
   FeedbackType,
 } from '../types';
 import type { AuthManager } from './auth-manager';
+import { RateLimiter } from './rate-limiter';
+import type { RateLimiterConfig } from './rate-limiter';
 
 /**
  * Maps an API error (or any unknown error) to a typed {@link ChatbotError}.
@@ -156,6 +158,13 @@ export class ConversationService {
   private readonly userContextHeader: string | undefined;
 
   /**
+   * Client-side rate limiter for message sending.
+   * Prevents excessive requests before they reach the backend.
+   * Created from the optional `rateLimitConfig` constructor parameter.
+   */
+  private readonly rateLimiter: RateLimiter;
+
+  /**
    * Creates a new ConversationService instance.
    *
    * @param apiUrl - Base URL of the Nevent API (e.g. 'https://api.nevent.es')
@@ -167,6 +176,9 @@ export class ConversationService {
    *   included in all API requests, and 401 responses trigger automatic token
    *   refresh via the configured `onTokenRefresh` callback.
    * @param options - Additional options for backend context headers/params
+   * @param rateLimitConfig - Optional client-side rate limiter configuration.
+   *   When provided, overrides the default rate limiter settings (10 req/min,
+   *   5s cooldown). Set `maxRequests` to 0 to disable rate limiting entirely.
    */
   constructor(
     apiUrl: string,
@@ -180,9 +192,14 @@ export class ConversationService {
       source?: string;
       userContext?: { lat: number; lng: number };
     },
+    rateLimitConfig?: Partial<RateLimiterConfig>,
   ) {
     this.apiUrl = apiUrl.replace(/\/$/, '');
-    this.httpClient = new HttpClient(apiUrl, token);
+    // Disable HTTP-level retries: the chatbot widget should fail fast and
+    // surface errors to the UI immediately. Higher-level reconnection logic
+    // is handled by ConnectionManager, making HttpClient retries redundant
+    // and harmful (they add multi-second latency before errors are reported).
+    this.httpClient = new HttpClient(apiUrl, token, { maxRetries: 0 });
     this.chatbotId = chatbotId;
     this.logger = new Logger('[NeventChatbot:ConversationService]', debug);
     this.authManager = authManager;
@@ -199,6 +216,70 @@ export class ConversationService {
         this.logger.warn('Failed to encode userContext — ignoring');
       }
     }
+
+    // Initialize the client-side rate limiter.
+    // Consumer can customize limits via rateLimitConfig or rely on defaults.
+    this.rateLimiter = new RateLimiter(rateLimitConfig);
+  }
+
+  // --------------------------------------------------------------------------
+  // Public: Rate Limiter Access
+  // --------------------------------------------------------------------------
+
+  /**
+   * Checks the client-side rate limiter and throws a typed
+   * {@link ChatbotError} with code `RATE_LIMITED` when the limit has been
+   * reached.
+   *
+   * This method is called internally before `sendMessage()` and is also
+   * exposed so the widget layer (ChatbotWidget / StreamingClient) can
+   * perform a pre-flight check before initiating a request.
+   *
+   * @throws {ChatbotError} with code `RATE_LIMITED` and `retryAfterMs` in
+   *   `details` when the request is rate limited
+   */
+  checkRateLimit(): void {
+    const result = this.rateLimiter.consume();
+    if (!result.allowed) {
+      const retryAfterMs = result.retryAfterMs ?? this.rateLimiter['config'].cooldownMs;
+      const error: ChatbotError = {
+        code: 'RATE_LIMITED',
+        message: 'Too many messages. Please wait before sending another.',
+        details: { retryAfterMs },
+      };
+      throw error;
+    }
+  }
+
+  /**
+   * Returns whether a message can be sent without hitting the rate limit.
+   *
+   * This is a read-only check that does NOT consume a token. Use it for
+   * UI state (e.g., disabling the send button) without side effects.
+   *
+   * @returns `true` if a message can be sent, `false` if rate limited
+   */
+  canSendMessage(): boolean {
+    return this.rateLimiter.canProceed();
+  }
+
+  /**
+   * Returns the number of messages remaining before hitting the rate limit.
+   *
+   * @returns Number of remaining allowed requests in the current window
+   */
+  remainingMessages(): number {
+    return this.rateLimiter.remaining();
+  }
+
+  /**
+   * Resets the rate limiter state.
+   *
+   * Call this when starting a new conversation or when the user has been
+   * idle long enough that the rate limit should no longer apply.
+   */
+  resetRateLimit(): void {
+    this.rateLimiter.reset();
   }
 
   // --------------------------------------------------------------------------
