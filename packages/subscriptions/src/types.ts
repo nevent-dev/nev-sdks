@@ -1,4 +1,4 @@
-import type { ConsentData, I18nDictionary } from '@nevent/core';
+import type { ConsentData, I18nDictionary, NormalizedError } from '@nevent/core';
 
 /**
  * Widget layout direction
@@ -230,6 +230,9 @@ export interface NewsletterConfig {
     privacyText?: string;
   };
 
+  // Internationalization
+  locale?: string;
+
   // Widget behavior
   analytics?: boolean;
   analyticsUrl?: string;
@@ -253,7 +256,7 @@ export interface NewsletterConfig {
   onLoad?: ((widget: unknown) => void) | undefined;
   onSubmit?: ((data: unknown) => void) | undefined;
   onSuccess?: ((response: unknown) => void) | undefined;
-  onError?: ((error: Error) => void) | undefined;
+  onError?: ((error: Error | NormalizedError) => void) | undefined;
 }
 
 /**

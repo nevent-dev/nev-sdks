@@ -20,6 +20,7 @@ export default defineConfig({
       external: [],
       output: {
         globals: {},
+        compact: true,
         assetFileNames: (assetInfo) => {
           if (assetInfo.name === 'style.css') {
             return 'nevent-subscriptions.css';
@@ -28,6 +29,12 @@ export default defineConfig({
         },
       },
     },
+  },
+  esbuild: {
+    drop: ['debugger'],
+    pure: ['console.log', 'console.debug'],
+    legalComments: 'none',
+    treeShaking: true,
   },
   resolve: {
     alias: {
