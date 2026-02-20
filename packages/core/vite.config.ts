@@ -12,5 +12,17 @@ export default defineConfig({
     sourcemap: true,
     minify: 'esbuild',
     target: 'es2020',
+    rollupOptions: {
+      output: {
+        // Improve tree-shaking by preserving module structure
+        compact: true,
+      },
+    },
+  },
+  esbuild: {
+    drop: ['debugger'],
+    pure: ['console.log', 'console.debug'],
+    legalComments: 'none',
+    treeShaking: true,
   },
 });
