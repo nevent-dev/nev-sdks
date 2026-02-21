@@ -764,6 +764,8 @@ export interface ChatbotConfig {
   theme?: ThemeMode;
   /** Locale for UI strings. Default: 'es' */
   locale?: SupportedLocale;
+  /** Avatar image URL override. Falls back to server-configured avatar when not provided. */
+  avatar?: string;
   /** Custom visual style overrides */
   styles?: ChatbotStyles;
   /**

@@ -466,7 +466,32 @@ export class ChatbotWidget {
         this.cssGenerator.inject(this.shadow ?? undefined);
 
         // Step 4: Fetch server configuration
-        let serverConfig: ServerChatbotConfig;
+        // Initialize with sensible defaults for graceful degradation when server is unavailable
+        let serverConfig: ServerChatbotConfig = {
+          chatbotId: config.chatbotId,
+          tenantId: config.tenantId,
+          name: 'Asistente',
+          welcomeMessage: config.welcomeMessage || '¡Hola! ¿En qué puedo ayudarte?',
+          placeholder: config.placeholder || 'Escribe tu mensaje...',
+          token: '',
+          theme: { primaryColor: config.brandColor || '#6366f1' },
+          features: {
+            quickReplies: false,
+            richContent: false,
+            fileUpload: false,
+            feedback: false,
+            reactions: false,
+            eventSuggestions: false,
+            streaming: false,
+            showBranding: config.showBranding !== false,
+          },
+          rateLimit: {
+            messagesPerMinute: 20,
+            conversationsPerHour: 5,
+            minMessageInterval: 1000,
+            maxMessageLength: 500,
+          },
+        } as ServerChatbotConfig;
         try {
           // Use a temporary ConversationService for the initial config fetch.
           // The config endpoint is public and does not require a token.
@@ -479,17 +504,13 @@ export class ChatbotWidget {
           serverConfig = await tempService.fetchConfig(config.tenantId);
           this.logger.debug('Server config fetched successfully');
         } catch (fetchError) {
-          this.logger.error('Failed to fetch server config', fetchError);
-          const error: ChatbotError = {
-            code: 'CONFIG_LOAD_FAILED',
-            message: 'Failed to load chatbot configuration from server',
-          };
-          config.onError(error);
-          throw Object.assign(new Error(error.message), error);
+          this.logger.warn('Failed to fetch server config, using local config only', fetchError);
         }
 
-        // Step 5: Merge server config into resolved config
-        this.configManager.mergeServerConfig(serverConfig);
+        // Step 5: Merge server config into resolved config (if available)
+        if (serverConfig) {
+          this.configManager.mergeServerConfig(serverConfig);
+        }
         const mergedConfig = this.configManager.getConfig();
 
         // Step 5b: Apply advanced theming from merged config.
@@ -528,8 +549,8 @@ export class ChatbotWidget {
         // Precedence: client customCSS > serverConfig.customCSS > styles.customCSS
         const effectiveCustomCSS =
           mergedConfig.customCSS ||
-          serverConfig.customCSS ||
-          mergedConfig.styles.customCSS ||
+          serverConfig?.customCSS ||
+          mergedConfig.styles?.customCSS ||
           '';
         if (effectiveCustomCSS) {
           this.cssGenerator.injectCustomCSS(
@@ -2000,7 +2021,7 @@ export class ChatbotWidget {
     const headerTitle = serverConfig.name || this.i18n.t('defaultTitle');
     const headerSubtitle =
       serverConfig.description || this.i18n.t('statusOnline');
-    const headerAvatar = serverConfig.avatar;
+    const headerAvatar = config.avatar || serverConfig.avatar;
 
     // Render bubble (floating mode only).
     // The bubble is rendered inside the shadow root for style isolation.

@@ -1734,7 +1734,7 @@ export class NewsletterWidget {
     });
 
     const link = document.createElement('a');
-    link.href = `https://nevent.es?${utmParams.toString()}`;
+    link.href = `https://nevent.ai?${utmParams.toString()}`;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.className = 'nevent-newsletter-branding-link';

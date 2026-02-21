@@ -991,6 +991,18 @@ export class CSSGenerator {
       `overflow:hidden;` +
       `text-overflow:ellipsis;` +
       `white-space:nowrap;` +
+      `display:flex;` +
+      `align-items:center;` +
+      `}` +
+      `.nevent-chatbot-status-dot{` +
+      `width:8px;` +
+      `height:8px;` +
+      `border-radius:50%;` +
+      `background:#22c55e;` +
+      `display:inline-block;` +
+      `margin-right:4px;` +
+      `flex-shrink:0;` +
+      `animation:nevent-chatbot-status-pulse 2s infinite;` +
       `}` +
       `.nevent-chatbot-header-button{` +
       `background:none;` +
@@ -2137,6 +2149,11 @@ export class CSSGenerator {
       `@keyframes nevent-chatbot-blink{` +
       `0%,100%{opacity:1;}` +
       `50%{opacity:0;}` +
+      `}` +
+      // Online status dot pulse animation.
+      `@keyframes nevent-chatbot-status-pulse{` +
+      `0%,100%{opacity:1;}` +
+      `50%{opacity:0.4;}` +
       `}`
     );
   }
