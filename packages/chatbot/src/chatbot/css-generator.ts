@@ -498,9 +498,11 @@ export class CSSGenerator {
     // The bubble is appended directly to the shadow root, not inside ROOT_CLASS,
     // so it cannot inherit from ROOT_CLASS — it needs the host to carry the tokens.
     if (this.styleTarget instanceof ShadowRoot) {
-      const hostEl = this.styleTarget.host as HTMLElement;
-      for (const [prop, value] of Object.entries(this.runtimeTokens)) {
-        hostEl.style.setProperty(prop, value);
+      const hostEl = this.styleTarget.host;
+      if (hostEl instanceof HTMLElement) {
+        for (const [prop, value] of Object.entries(this.runtimeTokens)) {
+          hostEl.style.setProperty(prop, value);
+        }
       }
     }
   }

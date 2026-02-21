@@ -472,8 +472,8 @@ export class ChatbotWidget {
           chatbotId: config.chatbotId,
           tenantId: config.tenantId,
           name: this.i18n.t('defaultTitle'),
-          welcomeMessage: config.welcomeMessage || '',
-          placeholder: config.placeholder || '',
+          welcomeMessage: config.welcomeMessage || this.i18n.t('defaultWelcomeMessage'),
+          placeholder: config.placeholder || this.i18n.t('inputPlaceholder'),
           token: '',
           theme: { primaryColor: config.brandColor || '#6366f1' },
           features: {
@@ -571,7 +571,7 @@ export class ChatbotWidget {
         // Precedence: client customCSS > serverConfig.customCSS > styles.customCSS
         const effectiveCustomCSS =
           mergedConfig.customCSS ||
-          serverConfig?.customCSS ||
+          serverConfig.customCSS ||
           mergedConfig.styles?.customCSS ||
           '';
         if (effectiveCustomCSS) {
@@ -1258,6 +1258,8 @@ export class ChatbotWidget {
             message: 'Failed to start a new conversation',
           };
           config.onError(error);
+          this.stateManager.setLoading(false);
+          this.inputRenderer?.setDisabled(false);
           return;
         }
       }

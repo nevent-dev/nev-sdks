@@ -1392,6 +1392,11 @@ export interface ChatbotTranslations extends Record<string, string> {
    * when both the bubble and the header button are visible simultaneously.
    */
   minimizeChat: string;
+  /**
+   * Default welcome message shown in the chat window when the server config
+   * is unavailable and no welcome message has been explicitly configured.
+   */
+  defaultWelcomeMessage: string;
 }
 
 // ============================================================================
