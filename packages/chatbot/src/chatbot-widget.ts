@@ -471,15 +471,17 @@ export class ChatbotWidget {
           chatbotId: config.chatbotId,
           tenantId: config.tenantId,
           name: 'Asistente',
-          welcomeMessage: config.welcomeMessage || '¡Hola! ¿En qué puedo ayudarte?',
+          welcomeMessage:
+            config.welcomeMessage || '¡Hola! ¿En qué puedo ayudarte?',
           placeholder: config.placeholder || 'Escribe tu mensaje...',
           token: '',
           theme: { primaryColor: config.brandColor || '#6366f1' },
           features: {
             quickReplies: false,
             richContent: false,
-            fileUpload: false,
-            feedback: false,
+            persistence: true,
+            typingIndicator: true,
+            fileAttachments: false,
             reactions: false,
             eventSuggestions: false,
             streaming: false,
@@ -504,7 +506,10 @@ export class ChatbotWidget {
           serverConfig = await tempService.fetchConfig(config.tenantId);
           this.logger.debug('Server config fetched successfully');
         } catch (fetchError) {
-          this.logger.warn('Failed to fetch server config, using local config only', fetchError);
+          this.logger.warn(
+            'Failed to fetch server config, using local config only',
+            fetchError
+          );
         }
 
         // Step 5: Merge server config into resolved config (if available)

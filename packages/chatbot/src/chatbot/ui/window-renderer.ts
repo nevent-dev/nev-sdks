@@ -406,7 +406,9 @@ export class WindowRenderer {
         dot.className = 'nevent-chatbot-status-dot';
         this.subtitleElement.appendChild(dot);
       }
-      this.subtitleElement.appendChild(document.createTextNode(options.subtitle));
+      this.subtitleElement.appendChild(
+        document.createTextNode(options.subtitle)
+      );
     }
     textContainer.appendChild(this.subtitleElement);
 
