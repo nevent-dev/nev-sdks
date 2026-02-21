@@ -89,6 +89,22 @@ export class WidgetTracker {
   }
 
   /**
+   * Tracks a click on the "Powered by Nevent" branding link.
+   *
+   * Used for PLG (Product-Led Growth) attribution to measure how many
+   * visitors click through to nevent.es from embedded newsletter widgets.
+   */
+  trackBrandingClick(): void {
+    this.analyticsClient.track('newsletter.branding_click', {
+      ...this.baseParams(),
+      interaction: true,
+      referrer_url: typeof window !== 'undefined' ? window.location.href : '',
+      referrer_domain:
+        typeof window !== 'undefined' ? window.location.hostname : '',
+    });
+  }
+
+  /**
    * Sets up impression tracking using IntersectionObserver
    *
    * Tracks when widget is 50% visible in viewport.

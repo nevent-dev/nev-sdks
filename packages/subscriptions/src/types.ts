@@ -271,6 +271,8 @@ export interface NewsletterConfig {
   showLabels?: boolean;
   animations?: boolean;
   debug?: boolean;
+  /** Show "Powered by Nevent" branding footer. Default: true */
+  showBranding?: boolean;
 
   // New structure
   styles?: WidgetStyles | null;
