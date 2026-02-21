@@ -22,6 +22,7 @@
  */
 
 import type { WindowStyles, HeaderStyles } from '../../types';
+import type { ChatbotTracker } from '../analytics/chatbot-tracker';
 import { I18nManager } from '../i18n-manager';
 
 // ============================================================================
@@ -33,6 +34,9 @@ const CLOSE_ICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" heigh
 
 /** New conversation icon (plus in a chat bubble) */
 const NEW_CONVERSATION_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+
+/** Lightning bolt icon for the "Powered by Nevent" branding footer */
+const BRANDING_ICON_SVG = `<svg class="nevent-chatbot-branding-icon" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>`;
 
 // ============================================================================
 // WindowRenderer Class
@@ -109,7 +113,8 @@ export class WindowRenderer {
   // --------------------------------------------------------------------------
 
   /**
-   * Renders the complete chat window with header, body, and footer sections.
+   * Renders the complete chat window with header, body, footer, and
+   * optional "Powered by Nevent" branding sections.
    *
    * The window starts hidden (display: none, opacity: 0). Call `open()` to
    * animate it into view.
@@ -120,6 +125,10 @@ export class WindowRenderer {
    * @param options.avatar - Optional avatar image URL
    * @param options.onClose - Callback when the close button is clicked
    * @param options.onNewConversation - Callback when the new conversation button is clicked
+   * @param options.showBranding - Whether to render the "Powered by Nevent" footer.
+   *   Defaults to `true`. White-label clients set this to `false`.
+   * @param options.tenantId - Tenant identifier for UTM attribution tracking
+   * @param options.tracker - Optional analytics tracker for branding click events
    * @returns The chat window container element
    */
   render(options: {
@@ -128,6 +137,9 @@ export class WindowRenderer {
     avatar?: string;
     onClose: () => void;
     onNewConversation: () => void;
+    showBranding?: boolean;
+    tenantId?: string;
+    tracker?: ChatbotTracker | null;
   }): HTMLElement {
     // Window container — ARIA dialog with labelled-by pointing to the title element.
     // We use a stable ID so aria-labelledby works when title updates dynamically.
@@ -159,6 +171,17 @@ export class WindowRenderer {
     this.footer.className = 'nevent-chatbot-footer';
     this.applyFooterStyles();
     this.window.appendChild(this.footer);
+
+    // Branding footer ("Powered by Nevent")
+    // Rendered below the input footer, just above the window border.
+    // Visible by default; white-label clients disable it via showBranding: false.
+    if (options.showBranding !== false) {
+      const branding = this.createBrandingFooter(
+        options.tenantId ?? '',
+        options.tracker ?? null
+      );
+      this.window.appendChild(branding);
+    }
 
     return this.window;
   }
@@ -467,6 +490,75 @@ export class WindowRenderer {
     button.addEventListener('click', onClick);
 
     return button;
+  }
+
+  // --------------------------------------------------------------------------
+  // Private: Branding Footer
+  // --------------------------------------------------------------------------
+
+  /**
+   * Creates the "Powered by Nevent" branding footer element.
+   *
+   * The branding links to nevent.es with UTM parameters for attribution:
+   * - `utm_source=chatbot_widget` - identifies the traffic source as the chatbot
+   * - `utm_medium=powered_by` - identifies the medium as the branding link
+   * - `utm_campaign=plg` - Product-Led Growth campaign
+   * - `utm_content={tenantId}` - identifies which tenant's widget generated the click
+   *
+   * A click event is tracked via the analytics tracker when provided.
+   *
+   * @param tenantId - Tenant ID for UTM content attribution
+   * @param tracker - Optional analytics tracker for click event tracking
+   * @returns The branding footer element
+   */
+  private createBrandingFooter(
+    tenantId: string,
+    tracker: ChatbotTracker | null
+  ): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'nevent-chatbot-branding';
+
+    const utmParams = new URLSearchParams({
+      utm_source: 'chatbot_widget',
+      utm_medium: 'powered_by',
+      utm_campaign: 'plg',
+      utm_content: tenantId,
+    });
+
+    const link = document.createElement('a');
+    link.href = `https://nevent.es?${utmParams.toString()}`;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.className = 'nevent-chatbot-branding-link';
+    link.setAttribute('aria-label', this.i18n.t('brandingAriaLabel'));
+
+    // SVG icon (lightning bolt)
+    const iconSpan = document.createElement('span');
+    iconSpan.innerHTML = BRANDING_ICON_SVG;
+    iconSpan.style.display = 'inline-flex';
+    iconSpan.style.alignItems = 'center';
+    link.appendChild(iconSpan);
+
+    // "Powered by " text node
+    const textNode = document.createTextNode(
+      `${this.i18n.t('poweredBy').replace('Nevent', '').trim()} `
+    );
+    link.appendChild(textNode);
+
+    // "Nevent" in bold
+    const strong = document.createElement('strong');
+    strong.textContent = 'Nevent';
+    link.appendChild(strong);
+
+    // Track branding clicks for attribution analytics
+    link.addEventListener('click', () => {
+      if (tracker) {
+        tracker.trackBrandingClick(window.location.href);
+      }
+    });
+
+    container.appendChild(link);
+    return container;
   }
 
   // --------------------------------------------------------------------------

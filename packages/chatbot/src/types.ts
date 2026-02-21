@@ -1382,6 +1382,8 @@ export interface ChatbotTranslations extends Record<string, string> {
   agentTyping: string;
   /** Typing indicator text when agent name is unknown */
   someoneTyping: string;
+  /** Accessible label for the "Powered by Nevent" branding link */
+  brandingAriaLabel: string;
 }
 
 // ============================================================================

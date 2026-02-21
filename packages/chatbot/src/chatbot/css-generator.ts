@@ -1995,15 +1995,34 @@ export class CSSGenerator {
     return (
       // Hidden state helper
       `${ROOT_CLASS} .nevent-chatbot-hidden{display:none!important;}` +
-      // Branding footer
+      // Branding footer ("Powered by Nevent")
       `.nevent-chatbot-branding{` +
       `display:flex;` +
       `justify-content:center;` +
-      `padding:var(--nev-cb-spacing-xs) 0;` +
+      `align-items:center;` +
+      `padding:6px 0;` +
       `font-size:var(--nev-cb-font-size-xs);` +
       `color:var(--nev-cb-color-text-muted);` +
       `border-top:1px solid var(--nev-cb-color-border);` +
+      `opacity:0.7;` +
+      `transition:opacity 0.2s ease;` +
+      `flex-shrink:0;` +
       `}` +
+      `.nevent-chatbot-branding:hover{opacity:1;}` +
+      `.nevent-chatbot-branding-link{` +
+      `display:inline-flex;` +
+      `align-items:center;` +
+      `gap:4px;` +
+      `color:inherit;` +
+      `text-decoration:none;` +
+      `cursor:pointer;` +
+      `}` +
+      `.nevent-chatbot-branding-link:hover{text-decoration:underline;}` +
+      `.nevent-chatbot-branding-link strong{` +
+      `font-weight:600;` +
+      `color:var(--nev-cb-color-primary);` +
+      `}` +
+      `.nevent-chatbot-branding-icon{opacity:0.6;}` +
       // Error message
       `.nevent-chatbot-error-message{` +
       `display:flex;` +
