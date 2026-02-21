@@ -36,6 +36,7 @@ import type {
   RichContent,
   BackendStreamEvent,
   BackendMessageRequest,
+  TypingStatusEvent,
 } from '../types';
 import type { AuthManager } from './auth-manager';
 
@@ -227,6 +228,22 @@ export interface StreamingOptions {
    * @param metadata - Tool call result metadata
    */
   onToolCallResult?: (content: string | null | undefined, metadata: unknown) => void;
+
+  /**
+   * Called when a `TYPING_START` SSE event is received from the backend,
+   * indicating that a live agent has started typing.
+   *
+   * @param event - The typing status event with agent identity
+   */
+  onAgentTypingStart?: (event: TypingStatusEvent) => void;
+
+  /**
+   * Called when a `TYPING_STOP` SSE event is received from the backend,
+   * indicating that a live agent has stopped typing.
+   *
+   * @param event - The typing status event with agent identity
+   */
+  onAgentTypingStop?: (event: TypingStatusEvent) => void;
 
   /**
    * Optional AbortSignal from the consumer.
@@ -806,7 +823,7 @@ export class StreamingClient {
         const parsed = JSON.parse(rawData);
         // Detect backend event format by checking for the 'type' field
         // containing a BackendStreamEventType value
-        if (parsed.type && ['TOKEN', 'THINKING', 'DONE', 'ERROR', 'TOOL_CALL_START', 'TOOL_CALL_RESULT'].includes(parsed.type)) {
+        if (parsed.type && ['TOKEN', 'THINKING', 'DONE', 'ERROR', 'TOOL_CALL_START', 'TOOL_CALL_RESULT', 'TYPING_START', 'TYPING_STOP'].includes(parsed.type)) {
           backendEvent = parsed as BackendStreamEvent;
         } else {
           data = parsed as StreamEventData;
@@ -881,6 +898,30 @@ export class StreamingClient {
         case 'TOOL_CALL_RESULT':
           options.onToolCallResult?.(backendEvent.content, backendEvent.metadata);
           break;
+
+        case 'TYPING_START': {
+          // Live agent started typing — parse metadata for agent identity
+          const typingStartEvent: TypingStatusEvent = {
+            isTyping: true,
+            ...(backendEvent.metadata && typeof backendEvent.metadata === 'object'
+              ? backendEvent.metadata as Partial<TypingStatusEvent>
+              : {}),
+          };
+          options.onAgentTypingStart?.(typingStartEvent);
+          break;
+        }
+
+        case 'TYPING_STOP': {
+          // Live agent stopped typing
+          const typingStopEvent: TypingStatusEvent = {
+            isTyping: false,
+            ...(backendEvent.metadata && typeof backendEvent.metadata === 'object'
+              ? backendEvent.metadata as Partial<TypingStatusEvent>
+              : {}),
+          };
+          options.onAgentTypingStop?.(typingStopEvent);
+          break;
+        }
 
         default:
           this.logger.debug('Unhandled backend event type', { type: backendEvent.type });

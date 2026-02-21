@@ -71,6 +71,9 @@ export class TypingRenderer {
   /** The outer container element for the typing indicator */
   private container: HTMLElement | null = null;
 
+  /** Reference to the label element for dynamic text updates */
+  private labelElement: HTMLElement | null = null;
+
   /**
    * Creates a new TypingRenderer instance.
    *
@@ -143,6 +146,7 @@ export class TypingRenderer {
     label.setAttribute('aria-hidden', 'true');
     this.applyLabelStyles(label);
     this.container.appendChild(label);
+    this.labelElement = label;
 
     return this.container;
   }
@@ -151,9 +155,43 @@ export class TypingRenderer {
    * Shows the typing indicator with a smooth fade-in animation.
    *
    * Transitions from opacity 0 + translateY(4px) to opacity 1 + translateY(0).
+   * Resets the label to the default "Thinking..." text.
    */
   show(): void {
     if (!this.container) return;
+
+    // Reset label to default text
+    this.setLabel(this.i18n.t('typingIndicator'));
+
+    this.container.style.display = 'flex';
+    // Force reflow before transitioning
+    void this.container.offsetHeight;
+    this.container.style.opacity = '1';
+    this.container.style.transform = 'translateY(0)';
+  }
+
+  /**
+   * Shows the typing indicator with a specific agent/bot display name.
+   *
+   * Uses the i18n `agentTyping` key with the `{name}` placeholder, or
+   * falls back to `someoneTyping` when no name is provided.
+   *
+   * @param displayName - The name to show (e.g., "Carlos", "Support")
+   */
+  showWithName(displayName?: string): void {
+    if (!this.container) return;
+
+    if (displayName) {
+      this.setLabel(this.i18n.format('agentTyping', { name: displayName }));
+    } else {
+      this.setLabel(this.i18n.t('someoneTyping'));
+    }
+
+    // Update the ARIA label for screen readers
+    const ariaText = displayName
+      ? this.i18n.format('agentTyping', { name: displayName })
+      : this.i18n.t('someoneTyping');
+    this.container.setAttribute('aria-label', ariaText);
 
     this.container.style.display = 'flex';
     // Force reflow before transitioning
@@ -189,6 +227,22 @@ export class TypingRenderer {
   destroy(): void {
     this.container?.remove();
     this.container = null;
+    this.labelElement = null;
+  }
+
+  // --------------------------------------------------------------------------
+  // Private: Label Management
+  // --------------------------------------------------------------------------
+
+  /**
+   * Updates the visible text label of the typing indicator.
+   *
+   * @param text - The text to display below the bouncing dots
+   */
+  private setLabel(text: string): void {
+    if (this.labelElement) {
+      this.labelElement.textContent = text;
+    }
   }
 
   // --------------------------------------------------------------------------
