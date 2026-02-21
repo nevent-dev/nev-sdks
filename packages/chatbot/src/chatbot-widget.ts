@@ -2026,19 +2026,22 @@ export class ChatbotWidget {
       this.shadow ?? undefined
     );
 
-    const windowRenderOptions: {
-      title: string;
-      subtitle?: string;
-      avatar?: string;
-      onClose: () => void;
-      onNewConversation: () => void;
-    } = {
+    // Resolve branding visibility: client config takes precedence over server
+    // feature flag. Both default to true when not explicitly set.
+    const showBranding =
+      config.showBranding !== false &&
+      serverConfig.features.showBranding !== false;
+
+    const windowRenderOptions: Parameters<WindowRenderer['render']>[0] = {
       title: headerTitle,
       subtitle: headerSubtitle,
       onClose: () => this.close(),
       onNewConversation: () => {
         void this.clearConversation();
       },
+      showBranding,
+      tenantId: config.tenantId,
+      tracker: this.tracker,
     };
     if (headerAvatar) {
       windowRenderOptions.avatar = headerAvatar;

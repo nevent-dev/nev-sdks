@@ -338,6 +338,27 @@ export class ChatbotTracker {
   }
 
   /**
+   * Tracks a click on the "Powered by Nevent" branding link.
+   *
+   * Used for PLG (Product-Led Growth) attribution: measures how many visitors
+   * click through to nevent.es from embedded chatbot widgets.
+   *
+   * @param referrerUrl - The full URL of the page hosting the chatbot widget.
+   *   Used for attribution analysis (which client pages generate the most clicks).
+   *
+   * Event name: `chatbot.branding_click`
+   */
+  trackBrandingClick(referrerUrl: string): void {
+    this.client.track('chatbot.branding_click', {
+      ...this.baseParams(),
+      interaction: true,
+      referrer_url: referrerUrl,
+      referrer_domain:
+        typeof window !== 'undefined' ? window.location.hostname : '',
+    });
+  }
+
+  /**
    * Tracks a conversation being resumed from localStorage persistence.
    *
    * Called when the widget detects a previously stored conversation and

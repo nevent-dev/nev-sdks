@@ -381,10 +381,46 @@ describe('E2E: Multi-Feature Flow', () => {
       });
       cleanup = c;
 
-      // Look for branding element
+      // Branding element must be rendered
       const branding = shadowRoot.querySelector('.nevent-chatbot-branding');
-      // Branding may or may not be visible depending on implementation
-      // At minimum, the widget should initialize without errors
+      expect(branding).not.toBeNull();
+
+      // Must contain a link to nevent.es with UTM parameters
+      const link = branding!.querySelector(
+        'a.nevent-chatbot-branding-link'
+      ) as HTMLAnchorElement;
+      expect(link).not.toBeNull();
+      expect(link.href).toContain('https://nevent.es');
+      expect(link.href).toContain('utm_source=chatbot_widget');
+      expect(link.href).toContain('utm_medium=powered_by');
+      expect(link.href).toContain('utm_campaign=plg');
+      expect(link.href).toContain('utm_content=');
+
+      // Security: link must open in new tab with noopener noreferrer
+      expect(link.target).toBe('_blank');
+      expect(link.rel).toBe('noopener noreferrer');
+
+      // Accessibility: link must have aria-label
+      expect(link.getAttribute('aria-label')).toBeTruthy();
+
+      // Branding text must include "Nevent" in a <strong> tag
+      const strong = link.querySelector('strong');
+      expect(strong).not.toBeNull();
+      expect(strong!.textContent).toBe('Nevent');
+    });
+
+    it('should include tenantId in UTM content parameter', async () => {
+      const { shadowRoot, cleanup: c } = await createInitializedWidget({
+        showBranding: true,
+        tenantId: 'tenant-test-456',
+      });
+      cleanup = c;
+
+      const link = shadowRoot.querySelector(
+        '.nevent-chatbot-branding-link'
+      ) as HTMLAnchorElement;
+      expect(link).not.toBeNull();
+      expect(link.href).toContain('utm_content=tenant-test-456');
     });
 
     it('should respect showBranding: false configuration', async () => {
@@ -396,6 +432,18 @@ describe('E2E: Multi-Feature Flow', () => {
       // Widget should still work with branding disabled
       const root = shadowRoot.querySelector('.nevent-chatbot-root');
       expect(root).not.toBeNull();
+
+      // Branding element must NOT be rendered
+      const branding = shadowRoot.querySelector('.nevent-chatbot-branding');
+      expect(branding).toBeNull();
+    });
+
+    it('should show branding by default when showBranding is not set', async () => {
+      const { shadowRoot, cleanup: c } = await createInitializedWidget({});
+      cleanup = c;
+
+      const branding = shadowRoot.querySelector('.nevent-chatbot-branding');
+      expect(branding).not.toBeNull();
     });
   });
 
