@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chatbot - Advanced CDN Example</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #F9FAFB;
+      color: #111827;
+    }
+
+    header {
+      background: #6366F1;
+      color: #fff;
+      padding: 24px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    header h1 { margin: 0; font-size: 1.5rem; }
+    header p  { margin: 4px 0 0; font-size: 0.875rem; opacity: 0.85; }
+
+    main {
+      max-width: 900px;
+      margin: 40px auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .card h2 { margin: 0 0 8px; font-size: 1.125rem; }
+    .card p  { margin: 0; color: #6B7280; font-size: 0.875rem; line-height: 1.6; }
+
+    /* Inline chatbot container — the widget embeds here */
+    #chatbot-inline {
+      grid-column: 1 / -1;
+      height: 560px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(99, 102, 241, 0.18);
+    }
+
+    /* Controls (programmatic API demo) */
+    .controls {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .controls button {
+      background: #6366F1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .controls button:hover  { background: #4F46E5; }
+    .controls button.secondary {
+      background: #fff;
+      color: #6366F1;
+      border: 1.5px solid #6366F1;
+    }
+    .controls button.secondary:hover { background: #EEF2FF; }
+
+    /* Event log */
+    #event-log {
+      grid-column: 1 / -1;
+      background: #1E1E2E;
+      color: #CDD6F4;
+      border-radius: 12px;
+      padding: 20px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      min-height: 120px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #event-log .log-entry { margin: 0; }
+    #event-log .log-entry.error { color: #F38BA8; }
+    #event-log .log-entry.message { color: #A6E3A1; }
+    #event-log .log-entry.lifecycle { color: #89DCEB; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>Summer Music Festival 2025</h1>
+      <p>Ask our AI assistant anything about the event</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="card">
+      <h2>Tickets</h2>
+      <p>General admission, VIP, and backstage passes available. Early-bird pricing ends June 1st.</p>
+    </div>
+    <div class="card">
+      <h2>Venue</h2>
+      <p>Parque de la Ciudadela, Barcelona. Doors open at 17:00. Gates close at 23:30.</p>
+    </div>
+
+    <!-- Inline chatbot — embedded directly on the page -->
+    <div id="chatbot-inline"></div>
+
+    <!-- Programmatic API controls -->
+    <div class="controls">
+      <button onclick="openChat()">Open Chat</button>
+      <button onclick="closeChat()" class="secondary">Close Chat</button>
+      <button onclick="sendDemo()">Send Demo Message</button>
+      <button onclick="clearChat()" class="secondary">Clear Conversation</button>
+      <button onclick="logState()">Log State</button>
+    </div>
+
+    <!-- Live event log -->
+    <pre id="event-log"><span class="log-entry lifecycle">[info] Initializing chatbot widget...</span>
+</pre>
+  </main>
+
+  <!--
+    @nevent/chatbot — Advanced CDN integration
+    ==========================================
+    Demonstrates:
+    - Inline mode (containerId)
+    - Brand color auto-theming
+    - Custom styles overrides
+    - Custom Google Font (Inter)
+    - Custom CSS injection
+    - All lifecycle callbacks wired to an event log
+    - Programmatic API: open / close / sendMessage / clearConversation / getState
+  -->
+  <script src="https://cdn.nevent.es/chatbot/nevent-chatbot.umd.cjs"></script>
+  <script>
+    const log = document.getElementById('event-log');
+
+    function appendLog(text, type = 'lifecycle') {
+      const entry = document.createElement('span');
+      entry.className = 'log-entry ' + type;
+      entry.textContent = '[' + new Date().toLocaleTimeString() + '] ' + text + '\n';
+      log.appendChild(entry);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    // ------------------------------------------------------------------
+    // Widget initialization
+    // ------------------------------------------------------------------
+    const chatbot = new NeventChatbot.ChatbotWidget({
+      // Required
+      chatbotId: 'your-chatbot-id',
+      tenantId:  'your-tenant-id',
+
+      // Inline mode: embed directly inside #chatbot-inline container
+      containerId: 'chatbot-inline',
+
+      // Brand color — generates a full harmonious theme automatically
+      brandColor: '#6366F1',
+
+      // Locale
+      locale: 'en',
+
+      // Granular style overrides (applied on top of the generated theme)
+      styles: {
+        window: {
+          borderRadius: 0,   // No radius — the card has its own rounding
+          width: undefined,  // Fill the container
+          height: undefined, // Fill the container
+        },
+        messages: {
+          fontSize: '14px',
+          borderRadius: 14,
+        },
+        input: {
+          borderRadius: '28px',
+        },
+      },
+
+      // Custom Google Font loaded for all widget text
+      fonts: [
+        {
+          family: 'Inter',
+          category: 'sans-serif',
+          type: 'GOOGLE_FONT',
+        },
+      ],
+
+      // Fine-grained CSS overrides
+      customCSS: `
+        .nevent-chatbot-header {
+          border-radius: 0;
+        }
+        .nevent-chatbot-branding {
+          opacity: 0.6;
+        }
+      `,
+
+      // Behavior
+      persistConversation: true,
+      conversationTTL: 48,
+      analytics: true,
+      debug: false,
+
+      // Lifecycle callbacks
+      onReady: function () {
+        appendLog('Widget ready — chatbot initialized successfully', 'lifecycle');
+      },
+
+      onOpen: function () {
+        appendLog('onOpen() — chat window opened', 'lifecycle');
+      },
+
+      onClose: function () {
+        appendLog('onClose() — chat window closed', 'lifecycle');
+      },
+
+      onMessage: function (message) {
+        appendLog(
+          'onMessage() — [' + message.role + '] "' + message.content.slice(0, 60) + '..."',
+          'message',
+        );
+      },
+
+      onError: function (error) {
+        appendLog(
+          'onError() — [' + error.code + '] ' + error.message,
+          'error',
+        );
+      },
+    });
+
+    chatbot.init().then(function () {
+      appendLog('init() resolved — widget mounted to DOM', 'lifecycle');
+    }).catch(function (err) {
+      appendLog('init() failed: ' + err.message, 'error');
+    });
+
+    // ------------------------------------------------------------------
+    // Programmatic API helpers (called by the control buttons above)
+    // ------------------------------------------------------------------
+
+    function openChat() {
+      chatbot.open();
+    }
+
+    function closeChat() {
+      chatbot.close();
+    }
+
+    function sendDemo() {
+      chatbot.sendMessage('What time does the festival start?').catch(function (err) {
+        appendLog('sendMessage error: ' + err.message, 'error');
+      });
+    }
+
+    function clearChat() {
+      chatbot.clearConversation().then(function () {
+        appendLog('clearConversation() — conversation cleared', 'lifecycle');
+      });
+    }
+
+    function logState() {
+      const state = chatbot.getState();
+      appendLog(
+        'getState() — isOpen: ' + state.isOpen +
+        ', messages: ' + (state.conversation?.messages.length ?? 0) +
+        ', unread: ' + state.unreadCount,
+        'lifecycle',
+      );
+    }
+  </script>
+
+</body>
+</html>
