@@ -58,6 +58,7 @@ import type {
   Conversation,
   PersistedConversationState,
   FeedbackType,
+  FileAttachment,
 } from './types';
 import { ConfigManager } from './chatbot/config-manager';
 import { ConversationService } from './chatbot/conversation-service';
@@ -72,6 +73,8 @@ import { ChatbotTracker } from './chatbot/analytics/chatbot-tracker';
 import { ConnectionManager } from './chatbot/connection-manager';
 import type { ConnectionStatus } from './chatbot/connection-manager';
 import { ErrorBoundary } from './chatbot/error-boundary';
+import { FileUploadService } from './chatbot/file-upload-service';
+import { TypingStatusService } from './chatbot/typing-status-service';
 import { BubbleRenderer } from './chatbot/ui/bubble-renderer';
 import { WindowRenderer } from './chatbot/ui/window-renderer';
 import { MessageRenderer } from './chatbot/ui/message-renderer';
@@ -220,6 +223,16 @@ export class ChatbotWidget {
 
   /** Bot typing indicator animation */
   private typingRenderer: TypingRenderer | null = null;
+
+  /** File upload service for validating and uploading attachments */
+  private fileUploadService: FileUploadService | null = null;
+
+  /**
+   * Bidirectional typing status service.
+   * Manages user→server typing notifications (debounced) and server→client
+   * agent typing events (via SSE). Initialized after server config fetch.
+   */
+  private typingStatusService: TypingStatusService | null = null;
 
   // --------------------------------------------------------------------------
   // State
@@ -558,7 +571,44 @@ export class ChatbotWidget {
         this.logger.debug('StreamingClient initialized — streaming mode active');
       }
 
-      // Step 6c: Initialize ConnectionManager for heartbeat / reconnection.
+      // Step 6c: Initialize FileUploadService when file uploads are enabled.
+      // Uses the same token and tenant ID for authenticated uploads.
+      if (mergedConfig.fileUpload?.enabled !== false) {
+        this.fileUploadService = new FileUploadService(
+          mergedConfig.fileUpload,
+          mergedConfig.apiUrl,
+          mergedConfig.tenantId,
+          serverConfig.token,
+          mergedConfig.debug,
+        );
+        this.logger.debug('FileUploadService initialized');
+      }
+
+      // Step 6d: Initialize TypingStatusService for bidirectional typing notifications.
+      // Enabled by default unless explicitly disabled via typingStatus.enabled === false.
+      if (mergedConfig.typingStatus?.enabled !== false) {
+        this.typingStatusService = new TypingStatusService(
+          mergedConfig.typingStatus,
+          mergedConfig.apiUrl,
+          mergedConfig.tenantId,
+          () => this.stateManager.getState().conversation?.id ?? null,
+          serverConfig.token,
+          mergedConfig.debug,
+        );
+
+        // Wire server typing events to the typing renderer
+        this.typingStatusService.onServerTyping((event) => {
+          if (event.isTyping) {
+            this.typingRenderer?.showWithName(event.displayName);
+          } else {
+            this.typingRenderer?.hide();
+          }
+        });
+
+        this.logger.debug('TypingStatusService initialized');
+      }
+
+      // Step 6e: Initialize ConnectionManager for heartbeat / reconnection.
       // Uses the same API URL as ConversationService so pings hit the same host.
       this.connectionManager = new ConnectionManager(mergedConfig.apiUrl, {
         debug: mergedConfig.debug,
@@ -923,9 +973,10 @@ export class ChatbotWidget {
     if (!this.conversationService) return;
 
     return this.errorBoundary.guardAsync(async () => {
-    // Validate text
+    // Validate text and attachments
     const trimmedText = text.trim();
-    if (!trimmedText) return;
+    const pendingAttachments = this.inputRenderer?.getAttachments() ?? [];
+    if (!trimmedText && pendingAttachments.length === 0) return;
 
     // Client-side rate limiting via ConversationService's RateLimiter.
     // If the limit is exceeded, show a countdown message and temporarily
@@ -963,6 +1014,47 @@ export class ChatbotWidget {
     const config = this.configManager.getConfig();
     const state = this.stateManager.getState();
 
+    // Upload any pending file attachments before building the user message.
+    // Each file is uploaded in parallel; failed uploads are filtered out.
+    let uploadedAttachments: FileAttachment[] = [];
+    if (pendingAttachments.length > 0 && this.fileUploadService) {
+      const uploadPromises = pendingAttachments.map(async (attachment) => {
+        if (attachment.status === 'uploaded' && attachment.url) {
+          return attachment; // Already uploaded
+        }
+        try {
+          const result = await this.fileUploadService!.upload(
+            attachment.file,
+            (progress) => {
+              this.inputRenderer?.updateAttachment(attachment.id, {
+                progress,
+                status: 'uploading',
+              });
+            },
+          );
+          const updateData: Partial<FileAttachment> = {
+            status: result.status,
+            progress: result.progress,
+          };
+          if (result.url) updateData.url = result.url;
+          if (result.error) updateData.error = result.error;
+          this.inputRenderer?.updateAttachment(attachment.id, updateData);
+          return result;
+        } catch {
+          this.inputRenderer?.updateAttachment(attachment.id, {
+            status: 'error',
+            error: 'Upload failed',
+          });
+          return null;
+        }
+      });
+
+      const results = await Promise.all(uploadPromises);
+      uploadedAttachments = results.filter(
+        (r): r is FileAttachment => r !== null && r.status === 'uploaded',
+      );
+    }
+
     // Create optimistic user message
     const userMessage: ChatMessage = {
       id: generateMessageId(),
@@ -972,6 +1064,7 @@ export class ChatbotWidget {
       type: 'text',
       timestamp: new Date().toISOString(),
       status: 'sending',
+      ...(uploadedAttachments.length > 0 ? { attachments: uploadedAttachments } : {}),
     };
 
     // Ensure a conversation exists (create lazily on first message)
@@ -1066,6 +1159,89 @@ export class ChatbotWidget {
       this.inputRenderer?.focus();
     }
     }, 'sendMessage');
+  }
+
+  // --------------------------------------------------------------------------
+  // Private: File Upload Handling
+  // --------------------------------------------------------------------------
+
+  /**
+   * Handles files selected by the user (via file input, drag-drop, or paste).
+   *
+   * Validates each file against the FileUploadService configuration (size,
+   * type), creates FileAttachment objects for valid files, and adds them to
+   * the InputRenderer's preview strip. Invalid files trigger inline error
+   * messages.
+   *
+   * @param files - Array of File objects selected by the user
+   */
+  private async handleFilesSelected(files: File[]): Promise<void> {
+    if (!this.fileUploadService || !this.inputRenderer) return;
+
+    for (const file of files) {
+      const validation = this.fileUploadService.validate(file);
+
+      if (!validation.valid) {
+        // Show validation error inline
+        const errorKey = validation.error ?? '';
+        if (errorKey.startsWith('FILE_TOO_LARGE:')) {
+          const maxMB = errorKey.split(':')[1] ?? '10';
+          this.showInlineError(this.i18n.format('fileTooBig', { maxMB }));
+        } else if (errorKey === 'FILE_TYPE_NOT_ALLOWED') {
+          this.showInlineError(this.i18n.t('fileTypeNotAllowed'));
+        } else {
+          this.showInlineError(this.i18n.t('uploadFailed'));
+        }
+        continue;
+      }
+
+      // Create a pending attachment with a local preview
+      const thumbnailUrl = this.fileUploadService.createPreview(file);
+      const id = crypto?.randomUUID?.() ?? `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+      const attachment: FileAttachment = {
+        id,
+        file,
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        status: 'pending',
+        progress: 0,
+        ...(thumbnailUrl ? { thumbnailUrl } : {}),
+      };
+
+      this.inputRenderer.addAttachments([attachment]);
+    }
+  }
+
+  /**
+   * Handles removal of a file attachment from the InputRenderer preview strip.
+   *
+   * Revokes the blob URL for the preview image (if any) and cancels any
+   * in-progress upload for the attachment.
+   *
+   * @param attachmentId - The ID of the attachment to remove
+   */
+  private handleFileRemoved(attachmentId: string): void {
+    if (!this.inputRenderer) return;
+
+    // Find the attachment to clean up its resources
+    const attachments = this.inputRenderer.getAttachments();
+    const attachment = attachments.find((a) => a.id === attachmentId);
+
+    if (attachment) {
+      // Revoke blob URL to prevent memory leaks
+      if (attachment.thumbnailUrl && this.fileUploadService) {
+        this.fileUploadService.revokePreview(attachment.thumbnailUrl);
+      }
+
+      // Cancel upload if in progress
+      if (attachment.status === 'uploading' && this.fileUploadService) {
+        this.fileUploadService.cancelUpload(attachmentId);
+      }
+    }
+
+    this.inputRenderer.removeAttachment(attachmentId);
   }
 
   // --------------------------------------------------------------------------
@@ -1236,6 +1412,15 @@ export class ChatbotWidget {
           setTimeout(this.errorBoundary.guardTimer(() => {
             this.focusFirstQuickReply();
           }, 'streamingQuickReplyFocus'), 50);
+        },
+
+        // Server → Client: agent typing status via SSE
+        onAgentTypingStart: (event) => {
+          this.typingStatusService?.handleServerTypingEvent(event);
+        },
+
+        onAgentTypingStop: (event) => {
+          this.typingStatusService?.handleServerTypingEvent(event);
         },
       },
     );
@@ -1474,6 +1659,18 @@ export class ChatbotWidget {
       if (this.streamingClient) {
         this.streamingClient.destroy();
         this.streamingClient = null;
+      }
+
+      // Destroy typing status service (clears timers, sends stop if mid-typing)
+      if (this.typingStatusService) {
+        this.typingStatusService.destroy();
+        this.typingStatusService = null;
+      }
+
+      // Destroy file upload service (cancels active uploads, revokes blob URLs)
+      if (this.fileUploadService) {
+        this.fileUploadService.destroy();
+        this.fileUploadService = null;
       }
 
       // Destroy UI renderers
@@ -1739,12 +1936,36 @@ export class ChatbotWidget {
       || serverConfig.placeholder
       || this.i18n.t('inputPlaceholder');
 
-    const inputElement = this.inputRenderer.render({
+    const inputRenderOptions: Parameters<InputRenderer['render']>[0] = {
       onSend: (text: string) => {
         void this.sendMessage(text);
       },
       placeholder,
-    });
+    };
+
+    // Wire typing status notifications (user → server).
+    // Properties are added conditionally to satisfy exactOptionalPropertyTypes.
+    if (this.typingStatusService) {
+      const typingSvc = this.typingStatusService;
+      inputRenderOptions.onTyping = () => { typingSvc.notifyTyping(); };
+      inputRenderOptions.onStoppedTyping = () => { typingSvc.notifyStoppedTyping(); };
+    }
+
+    if (this.fileUploadService) {
+      inputRenderOptions.fileUpload = {
+        enabled: true,
+        accept: this.fileUploadService.getAcceptString(),
+        maxFiles: this.fileUploadService.getMaxFiles(),
+        onFilesSelected: (files: File[]) => {
+          void this.handleFilesSelected(files);
+        },
+        onFileRemoved: (attachmentId: string) => {
+          this.handleFileRemoved(attachmentId);
+        },
+      };
+    }
+
+    const inputElement = this.inputRenderer.render(inputRenderOptions);
     this.windowRenderer.getFooter().appendChild(inputElement);
 
     // The root element is already inside the shadow root (mounted in init()).

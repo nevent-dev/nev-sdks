@@ -71,6 +71,15 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     connectionOffline: 'Sin conexión a internet',
     connectionReconnecting: 'Reconectando...',
     connectionReconnected: 'Reconectado',
+    attachFile: 'Adjuntar archivo',
+    removeFile: 'Eliminar',
+    uploading: 'Subiendo',
+    fileTooBig: 'El archivo es demasiado grande. Máximo {maxMB} MB.',
+    fileTypeNotAllowed: 'Tipo de archivo no permitido.',
+    uploadFailed: 'Error al subir el archivo. Inténtalo de nuevo.',
+    dragDropHint: 'Suelta los archivos aquí',
+    agentTyping: '{name} está escribiendo...',
+    someoneTyping: 'Alguien está escribiendo...',
   },
 
   /**
@@ -100,6 +109,15 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     connectionOffline: 'No internet connection',
     connectionReconnecting: 'Reconnecting...',
     connectionReconnected: 'Reconnected',
+    attachFile: 'Attach file',
+    removeFile: 'Remove',
+    uploading: 'Uploading',
+    fileTooBig: 'File is too large. Maximum {maxMB} MB.',
+    fileTypeNotAllowed: 'File type not allowed.',
+    uploadFailed: 'Upload failed. Please try again.',
+    dragDropHint: 'Drop files here',
+    agentTyping: '{name} is typing...',
+    someoneTyping: 'Someone is typing...',
   },
 
   /**
@@ -129,6 +147,15 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     connectionOffline: 'Sense connexió a internet',
     connectionReconnecting: 'Reconnectant...',
     connectionReconnected: 'Reconnectat',
+    attachFile: 'Adjuntar fitxer',
+    removeFile: 'Eliminar',
+    uploading: 'Pujant',
+    fileTooBig: 'El fitxer és massa gran. Màxim {maxMB} MB.',
+    fileTypeNotAllowed: 'Tipus de fitxer no permès.',
+    uploadFailed: "Error en pujar el fitxer. Torna-ho a intentar.",
+    dragDropHint: 'Deixa anar els fitxers aquí',
+    agentTyping: '{name} està escrivint...',
+    someoneTyping: 'Algú està escrivint...',
   },
 
   /**
@@ -158,6 +185,15 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     connectionOffline: 'Sem conexão à internet',
     connectionReconnecting: 'Reconectando...',
     connectionReconnected: 'Reconectado',
+    attachFile: 'Anexar arquivo',
+    removeFile: 'Remover',
+    uploading: 'Enviando',
+    fileTooBig: 'O arquivo é muito grande. Máximo {maxMB} MB.',
+    fileTypeNotAllowed: 'Tipo de arquivo não permitido.',
+    uploadFailed: 'Falha ao enviar o arquivo. Tente novamente.',
+    dragDropHint: 'Solte os arquivos aqui',
+    agentTyping: '{name} está a escrever...',
+    someoneTyping: 'Alguém está a escrever...',
   },
 };
 

@@ -27,7 +27,7 @@
  * and updateMessage() with ChatMessage objects.
  */
 
-import type { ActionButton, ChatMessage, MessageStyles, QuickReply, QuickReplyStyles } from '../../types';
+import type { ActionButton, ChatMessage, FileAttachment, MessageStyles, QuickReply, QuickReplyStyles } from '../../types';
 import { I18nManager } from '../i18n-manager';
 import { MarkdownRenderer } from '../markdown-renderer';
 import { MessageSanitizer } from '../message-sanitizer';
@@ -1188,6 +1188,12 @@ export class MessageRenderer {
 
     wrapper.appendChild(bubble);
 
+    // File attachments (rendered below the text bubble if present)
+    if (message.attachments && message.attachments.length > 0) {
+      const attachmentsEl = this.createAttachmentsElement(message.attachments, isUser);
+      wrapper.appendChild(attachmentsEl);
+    }
+
     // Metadata row (timestamp + status)
     const meta = document.createElement('div');
     meta.className = 'nevent-chatbot-message-meta';
@@ -1241,6 +1247,277 @@ export class MessageRenderer {
 
     wrapper.appendChild(text);
     return wrapper;
+  }
+
+  // --------------------------------------------------------------------------
+  // Private: Attachment Rendering
+  // --------------------------------------------------------------------------
+
+  /**
+   * Creates a container element displaying all file attachments for a message.
+   *
+   * Renders image attachments as clickable thumbnails and non-image attachments
+   * as file cards with an icon, filename, and file size. Each attachment links
+   * to its CDN URL for downloading.
+   *
+   * @param attachments - Array of FileAttachment objects to render
+   * @param isUser - Whether this is a user message (affects alignment and colors)
+   * @returns Container element with all attachment items
+   */
+  private createAttachmentsElement(attachments: FileAttachment[], isUser: boolean): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'nevent-chatbot-message-attachments';
+    container.setAttribute('role', 'list');
+    container.setAttribute('aria-label', this.i18n.t('attachFile'));
+
+    Object.assign(container.style, {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '4px',
+      marginTop: '4px',
+      maxWidth: this.styles?.maxWidth ?? '80%',
+    });
+
+    for (const attachment of attachments) {
+      const item = this.createAttachmentItem(attachment, isUser);
+      container.appendChild(item);
+    }
+
+    return container;
+  }
+
+  /**
+   * Creates a single attachment item element.
+   *
+   * For image attachments with a URL or thumbnailUrl, renders a clickable
+   * thumbnail image. For non-image files, renders a card with a file icon,
+   * filename, and size.
+   *
+   * @param attachment - The FileAttachment to render
+   * @param isUser - Whether this is a user message
+   * @returns The attachment item element
+   */
+  private createAttachmentItem(attachment: FileAttachment, isUser: boolean): HTMLElement {
+    const item = document.createElement('div');
+    item.className = 'nevent-chatbot-message-attachment-item';
+    item.setAttribute('role', 'listitem');
+
+    const isImage = attachment.type.startsWith('image/');
+    const displayUrl = attachment.url ?? attachment.thumbnailUrl;
+
+    if (isImage && displayUrl) {
+      return this.createImageAttachment(item, attachment, displayUrl, isUser);
+    }
+
+    return this.createFileAttachment(item, attachment, isUser);
+  }
+
+  /**
+   * Creates an image attachment element with a clickable thumbnail.
+   *
+   * @param item - The container element
+   * @param attachment - The file attachment data
+   * @param imageUrl - The URL to display as the thumbnail
+   * @param isUser - Whether this is a user message
+   * @returns The styled image attachment element
+   */
+  private createImageAttachment(
+    item: HTMLElement,
+    attachment: FileAttachment,
+    imageUrl: string,
+    _isUser: boolean,
+  ): HTMLElement {
+    Object.assign(item.style, {
+      borderRadius: '8px',
+      overflow: 'hidden',
+      cursor: attachment.url ? 'pointer' : 'default',
+    });
+
+    const img = document.createElement('img');
+    img.src = imageUrl;
+    img.alt = MessageSanitizer.escapeHtml(attachment.name);
+    img.loading = 'lazy';
+    Object.assign(img.style, {
+      display: 'block',
+      maxWidth: '200px',
+      maxHeight: '200px',
+      borderRadius: '8px',
+      objectFit: 'cover',
+    });
+
+    if (attachment.url) {
+      const link = document.createElement('a');
+      link.href = attachment.url;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.setAttribute(
+        'aria-label',
+        `${MessageSanitizer.escapeHtml(attachment.name)} (${this.formatAttachmentSize(attachment.size)})`,
+      );
+      link.appendChild(img);
+      item.appendChild(link);
+    } else {
+      item.appendChild(img);
+    }
+
+    // Upload progress overlay
+    if (attachment.status === 'uploading') {
+      const overlay = this.createUploadOverlay(attachment);
+      item.style.position = 'relative';
+      item.appendChild(overlay);
+    }
+
+    return item;
+  }
+
+  /**
+   * Creates a non-image file attachment element with icon, name, and size.
+   *
+   * @param item - The container element
+   * @param attachment - The file attachment data
+   * @param isUser - Whether this is a user message
+   * @returns The styled file attachment element
+   */
+  private createFileAttachment(
+    item: HTMLElement,
+    attachment: FileAttachment,
+    isUser: boolean,
+  ): HTMLElement {
+    const bgColor = isUser ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
+    const textColor = isUser
+      ? (this.styles?.userTextColor ?? '#ffffff')
+      : (this.styles?.botTextColor ?? '#333333');
+
+    Object.assign(item.style, {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      padding: '8px 12px',
+      backgroundColor: bgColor,
+      borderRadius: '8px',
+      textDecoration: 'none',
+      position: 'relative',
+    });
+
+    // File icon
+    const iconContainer = document.createElement('div');
+    iconContainer.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="${textColor}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`;
+    Object.assign(iconContainer.style, {
+      lineHeight: '0',
+      flexShrink: '0',
+    });
+    item.appendChild(iconContainer);
+
+    // File info
+    const info = document.createElement('div');
+    Object.assign(info.style, {
+      flex: '1',
+      minWidth: '0',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '1px',
+    });
+
+    const nameEl = document.createElement('span');
+    nameEl.textContent = attachment.name;
+    nameEl.title = attachment.name;
+    Object.assign(nameEl.style, {
+      fontSize: '13px',
+      fontWeight: '500',
+      color: textColor,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap',
+    });
+    info.appendChild(nameEl);
+
+    const sizeEl = document.createElement('span');
+    sizeEl.textContent = this.formatAttachmentSize(attachment.size);
+    Object.assign(sizeEl.style, {
+      fontSize: '11px',
+      color: isUser ? 'rgba(255,255,255,0.7)' : '#888888',
+    });
+    info.appendChild(sizeEl);
+
+    item.appendChild(info);
+
+    // Download link (wraps the whole card if URL is available)
+    if (attachment.url) {
+      item.style.cursor = 'pointer';
+      item.addEventListener('click', () => {
+        window.open(attachment.url!, '_blank', 'noopener,noreferrer');
+      });
+      item.setAttribute('role', 'link');
+      item.setAttribute('tabindex', '0');
+      item.setAttribute(
+        'aria-label',
+        `${MessageSanitizer.escapeHtml(attachment.name)} (${this.formatAttachmentSize(attachment.size)})`,
+      );
+    }
+
+    // Upload progress overlay
+    if (attachment.status === 'uploading') {
+      const overlay = this.createUploadOverlay(attachment);
+      item.appendChild(overlay);
+    }
+
+    return item;
+  }
+
+  /**
+   * Creates a semi-transparent upload progress overlay for an attachment.
+   *
+   * Shows a circular progress indicator and percentage text on top of the
+   * attachment preview or file card.
+   *
+   * @param attachment - The uploading file attachment
+   * @returns The progress overlay element
+   */
+  private createUploadOverlay(attachment: FileAttachment): HTMLElement {
+    const overlay = document.createElement('div');
+    overlay.className = 'nevent-chatbot-attachment-upload-overlay';
+    overlay.setAttribute('role', 'progressbar');
+    overlay.setAttribute('aria-valuemin', '0');
+    overlay.setAttribute('aria-valuemax', '100');
+    overlay.setAttribute('aria-valuenow', String(attachment.progress));
+    overlay.setAttribute(
+      'aria-label',
+      `${this.i18n.t('uploading')} ${MessageSanitizer.escapeHtml(attachment.name)}`,
+    );
+
+    Object.assign(overlay.style, {
+      position: 'absolute',
+      inset: '0',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.4)',
+      borderRadius: 'inherit',
+      color: '#ffffff',
+      fontSize: '13px',
+      fontWeight: '600',
+    });
+
+    overlay.textContent = `${attachment.progress}%`;
+
+    return overlay;
+  }
+
+  /**
+   * Formats a file size in bytes into a human-readable string.
+   *
+   * @param bytes - File size in bytes
+   * @returns Formatted string (e.g., '1.5 MB', '256 KB')
+   */
+  private formatAttachmentSize(bytes: number): string {
+    if (bytes === 0) return '0 B';
+
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const k = 1024;
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    const size = bytes / Math.pow(k, i);
+
+    return `${size < 10 ? size.toFixed(1) : Math.round(size)} ${units[i] ?? 'B'}`;
   }
 
   // --------------------------------------------------------------------------

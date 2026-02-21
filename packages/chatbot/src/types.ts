@@ -346,6 +346,131 @@ export interface ChatbotStyles {
 }
 
 // ============================================================================
+// Typing Status Types
+// ============================================================================
+
+/**
+ * Configuration for bidirectional typing status notifications.
+ *
+ * Controls whether the widget sends "user is typing" notifications to the
+ * server and how aggressively it debounces those notifications to avoid
+ * spamming the backend with keystroke-level events.
+ *
+ * The server→client direction (agent/bot typing) is handled via SSE events
+ * and does not require additional configuration.
+ *
+ * @example
+ * ```typescript
+ * const config: TypingStatusConfig = {
+ *   enabled: true,
+ *   debounceMs: 2000,
+ *   timeoutMs: 5000,
+ * };
+ * ```
+ */
+export interface TypingStatusConfig {
+  /** Whether typing status notifications are enabled. Default: true */
+  enabled?: boolean;
+  /**
+   * Debounce interval in milliseconds between typing notifications.
+   * After the first "typing start" is sent, subsequent keystrokes within
+   * this window do NOT trigger additional requests. Default: 2000
+   */
+  debounceMs?: number;
+  /**
+   * Auto-stop timeout in milliseconds. If no keystroke occurs within this
+   * duration after the last notification, a "typing stop" is sent
+   * automatically. Default: 5000
+   */
+  timeoutMs?: number;
+}
+
+/**
+ * Typing status event received from the server via SSE.
+ *
+ * Emitted when a live agent or bot starts/stops typing in the conversation.
+ * The widget uses this to show "{name} is typing..." in the typing indicator.
+ */
+export interface TypingStatusEvent {
+  /** User/visitor ID of the person typing (for multi-user scenarios) */
+  userId?: string;
+  /** Agent ID when a live agent is typing */
+  agentId?: string;
+  /** Whether the agent/bot is currently typing */
+  isTyping: boolean;
+  /** Display name to show (e.g., "Agent Carlos", "Support") */
+  displayName?: string;
+}
+
+// ============================================================================
+// File Upload Types
+// ============================================================================
+
+/**
+ * Represents a file attached to a chat message.
+ *
+ * Tracks the full lifecycle of an attachment from selection through upload
+ * completion: pending (selected but not yet uploading), uploading (in-flight
+ * with progress updates), uploaded (CDN URL available), or error.
+ *
+ * For image files, a local `thumbnailUrl` blob URL is created for instant
+ * preview before the upload completes. Consumers must call
+ * `FileUploadService.revokePreview()` to release the blob URL and avoid
+ * memory leaks.
+ */
+export interface FileAttachment {
+  /** Unique identifier for this attachment (UUID) */
+  id: string;
+  /** The original File object from the user's file picker or drop */
+  file: File;
+  /** Display name of the file (may differ from `file.name` if sanitized) */
+  name: string;
+  /** File size in bytes */
+  size: number;
+  /** MIME type of the file (e.g. 'image/png', 'application/pdf') */
+  type: string;
+  /** CDN URL of the uploaded file (populated after successful upload) */
+  url?: string;
+  /** Local blob URL for image preview (populated immediately for image files) */
+  thumbnailUrl?: string;
+  /** Current upload lifecycle status */
+  status: 'pending' | 'uploading' | 'uploaded' | 'error';
+  /** Upload progress percentage (0-100) */
+  progress: number;
+  /** Error message when status is 'error' */
+  error?: string;
+}
+
+/**
+ * Configuration for file upload functionality in the chatbot widget.
+ *
+ * Controls which file types are accepted, size limits, maximum number of
+ * files per message, and the upload endpoint URL.
+ *
+ * @example
+ * ```typescript
+ * const config: FileUploadConfig = {
+ *   enabled: true,
+ *   maxFileSize: 5 * 1024 * 1024, // 5MB
+ *   maxFiles: 3,
+ *   acceptedTypes: ['image/*', 'application/pdf'],
+ * };
+ * ```
+ */
+export interface FileUploadConfig {
+  /** Whether file uploads are enabled. Default: true */
+  enabled?: boolean;
+  /** Maximum file size in bytes. Default: 10MB (10 * 1024 * 1024) */
+  maxFileSize?: number;
+  /** Maximum number of files per message. Default: 5 */
+  maxFiles?: number;
+  /** Accepted MIME type patterns. Default: ['image/*', 'application/pdf', 'text/plain'] */
+  acceptedTypes?: string[];
+  /** Override the upload endpoint URL. Default: '{apiUrl}/chatbot/upload' */
+  uploadEndpoint?: string;
+}
+
+// ============================================================================
 // Message & Conversation Types
 // ============================================================================
 
@@ -375,6 +500,8 @@ export interface ChatMessage {
   timestamp: string;
   /** Current delivery status of the message */
   status?: MessageStatus;
+  /** File attachments included with this message */
+  attachments?: FileAttachment[];
   /** Additional metadata attached to the message */
   metadata?: Record<string, unknown>;
 }
@@ -672,6 +799,48 @@ export interface ChatbotConfig {
    */
   fonts?: FontConfig[];
 
+  // === Typing Status ===
+  /**
+   * Configuration for bidirectional typing status notifications.
+   *
+   * When enabled, the widget notifies the server when the user starts and
+   * stops typing, allowing live agent dashboards to display "User is typing..."
+   * in real-time. The server→client direction (agent typing) is handled via
+   * SSE events regardless of this setting.
+   *
+   * @example
+   * ```typescript
+   * typingStatus: {
+   *   enabled: true,
+   *   debounceMs: 2000,
+   *   timeoutMs: 5000,
+   * }
+   * ```
+   */
+  typingStatus?: TypingStatusConfig;
+
+  // === File Upload ===
+  /**
+   * Configuration for file/image upload functionality.
+   *
+   * When provided (or when `enabled` is not explicitly `false`), the chatbot
+   * displays an attachment button next to the send button and supports
+   * drag-and-drop and clipboard paste for file uploads.
+   *
+   * Files are uploaded to `{apiUrl}/chatbot/upload` (or the configured
+   * `uploadEndpoint`) as multipart/form-data with an `X-Tenant-ID` header.
+   *
+   * @example
+   * ```typescript
+   * fileUpload: {
+   *   maxFileSize: 5 * 1024 * 1024, // 5MB
+   *   maxFiles: 3,
+   *   acceptedTypes: ['image/*', 'application/pdf'],
+   * }
+   * ```
+   */
+  fileUpload?: FileUploadConfig;
+
   // === Analytics ===
   /** Enable analytics event tracking. Default: true */
   analytics?: boolean;
@@ -915,7 +1084,9 @@ export type BackendStreamEventType =
   | 'DONE'
   | 'ERROR'
   | 'TOOL_CALL_START'
-  | 'TOOL_CALL_RESULT';
+  | 'TOOL_CALL_RESULT'
+  | 'TYPING_START'
+  | 'TYPING_STOP';
 
 /**
  * Feedback type for chatbot message feedback (thumbs up/down).
@@ -1010,6 +1181,9 @@ export type ChatbotErrorCode =
   | 'SANITIZATION_ERROR'
   | 'STREAM_ERROR'
   | 'FEEDBACK_FAILED'
+  | 'FILE_TOO_LARGE'
+  | 'FILE_TYPE_NOT_ALLOWED'
+  | 'UPLOAD_FAILED'
   | 'UNKNOWN_ERROR';
 
 // ============================================================================
@@ -1148,6 +1322,24 @@ export interface ChatbotTranslations extends Record<string, string> {
   connectionReconnecting: string;
   /** Banner text shown briefly after a successful reconnection */
   connectionReconnected: string;
+  /** Accessible label for the attachment (paperclip) button */
+  attachFile: string;
+  /** Accessible label prefix for the remove button on file previews */
+  removeFile: string;
+  /** Label shown during file upload progress */
+  uploading: string;
+  /** Error message when a file exceeds the size limit (uses {maxMB} placeholder) */
+  fileTooBig: string;
+  /** Error message when a file type is not accepted */
+  fileTypeNotAllowed: string;
+  /** Error message when a file upload fails */
+  uploadFailed: string;
+  /** Hint text shown on the drag-and-drop overlay */
+  dragDropHint: string;
+  /** Typing indicator text with agent name (uses {name} placeholder) */
+  agentTyping: string;
+  /** Typing indicator text when agent name is unknown */
+  someoneTyping: string;
 }
 
 // ============================================================================

@@ -454,6 +454,7 @@ export class CSSGenerator {
       this.generateMessageStyles(),
       this.generateQuickReplyStyles(),
       this.generateInputStyles(),
+      this.generateFileUploadStyles(),
       this.generateTypingStyles(),
       this.generateRichContentStyles(),
       this.generateMarkdownStyles(),
@@ -1338,12 +1339,11 @@ export class CSSGenerator {
    */
   private generateInputStyles(): string {
     return (
-      // Input container
+      // Input container (column layout: preview strip + input row)
       `.nevent-chatbot-input{` +
       `display:flex;` +
-      `align-items:flex-end;` +
-      `gap:var(--nev-cb-spacing-sm);` +
-      `padding:var(--nev-cb-spacing-md);` +
+      `flex-direction:column;` +
+      `position:relative;` +
       `}` +
       // Textarea
       `.nevent-chatbot-input-field{` +
@@ -1394,6 +1394,221 @@ export class CSSGenerator {
       `color:var(--nev-cb-color-text-muted);` +
       `opacity:0.6;` +
       `cursor:default;` +
+      `}`
+    );
+  }
+
+  /**
+   * Generates styles for file upload components: attachment button, file preview
+   * strip, preview items, progress bars, drag-and-drop overlay, and message
+   * attachment rendering.
+   *
+   * @returns CSS block string for file upload components.
+   */
+  private generateFileUploadStyles(): string {
+    return (
+      // Input row (flex row inside input container)
+      `.nevent-chatbot-input-row{` +
+      `display:flex;` +
+      `align-items:flex-end;` +
+      `gap:var(--nev-cb-spacing-sm);` +
+      `padding:var(--nev-cb-spacing-md);` +
+      `}` +
+
+      // Attachment (paperclip) button
+      `.nevent-chatbot-attach-button{` +
+      `width:36px;` +
+      `height:36px;` +
+      `min-width:36px;` +
+      `border-radius:50%;` +
+      `border:none;` +
+      `display:flex;` +
+      `align-items:center;` +
+      `justify-content:center;` +
+      `padding:0;` +
+      `background-color:transparent;` +
+      `color:var(--nev-cb-color-text-muted);` +
+      `cursor:pointer;` +
+      `transition:color var(--nev-cb-transition-fast),background-color var(--nev-cb-transition-fast);` +
+      `line-height:0;` +
+      `flex-shrink:0;` +
+      `}` +
+      `.nevent-chatbot-attach-button:hover{` +
+      `color:var(--nev-cb-color-primary);` +
+      `background-color:color-mix(in srgb,var(--nev-cb-color-primary) 10%,transparent);` +
+      `}` +
+      `.nevent-chatbot-attach-button:disabled{` +
+      `opacity:0.4;` +
+      `cursor:default;` +
+      `}` +
+
+      // File preview strip (horizontal scroll above textarea)
+      `.nevent-chatbot-file-preview-strip{` +
+      `display:flex;` +
+      `gap:var(--nev-cb-spacing-sm);` +
+      `padding:var(--nev-cb-spacing-sm) var(--nev-cb-spacing-md) 0 var(--nev-cb-spacing-md);` +
+      `overflow-x:auto;` +
+      `overflow-y:hidden;` +
+      `scrollbar-width:thin;` +
+      `}` +
+      `.nevent-chatbot-file-preview-strip::-webkit-scrollbar{` +
+      `height:4px;` +
+      `}` +
+      `.nevent-chatbot-file-preview-strip::-webkit-scrollbar-track{` +
+      `background:transparent;` +
+      `}` +
+      `.nevent-chatbot-file-preview-strip::-webkit-scrollbar-thumb{` +
+      `background:var(--nev-cb-color-border);` +
+      `border-radius:2px;` +
+      `}` +
+
+      // File preview item
+      `.nevent-chatbot-file-preview-item{` +
+      `display:flex;` +
+      `align-items:center;` +
+      `gap:var(--nev-cb-spacing-sm);` +
+      `padding:6px var(--nev-cb-spacing-sm);` +
+      `background-color:var(--nev-cb-color-surface);` +
+      `border-radius:var(--nev-cb-radius-sm);` +
+      `border:1px solid var(--nev-cb-color-border);` +
+      `position:relative;` +
+      `min-width:160px;` +
+      `max-width:200px;` +
+      `flex-shrink:0;` +
+      `}` +
+
+      // File preview thumbnail
+      `.nevent-chatbot-file-preview-thumb{` +
+      `width:36px;` +
+      `height:36px;` +
+      `min-width:36px;` +
+      `border-radius:4px;` +
+      `overflow:hidden;` +
+      `background-color:var(--nev-cb-color-border);` +
+      `display:flex;` +
+      `align-items:center;` +
+      `justify-content:center;` +
+      `}` +
+      `.nevent-chatbot-file-preview-thumb img{` +
+      `width:100%;` +
+      `height:100%;` +
+      `object-fit:cover;` +
+      `}` +
+
+      // File preview info
+      `.nevent-chatbot-file-preview-info{` +
+      `flex:1;` +
+      `min-width:0;` +
+      `display:flex;` +
+      `flex-direction:column;` +
+      `gap:2px;` +
+      `}` +
+      `.nevent-chatbot-file-preview-name{` +
+      `font-size:12px;` +
+      `font-weight:500;` +
+      `color:var(--nev-cb-color-text);` +
+      `overflow:hidden;` +
+      `text-overflow:ellipsis;` +
+      `white-space:nowrap;` +
+      `max-width:120px;` +
+      `}` +
+      `.nevent-chatbot-file-preview-size{` +
+      `font-size:10px;` +
+      `color:var(--nev-cb-color-text-muted);` +
+      `}` +
+
+      // File preview progress bar
+      `.nevent-chatbot-file-preview-progress{` +
+      `position:absolute;` +
+      `bottom:0;` +
+      `left:0;` +
+      `right:0;` +
+      `height:3px;` +
+      `background-color:var(--nev-cb-color-border);` +
+      `border-radius:0 0 var(--nev-cb-radius-sm) var(--nev-cb-radius-sm);` +
+      `overflow:hidden;` +
+      `}` +
+      `.nevent-chatbot-file-preview-progress-bar{` +
+      `height:100%;` +
+      `background-color:var(--nev-cb-color-primary);` +
+      `border-radius:0 0 var(--nev-cb-radius-sm) var(--nev-cb-radius-sm);` +
+      `transition:width 0.2s ease;` +
+      `}` +
+
+      // File preview error state
+      `.nevent-chatbot-file-preview-error{` +
+      `position:absolute;` +
+      `inset:0;` +
+      `background-color:rgba(239,68,68,0.1);` +
+      `border-radius:var(--nev-cb-radius-sm);` +
+      `border:1px solid rgba(239,68,68,0.3);` +
+      `pointer-events:none;` +
+      `}` +
+
+      // File preview remove button
+      `.nevent-chatbot-file-preview-remove{` +
+      `width:20px;` +
+      `height:20px;` +
+      `min-width:20px;` +
+      `border-radius:50%;` +
+      `border:none;` +
+      `cursor:pointer;` +
+      `display:flex;` +
+      `align-items:center;` +
+      `justify-content:center;` +
+      `padding:0;` +
+      `background-color:var(--nev-cb-color-border);` +
+      `color:var(--nev-cb-color-text-muted);` +
+      `transition:background-color var(--nev-cb-transition-fast);` +
+      `flex-shrink:0;` +
+      `position:absolute;` +
+      `top:-6px;` +
+      `right:-6px;` +
+      `z-index:1;` +
+      `}` +
+      `.nevent-chatbot-file-preview-remove:hover{` +
+      `background-color:rgba(239,68,68,0.2);` +
+      `color:#ef4444;` +
+      `}` +
+
+      // Drag-and-drop overlay on input area
+      `.nevent-chatbot-input--dragover{` +
+      `outline:2px dashed var(--nev-cb-color-primary);` +
+      `outline-offset:-2px;` +
+      `background-color:color-mix(in srgb,var(--nev-cb-color-primary) 5%,transparent);` +
+      `}` +
+
+      // Message attachment rendering
+      `.nevent-chatbot-message-attachments{` +
+      `display:flex;` +
+      `flex-direction:column;` +
+      `gap:4px;` +
+      `margin-top:4px;` +
+      `}` +
+      `.nevent-chatbot-message-attachment-item{` +
+      `border-radius:var(--nev-cb-radius-sm);` +
+      `overflow:hidden;` +
+      `}` +
+      `.nevent-chatbot-message-attachment-item img{` +
+      `display:block;` +
+      `max-width:200px;` +
+      `max-height:200px;` +
+      `border-radius:var(--nev-cb-radius-sm);` +
+      `object-fit:cover;` +
+      `}` +
+
+      // Upload overlay on attachments
+      `.nevent-chatbot-attachment-upload-overlay{` +
+      `position:absolute;` +
+      `inset:0;` +
+      `display:flex;` +
+      `align-items:center;` +
+      `justify-content:center;` +
+      `background-color:rgba(0,0,0,0.4);` +
+      `border-radius:inherit;` +
+      `color:#ffffff;` +
+      `font-size:13px;` +
+      `font-weight:600;` +
       `}`
     );
   }
