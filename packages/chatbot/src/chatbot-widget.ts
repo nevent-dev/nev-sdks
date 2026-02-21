@@ -47,7 +47,8 @@
  * @packageDocumentation
  */
 
-import { Logger } from '@nevent/core';
+import { Logger, SentryReporter } from '@nevent/core';
+import type { SentryReporterConfig, SentryEvent } from '@nevent/core';
 import type {
   ChatbotConfig,
   ChatMessage,
@@ -176,6 +177,13 @@ export class ChatbotWidget {
 
   /** Analytics event tracker (null when analytics disabled) */
   private tracker: ChatbotTracker | null = null;
+
+  /**
+   * Lightweight Sentry error reporter for automatic error tracking.
+   * Initialized during {@link init} when not explicitly disabled.
+   * Wired to the ErrorBoundary so all caught errors are forwarded to Sentry.
+   */
+  private sentryReporter: SentryReporter | null = null;
 
   /**
    * Connection lifecycle manager: monitors browser online/offline events,
@@ -647,6 +655,69 @@ export class ChatbotWidget {
           this.logger.warn(
             'Analytics initialization failed (non-fatal)',
             analyticsError
+          );
+        }
+
+        // Step 7b: Initialize Sentry error reporter (non-critical)
+        try {
+          const sentryConfig = mergedConfig.sentry;
+          if (sentryConfig?.enabled !== false) {
+            // Default DSN for Nevent SDKs
+            const defaultDsn =
+              'https://ecaff66e5b924e2aa881e662581fe805@o4504651545640960.ingest.sentry.io/4504788728872960';
+
+            // Auto-detect environment from API URL
+            const detectedEnv = mergedConfig.apiUrl.includes('dev.')
+              ? 'development'
+              : mergedConfig.apiUrl.includes('staging.')
+                ? 'staging'
+                : 'production';
+
+            const reporterConfig: SentryReporterConfig = {
+              dsn: sentryConfig?.dsn ?? defaultDsn,
+              enabled: true,
+              tunnel:
+                sentryConfig?.tunnel ?? `${mergedConfig.apiUrl}/diagnostics`,
+              environment: sentryConfig?.environment ?? detectedEnv,
+              release: `@nevent/chatbot@0.1.0`,
+              sampleRate: sentryConfig?.sampleRate ?? 1.0,
+              tags: {
+                sdk: 'chatbot',
+                tenantId: mergedConfig.tenantId,
+                chatbotId: mergedConfig.chatbotId,
+              },
+            };
+
+            // Only set beforeSend if provided (exactOptionalPropertyTypes)
+            if (sentryConfig?.beforeSend) {
+              reporterConfig.beforeSend = sentryConfig.beforeSend as (
+                event: SentryEvent
+              ) => SentryEvent | null;
+            }
+
+            this.sentryReporter = new SentryReporter(reporterConfig);
+
+            // Wire Sentry to ErrorBoundary for automatic error forwarding
+            this.errorBoundary.setSentryReporter(this.sentryReporter);
+
+            // Set user context if auth is configured
+            if (mergedConfig.auth?.userIdentity) {
+              const userCtx: { id?: string; email?: string } = {};
+              if (mergedConfig.auth.userIdentity.userId) {
+                userCtx.id = mergedConfig.auth.userIdentity.userId;
+              }
+              if (mergedConfig.auth.userIdentity.email) {
+                userCtx.email = mergedConfig.auth.userIdentity.email;
+              }
+              this.sentryReporter.setUser(userCtx);
+            }
+
+            this.logger.debug('Sentry reporter initialized');
+          }
+        } catch (sentryError) {
+          this.logger.warn(
+            'Sentry initialization failed (non-fatal)',
+            sentryError
           );
         }
 
@@ -1775,6 +1846,13 @@ export class ChatbotWidget {
       if (this.authManager) {
         this.authManager.destroy();
         this.authManager = null;
+      }
+
+      // Destroy Sentry reporter and detach from error boundary
+      if (this.sentryReporter) {
+        this.errorBoundary.setSentryReporter(null);
+        this.sentryReporter.destroy();
+        this.sentryReporter = null;
       }
 
       // Clean up references

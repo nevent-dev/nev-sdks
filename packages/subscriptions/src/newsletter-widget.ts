@@ -6,8 +6,13 @@ import {
   ErrorBoundary,
   Sanitizer,
   I18nManager,
+  SentryReporter,
 } from '@nevent/core';
-import type { NormalizedError } from '@nevent/core';
+import type {
+  NormalizedError,
+  SentryReporterConfig,
+  SentryEvent,
+} from '@nevent/core';
 import type {
   CustomFont,
   FieldConfiguration,
@@ -142,6 +147,13 @@ export class NewsletterWidget {
   private errorBoundary: ErrorBoundary;
 
   /**
+   * Lightweight Sentry error reporter for automatic error tracking.
+   * Initialized during {@link init} when not explicitly disabled.
+   * Wired to the ErrorBoundary so all caught errors are forwarded to Sentry.
+   */
+  private sentryReporter: SentryReporter | null = null;
+
+  /**
    * I18n manager providing localized strings for all user-facing text.
    * Configured with es, en, ca, pt locales.
    */
@@ -254,6 +266,7 @@ export class NewsletterWidget {
       injectSeoTags();
       this.initHttpClient();
       this.initAnalytics();
+      this.initSentry();
       this.loadGoogleFonts();
       this.loadCustomFonts();
       this.createShadowDOM();
@@ -330,6 +343,13 @@ export class NewsletterWidget {
       // Remove host element from DOM (this removes shadow root and all widget DOM)
       if (this.hostElement && this.hostElement.parentNode) {
         this.hostElement.parentNode.removeChild(this.hostElement);
+      }
+
+      // Destroy Sentry reporter and detach from error boundary
+      if (this.sentryReporter) {
+        this.errorBoundary.setSentryReporter(null);
+        this.sentryReporter.destroy();
+        this.sentryReporter = null;
       }
 
       // Reset references
@@ -510,6 +530,7 @@ export class NewsletterWidget {
       privacyPolicyUrl: '',
       title: '',
       subtitle: '',
+      sentry: undefined,
       onLoad: undefined,
       onSubmit: undefined,
       onSuccess: undefined,
@@ -857,6 +878,68 @@ export class NewsletterWidget {
       this.config.newsletterId,
       this.config.tenantId
     );
+  }
+
+  // --------------------------------------------------------------------------
+  // Sentry initialization
+  // --------------------------------------------------------------------------
+
+  /**
+   * Initializes the lightweight Sentry error reporter.
+   *
+   * Creates a {@link SentryReporter} instance with sensible defaults and
+   * wires it to the ErrorBoundary so all caught errors are automatically
+   * forwarded to Sentry. Non-critical: failures are logged and swallowed.
+   */
+  private initSentry(): void {
+    try {
+      const sentryConfig = this.config.sentry;
+      if (sentryConfig?.enabled === false) {
+        return;
+      }
+
+      // Default DSN for Nevent SDKs
+      const defaultDsn =
+        'https://ecaff66e5b924e2aa881e662581fe805@o4504651545640960.ingest.sentry.io/4504788728872960';
+
+      // Auto-detect environment from API URL
+      const apiUrl = this.config.apiUrl;
+      const detectedEnv = apiUrl.includes('dev.')
+        ? 'development'
+        : apiUrl.includes('staging.')
+          ? 'staging'
+          : 'production';
+
+      const reporterConfig: SentryReporterConfig = {
+        dsn: sentryConfig?.dsn ?? defaultDsn,
+        enabled: true,
+        tunnel: sentryConfig?.tunnel ?? `${apiUrl}/diagnostics`,
+        environment: sentryConfig?.environment ?? detectedEnv,
+        release: `@nevent/subscriptions@0.1.0`,
+        sampleRate: sentryConfig?.sampleRate ?? 1.0,
+        tags: {
+          sdk: 'subscriptions',
+          tenantId: this.config.tenantId,
+          newsletterId: this.config.newsletterId,
+        },
+      };
+
+      // Only set beforeSend if provided (exactOptionalPropertyTypes)
+      if (sentryConfig?.beforeSend) {
+        reporterConfig.beforeSend = sentryConfig.beforeSend as (
+          event: SentryEvent
+        ) => SentryEvent | null;
+      }
+
+      this.sentryReporter = new SentryReporter(reporterConfig);
+
+      // Wire Sentry to ErrorBoundary for automatic error forwarding
+      this.errorBoundary.setSentryReporter(this.sentryReporter);
+
+      this.logger.debug('Sentry reporter initialized');
+    } catch (sentryError) {
+      this.logger.warn('Sentry initialization failed (non-fatal)', sentryError);
+    }
   }
 
   // --------------------------------------------------------------------------

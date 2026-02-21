@@ -37,6 +37,8 @@
  * @packageDocumentation
  */
 
+import type { SentryReporter } from './sentry-reporter';
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -77,6 +79,14 @@ export class ErrorBoundary {
    */
   private errorHandler: ((error: NormalizedError) => void) | null = null;
 
+  /**
+   * Optional Sentry reporter for automatic error tracking.
+   * When set, all errors caught by the boundary are forwarded to Sentry
+   * via {@link SentryReporter.captureException}.
+   * Set via {@link setSentryReporter}.
+   */
+  private sentryReporter: SentryReporter | null = null;
+
   /** Whether debug logging is enabled */
   private readonly debug: boolean;
 
@@ -108,6 +118,22 @@ export class ErrorBoundary {
    */
   setErrorHandler(handler: (error: NormalizedError) => void): void {
     this.errorHandler = handler;
+  }
+
+  /**
+   * Attaches a {@link SentryReporter} for automatic error forwarding.
+   *
+   * When set, every error caught by the boundary guard methods is
+   * automatically reported to Sentry via `captureException`. The Sentry
+   * call is fire-and-forget and wrapped in its own try/catch, so a failure
+   * in the reporter never affects the error boundary's own behavior.
+   *
+   * Pass `null` to detach the reporter (e.g. during widget destroy).
+   *
+   * @param reporter - A {@link SentryReporter} instance, or `null` to detach
+   */
+  setSentryReporter(reporter: SentryReporter | null): void {
+    this.sentryReporter = reporter;
   }
 
   // --------------------------------------------------------------------------
@@ -358,6 +384,16 @@ export class ErrorBoundary {
         `${this.logPrefix} Error in ${context ?? 'unknown'}:`,
         error
       );
+    }
+
+    // Forward to Sentry reporter (fire-and-forget, never throws)
+    try {
+      this.sentryReporter?.captureException(error, {
+        boundary_context: context ?? 'unknown',
+        normalized_code: normalized.code,
+      });
+    } catch {
+      // Silent: Sentry reporting failure must never affect the boundary
     }
 
     // Fire error handler -- wrapped to prevent infinite loops

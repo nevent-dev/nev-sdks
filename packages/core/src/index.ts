@@ -26,6 +26,12 @@ export { Logger } from './logger';
 export { Storage } from './storage';
 export { ErrorBoundary } from './error-boundary';
 export type { NormalizedError } from './error-boundary';
+export { SentryReporter } from './sentry-reporter';
+export type {
+  SentryReporterConfig,
+  SentryEvent,
+  SentryBreadcrumb,
+} from './sentry-reporter';
 export { Sanitizer } from './sanitizer';
 export { I18nManager } from './i18n-manager';
 

@@ -76,6 +76,8 @@ const DEFAULTS: Omit<Required<ChatbotConfig>, 'chatbotId' | 'tenantId'> = {
   typingStatus: undefined as unknown as import('../types').TypingStatusConfig,
   // Auth defaults — undefined means public (anonymous) mode
   auth: undefined as unknown as AuthConfig,
+  // Sentry defaults — undefined means use built-in defaults (enabled with Nevent DSN)
+  sentry: undefined as unknown as NonNullable<ChatbotConfig['sentry']>,
   onOpen: () => {},
   onClose: () => {},
   onMessage: () => {},

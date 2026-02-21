@@ -237,6 +237,33 @@ export interface NewsletterConfig {
   // Internationalization
   locale?: string;
 
+  // Sentry Error Reporting
+  /**
+   * Configuration for lightweight Sentry error reporting.
+   *
+   * When provided (or when not explicitly disabled), errors caught by the
+   * ErrorBoundary are automatically forwarded to Sentry for tracking.
+   *
+   * By default, errors are sent through the Nevent diagnostics tunnel
+   * endpoint (`{apiUrl}/diagnostics`) to bypass ad-blockers.
+   */
+  sentry?:
+    | {
+        /** Whether Sentry reporting is enabled. Default: true */
+        enabled?: boolean;
+        /** Sentry DSN. Default: Nevent's shared SDK DSN */
+        dsn?: string;
+        /** Tunnel URL for bypassing ad-blockers. Default: `{apiUrl}/diagnostics` */
+        tunnel?: string;
+        /** Environment tag. Default: auto-detected from apiUrl */
+        environment?: string;
+        /** Sample rate (0-1). Default: 1.0 */
+        sampleRate?: number;
+        /** Pre-send filter/modifier hook */
+        beforeSend?: (event: unknown) => unknown | null;
+      }
+    | undefined;
+
   // Widget behavior
   analytics?: boolean;
   analyticsUrl?: string;

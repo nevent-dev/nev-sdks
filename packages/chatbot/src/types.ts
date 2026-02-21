@@ -841,6 +841,48 @@ export interface ChatbotConfig {
    */
   fileUpload?: FileUploadConfig;
 
+  // === Sentry Error Reporting ===
+  /**
+   * Configuration for lightweight Sentry error reporting.
+   *
+   * When provided (or when not explicitly disabled), errors caught by the
+   * ErrorBoundary are automatically forwarded to Sentry for tracking.
+   * Uses a lightweight custom implementation (~3KB) instead of the full
+   * `@sentry/browser` to avoid bundle bloat and host-page conflicts.
+   *
+   * By default, errors are sent through the Nevent diagnostics tunnel
+   * endpoint (`{apiUrl}/diagnostics`) to bypass ad-blockers.
+   *
+   * @example
+   * ```typescript
+   * sentry: {
+   *   enabled: true,
+   *   sampleRate: 0.5,  // Report 50% of errors
+   *   beforeSend: (event) => {
+   *     // Filter out known non-critical errors
+   *     if (event.exception?.values?.[0]?.value?.includes('ResizeObserver')) {
+   *       return null;
+   *     }
+   *     return event;
+   *   },
+   * }
+   * ```
+   */
+  sentry?: {
+    /** Whether Sentry reporting is enabled. Default: true */
+    enabled?: boolean;
+    /** Sentry DSN. Default: Nevent's shared SDK DSN */
+    dsn?: string;
+    /** Tunnel URL for bypassing ad-blockers. Default: `{apiUrl}/diagnostics` */
+    tunnel?: string;
+    /** Environment tag. Default: auto-detected from apiUrl */
+    environment?: string;
+    /** Sample rate (0-1). Default: 1.0 */
+    sampleRate?: number;
+    /** Pre-send filter/modifier hook */
+    beforeSend?: (event: unknown) => unknown | null;
+  };
+
   // === Analytics ===
   /** Enable analytics event tracking. Default: true */
   analytics?: boolean;
