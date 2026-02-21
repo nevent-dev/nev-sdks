@@ -68,9 +68,7 @@ describe('I18nManager', () => {
     });
 
     it('should interpolate multiple parameters', () => {
-      expect(i18n.t('welcome', { app: 'Nevent' })).toBe(
-        'Welcome to Nevent!',
-      );
+      expect(i18n.t('welcome', { app: 'Nevent' })).toBe('Welcome to Nevent!');
     });
 
     it('should leave missing interpolation params as-is', () => {
@@ -79,9 +77,7 @@ describe('I18nManager', () => {
 
     it('should leave partially missing params as-is', () => {
       // 'count' has {{num}}, pass a different param
-      expect(i18n.t('count', { other: 'value' })).toBe(
-        '{{num}} items found',
-      );
+      expect(i18n.t('count', { other: 'value' })).toBe('{{num}} items found');
     });
 
     it('should translate in the current locale', () => {
@@ -100,13 +96,13 @@ describe('I18nManager', () => {
       };
       const i18nPartial = new I18nManager<TestLabels>(
         { en: EN, fr: partial },
-        'en',
+        'en'
       );
       i18nPartial.setLocale('fr');
 
       // 'greeting' exists in fr
       expect(i18nPartial.t('greeting', { name: 'Monde' })).toBe(
-        'Bonjour Monde',
+        'Bonjour Monde'
       );
 
       // 'farewell' is empty string in fr (which is a valid value, not undefined)
@@ -139,7 +135,7 @@ describe('I18nManager', () => {
 
       expect(i18n.getLocale()).toBe('en'); // unchanged
       expect(warnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('locale "fr" not available'),
+        expect.stringContaining('locale "fr" not available')
       );
 
       warnSpy.mockRestore();

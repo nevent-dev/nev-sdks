@@ -35,20 +35,14 @@ function mockFetchError(status: number, message: string): void {
     code: `HTTP_${status}`,
   };
 
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockRejectedValue(error)
-  );
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(error));
 }
 
 /**
  * Creates a mock fetch that rejects with a network error.
  */
 function mockFetchNetworkError(): void {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn().mockRejectedValue(new Error('Network error'))
-  );
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 }
 
 describe('ConversationService', () => {
@@ -335,18 +329,27 @@ describe('ConversationService', () => {
 
       // Body should be BackendMessageRequest format { message: string }
       const calledOptions = fetchMock.mock.calls[0]![1] as RequestInit;
-      expect(JSON.parse(calledOptions.body as string)).toEqual({ message: 'Hola' });
+      expect(JSON.parse(calledOptions.body as string)).toEqual({
+        message: 'Hola',
+      });
 
       expect(result.userMessage.content).toBe('Hola');
       expect(result.botMessage.content).toBe('Hello! How can I help?');
     });
 
     it('should include eventId and source as query params when provided', async () => {
-      const serviceWithContext = new ConversationService(API_URL, TOKEN, CHATBOT_ID, false, undefined, {
-        tenantId: TENANT_ID,
-        eventId: 'evt-1',
-        source: 'src-uuid',
-      });
+      const serviceWithContext = new ConversationService(
+        API_URL,
+        TOKEN,
+        CHATBOT_ID,
+        false,
+        undefined,
+        {
+          tenantId: TENANT_ID,
+          eventId: 'evt-1',
+          source: 'src-uuid',
+        }
+      );
 
       const mockResponse: SendMessageResponse = {
         userMessage: {
@@ -371,7 +374,9 @@ describe('ConversationService', () => {
 
       mockFetchSuccess(mockResponse);
 
-      await serviceWithContext.sendMessage(CONVERSATION_ID, { content: 'Hello' });
+      await serviceWithContext.sendMessage(CONVERSATION_ID, {
+        content: 'Hello',
+      });
 
       const fetchMock = vi.mocked(globalThis.fetch);
       const calledUrl = fetchMock.mock.calls[0]![0] as string;
@@ -388,10 +393,7 @@ describe('ConversationService', () => {
         code: 'HTTP_429',
       };
 
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(rateLimitError)
-      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(rateLimitError));
 
       try {
         await service.sendMessage(CONVERSATION_ID, { content: 'Hello' });
@@ -410,10 +412,7 @@ describe('ConversationService', () => {
         code: 'HTTP_500',
       };
 
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(serverError)
-      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(serverError));
 
       try {
         await service.sendMessage(CONVERSATION_ID, { content: 'Hello' });
@@ -466,11 +465,18 @@ describe('ConversationService', () => {
     });
 
     it('should include source and eventId as query params when provided', async () => {
-      const serviceWithContext = new ConversationService(API_URL, TOKEN, CHATBOT_ID, false, undefined, {
-        tenantId: TENANT_ID,
-        eventId: 'evt-1',
-        source: 'src-uuid',
-      });
+      const serviceWithContext = new ConversationService(
+        API_URL,
+        TOKEN,
+        CHATBOT_ID,
+        false,
+        undefined,
+        {
+          tenantId: TENANT_ID,
+          eventId: 'evt-1',
+          source: 'src-uuid',
+        }
+      );
 
       const mockResponse: GetMessagesResponse = {
         messages: [],
@@ -633,9 +639,16 @@ describe('ConversationService', () => {
 
   describe('backend context headers', () => {
     it('should include X-Tenant-ID header when tenantId is provided', async () => {
-      const serviceWithTenant = new ConversationService(API_URL, TOKEN, CHATBOT_ID, false, undefined, {
-        tenantId: TENANT_ID,
-      });
+      const serviceWithTenant = new ConversationService(
+        API_URL,
+        TOKEN,
+        CHATBOT_ID,
+        false,
+        undefined,
+        {
+          tenantId: TENANT_ID,
+        }
+      );
 
       mockFetchSuccess({});
 
@@ -649,10 +662,17 @@ describe('ConversationService', () => {
     });
 
     it('should include X-User-Context header when userContext is provided', async () => {
-      const serviceWithContext = new ConversationService(API_URL, TOKEN, CHATBOT_ID, false, undefined, {
-        tenantId: TENANT_ID,
-        userContext: { lat: 40.4168, lng: -3.7038 },
-      });
+      const serviceWithContext = new ConversationService(
+        API_URL,
+        TOKEN,
+        CHATBOT_ID,
+        false,
+        undefined,
+        {
+          tenantId: TENANT_ID,
+          userContext: { lat: 40.4168, lng: -3.7038 },
+        }
+      );
 
       mockFetchSuccess({});
 
@@ -695,11 +715,18 @@ describe('ConversationService', () => {
     });
 
     it('should include eventId and source as query params when configured', () => {
-      const serviceWithContext = new ConversationService(API_URL, TOKEN, CHATBOT_ID, false, undefined, {
-        tenantId: TENANT_ID,
-        eventId: 'evt-1',
-        source: 'src-uuid',
-      });
+      const serviceWithContext = new ConversationService(
+        API_URL,
+        TOKEN,
+        CHATBOT_ID,
+        false,
+        undefined,
+        {
+          tenantId: TENANT_ID,
+          eventId: 'evt-1',
+          source: 'src-uuid',
+        }
+      );
 
       const url = serviceWithContext.getStreamingUrl('conv-123');
       expect(url).toContain('/chatbot/stream');
@@ -720,10 +747,7 @@ describe('ConversationService', () => {
         code: 'HTTP_401',
       };
 
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(apiError)
-      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(apiError));
 
       try {
         await service.fetchConfig(TENANT_ID);
@@ -757,10 +781,7 @@ describe('ConversationService', () => {
       // HttpClient normalises it to a generic 'Network request failed' ApiError.
       // ConversationService then maps that to the domain error code while
       // preserving the HttpClient's message.
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue('string error')
-      );
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue('string error'));
 
       try {
         await service.fetchConfig(TENANT_ID);

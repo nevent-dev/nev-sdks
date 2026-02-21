@@ -29,7 +29,9 @@ import type { FontConfig } from '../../types';
  */
 function getInjectedLinks(): HTMLLinkElement[] {
   return Array.from(
-    document.querySelectorAll<HTMLLinkElement>('link[data-nevent-chatbot-gfont]'),
+    document.querySelectorAll<HTMLLinkElement>(
+      'link[data-nevent-chatbot-gfont]'
+    )
   );
 }
 
@@ -38,7 +40,9 @@ function getInjectedLinks(): HTMLLinkElement[] {
  */
 function getInjectedFontStyles(): HTMLStyleElement[] {
   return Array.from(
-    document.querySelectorAll<HTMLStyleElement>('style[data-nevent-chatbot-font]'),
+    document.querySelectorAll<HTMLStyleElement>(
+      'style[data-nevent-chatbot-font]'
+    )
   );
 }
 
@@ -52,8 +56,12 @@ describe('FontLoader.loadGoogleFont', () => {
   beforeEach(() => {
     loader = new FontLoader();
     // Flush any previously injected elements
-    document.querySelectorAll('link[data-nevent-chatbot-gfont]').forEach((el) => el.remove());
-    document.querySelectorAll('style[data-nevent-chatbot-font]').forEach((el) => el.remove());
+    document
+      .querySelectorAll('link[data-nevent-chatbot-gfont]')
+      .forEach((el) => el.remove());
+    document
+      .querySelectorAll('style[data-nevent-chatbot-font]')
+      .forEach((el) => el.remove());
   });
 
   afterEach(() => {
@@ -64,15 +72,17 @@ describe('FontLoader.loadGoogleFont', () => {
     // Simulate link load event so the promise resolves
     let capturedLink: HTMLLinkElement | null = null;
     const originalAppendChild = document.head.appendChild.bind(document.head);
-    const spy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
-      const result = originalAppendChild(node);
-      if (node instanceof HTMLLinkElement) {
-        capturedLink = node;
-        // Fire onload synchronously so promise resolves
-        setTimeout(() => node.onload && (node.onload as () => void)(), 0);
-      }
-      return result;
-    });
+    const spy = vi
+      .spyOn(document.head, 'appendChild')
+      .mockImplementation((node) => {
+        const result = originalAppendChild(node);
+        if (node instanceof HTMLLinkElement) {
+          capturedLink = node;
+          // Fire onload synchronously so promise resolves
+          setTimeout(() => node.onload && (node.onload as () => void)(), 0);
+        }
+        return result;
+      });
 
     await loader.loadGoogleFont('Inter', [400, 700]);
 
@@ -89,25 +99,29 @@ describe('FontLoader.loadGoogleFont', () => {
 
   it('uses default weights [400;500;600;700] when no weights are provided', async () => {
     let capturedLink: HTMLLinkElement | null = null;
-    const spy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
-      const result = (document.head as HTMLElement & { appendChild: typeof document.head.appendChild }).appendChild.call
-        ? document.createElement('div') as unknown as typeof node
-        : node;
-      if (node instanceof HTMLLinkElement) {
-        capturedLink = node;
-        setTimeout(() => node.onload && (node.onload as () => void)(), 0);
-      }
-      return node;
-    });
+    const spy = vi
+      .spyOn(document.head, 'appendChild')
+      .mockImplementation((node) => {
+        const result = (
+          document.head as HTMLElement & {
+            appendChild: typeof document.head.appendChild;
+          }
+        ).appendChild.call
+          ? (document.createElement('div') as unknown as typeof node)
+          : node;
+        if (node instanceof HTMLLinkElement) {
+          capturedLink = node;
+          setTimeout(() => node.onload && (node.onload as () => void)(), 0);
+        }
+        return node;
+      });
 
     // Use a simpler approach — just track the href
     const appendSpy = vi.spyOn(document.head, 'appendChild');
     await loader.loadGoogleFont('Roboto');
 
     const calls = appendSpy.mock.calls;
-    const linkCall = calls.find(
-      (args) => args[0] instanceof HTMLLinkElement
-    );
+    const linkCall = calls.find((args) => args[0] instanceof HTMLLinkElement);
 
     if (linkCall) {
       const link = linkCall[0] as HTMLLinkElement;
@@ -123,13 +137,15 @@ describe('FontLoader.loadGoogleFont', () => {
 
   it('encodes spaces in font family name as + in URL', async () => {
     const originalAppendChild = document.head.appendChild.bind(document.head);
-    const appendSpy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
-      const result = originalAppendChild(node);
-      if (node instanceof HTMLLinkElement) {
-        setTimeout(() => node.onload && (node.onload as () => void)(), 0);
-      }
-      return result;
-    });
+    const appendSpy = vi
+      .spyOn(document.head, 'appendChild')
+      .mockImplementation((node) => {
+        const result = originalAppendChild(node);
+        if (node instanceof HTMLLinkElement) {
+          setTimeout(() => node.onload && (node.onload as () => void)(), 0);
+        }
+        return result;
+      });
 
     await loader.loadGoogleFont('Open Sans', [400]);
 
@@ -146,19 +162,21 @@ describe('FontLoader.loadGoogleFont', () => {
 
   it('is idempotent — calling twice for the same family does not inject twice', async () => {
     const originalAppendChild = document.head.appendChild.bind(document.head);
-    const appendSpy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
-      const result = originalAppendChild(node);
-      if (node instanceof HTMLLinkElement) {
-        setTimeout(() => node.onload && (node.onload as () => void)(), 0);
-      }
-      return result;
-    });
+    const appendSpy = vi
+      .spyOn(document.head, 'appendChild')
+      .mockImplementation((node) => {
+        const result = originalAppendChild(node);
+        if (node instanceof HTMLLinkElement) {
+          setTimeout(() => node.onload && (node.onload as () => void)(), 0);
+        }
+        return result;
+      });
 
     await loader.loadGoogleFont('Inter', [400]);
     await loader.loadGoogleFont('Inter', [400]);
 
     const linkCalls = appendSpy.mock.calls.filter(
-      (args) => args[0] instanceof HTMLLinkElement,
+      (args) => args[0] instanceof HTMLLinkElement
     );
     // Should only inject once
     expect(linkCalls.length).toBe(1);
@@ -167,12 +185,14 @@ describe('FontLoader.loadGoogleFont', () => {
   });
 
   it('marks the font as loaded after injection', async () => {
-    const appendSpy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
-      if (node instanceof HTMLLinkElement) {
-        setTimeout(() => node.onload && (node.onload as () => void)(), 0);
-      }
-      return node;
-    });
+    const appendSpy = vi
+      .spyOn(document.head, 'appendChild')
+      .mockImplementation((node) => {
+        if (node instanceof HTMLLinkElement) {
+          setTimeout(() => node.onload && (node.onload as () => void)(), 0);
+        }
+        return node;
+      });
 
     await loader.loadGoogleFont('Nunito', [400]);
     expect(loader.isFontLoaded('Nunito')).toBe(true);
@@ -182,19 +202,21 @@ describe('FontLoader.loadGoogleFont', () => {
 
   it('strips characters outside allowed set from family name', async () => {
     const originalAppendChild = document.head.appendChild.bind(document.head);
-    const appendSpy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
-      const result = originalAppendChild(node);
-      if (node instanceof HTMLLinkElement) {
-        setTimeout(() => node.onload && (node.onload as () => void)(), 0);
-      }
-      return result;
-    });
+    const appendSpy = vi
+      .spyOn(document.head, 'appendChild')
+      .mockImplementation((node) => {
+        const result = originalAppendChild(node);
+        if (node instanceof HTMLLinkElement) {
+          setTimeout(() => node.onload && (node.onload as () => void)(), 0);
+        }
+        return result;
+      });
 
     // Family with disallowed characters — should be sanitised
     await loader.loadGoogleFont('Inter<script>', [400]);
 
     const linkCalls = appendSpy.mock.calls.filter(
-      (args) => args[0] instanceof HTMLLinkElement,
+      (args) => args[0] instanceof HTMLLinkElement
     );
     if (linkCalls.length > 0) {
       const link = linkCalls[0]![0] as HTMLLinkElement;
@@ -212,7 +234,7 @@ describe('FontLoader.loadGoogleFont', () => {
     await loader.loadGoogleFont('<<<>>>', [400]);
 
     const linkCalls = appendSpy.mock.calls.filter(
-      (args) => args[0] instanceof HTMLLinkElement,
+      (args) => args[0] instanceof HTMLLinkElement
     );
     expect(linkCalls.length).toBe(0);
 
@@ -230,7 +252,9 @@ describe('FontLoader.loadCustomFont', () => {
   beforeEach(() => {
     loader = new FontLoader();
     // Remove any lingering font styles
-    document.querySelectorAll('style[data-nevent-chatbot-font]').forEach((el) => el.remove());
+    document
+      .querySelectorAll('style[data-nevent-chatbot-font]')
+      .forEach((el) => el.remove());
   });
 
   afterEach(() => {
@@ -249,7 +273,9 @@ describe('FontLoader.loadCustomFont', () => {
 
     loader.loadCustomFont(config);
 
-    const style = document.querySelector<HTMLStyleElement>('style[data-nevent-chatbot-font]');
+    const style = document.querySelector<HTMLStyleElement>(
+      'style[data-nevent-chatbot-font]'
+    );
     expect(style).not.toBeNull();
     expect(style!.textContent).toContain('@font-face');
     expect(style!.textContent).toContain('BrandFont');
@@ -269,7 +295,9 @@ describe('FontLoader.loadCustomFont', () => {
 
     loader.loadCustomFont(config);
 
-    const style = document.querySelector<HTMLStyleElement>(`style#nevent-cb-font-testfont`);
+    const style = document.querySelector<HTMLStyleElement>(
+      `style#nevent-cb-font-testfont`
+    );
     expect(style).not.toBeNull();
     const css = style!.textContent ?? '';
     expect(css).toContain('font-weight:400');
@@ -285,7 +313,9 @@ describe('FontLoader.loadCustomFont', () => {
 
     loader.loadCustomFont(config);
 
-    const style = document.querySelector<HTMLStyleElement>(`style#nevent-cb-font-swapfont`);
+    const style = document.querySelector<HTMLStyleElement>(
+      `style#nevent-cb-font-swapfont`
+    );
     expect(style!.textContent).toContain('font-display:swap');
   });
 
@@ -298,7 +328,9 @@ describe('FontLoader.loadCustomFont', () => {
 
     loader.loadCustomFont(config);
 
-    const style = document.querySelector<HTMLStyleElement>(`style#nevent-cb-font-woff2font`);
+    const style = document.querySelector<HTMLStyleElement>(
+      `style#nevent-cb-font-woff2font`
+    );
     expect(style!.textContent).toContain("format('woff2')");
   });
 
@@ -311,9 +343,13 @@ describe('FontLoader.loadCustomFont', () => {
 
     loader.loadCustomFont(config);
 
-    const style = document.querySelector<HTMLStyleElement>(`style#nevent-cb-font-wofftfont`);
+    const style = document.querySelector<HTMLStyleElement>(
+      `style#nevent-cb-font-wofftfont`
+    );
     // Style may be found by different id, just check textContent
-    const allStyles = document.querySelectorAll<HTMLStyleElement>('style[data-nevent-chatbot-font]');
+    const allStyles = document.querySelectorAll<HTMLStyleElement>(
+      'style[data-nevent-chatbot-font]'
+    );
     let found = false;
     for (const s of Array.from(allStyles)) {
       if (s.textContent?.includes('WoffFont')) {
@@ -336,7 +372,7 @@ describe('FontLoader.loadCustomFont', () => {
     loader.loadCustomFont(config);
 
     const styles = document.querySelectorAll<HTMLStyleElement>(
-      'style[data-nevent-chatbot-font="IdempotentFont"]',
+      'style[data-nevent-chatbot-font="IdempotentFont"]'
     );
     expect(styles.length).toBe(1);
   });
@@ -418,12 +454,14 @@ describe('FontLoader.destroy', () => {
     const loader = new FontLoader();
 
     // Spy to capture and trigger load event
-    const appendSpy = vi.spyOn(document.head, 'appendChild').mockImplementation((node) => {
-      if (node instanceof HTMLLinkElement) {
-        setTimeout(() => node.onload && (node.onload as () => void)(), 0);
-      }
-      return node;
-    });
+    const appendSpy = vi
+      .spyOn(document.head, 'appendChild')
+      .mockImplementation((node) => {
+        if (node instanceof HTMLLinkElement) {
+          setTimeout(() => node.onload && (node.onload as () => void)(), 0);
+        }
+        return node;
+      });
 
     await loader.loadGoogleFont('DestroyTestFont', [400]);
 
@@ -431,7 +469,9 @@ describe('FontLoader.destroy', () => {
     appendSpy.mockRestore();
 
     // Manually track what was added
-    const linksBefore = document.querySelectorAll('link[data-nevent-chatbot-gfont]').length;
+    const linksBefore = document.querySelectorAll(
+      'link[data-nevent-chatbot-gfont]'
+    ).length;
 
     loader.destroy();
 
@@ -448,12 +488,16 @@ describe('FontLoader.destroy', () => {
       files: { '400': 'https://cdn.example.com/font.woff2' },
     });
 
-    const styleBefore = document.querySelector('style[data-nevent-chatbot-font="DestroyCustomFont"]');
+    const styleBefore = document.querySelector(
+      'style[data-nevent-chatbot-font="DestroyCustomFont"]'
+    );
     expect(styleBefore).not.toBeNull();
 
     loader.destroy();
 
-    const styleAfter = document.querySelector('style[data-nevent-chatbot-font="DestroyCustomFont"]');
+    const styleAfter = document.querySelector(
+      'style[data-nevent-chatbot-font="DestroyCustomFont"]'
+    );
     expect(styleAfter).toBeNull();
     expect(loader.isFontLoaded('DestroyCustomFont')).toBe(false);
   });

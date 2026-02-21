@@ -243,9 +243,9 @@ export class Sanitizer {
     if (!trimmed) return false;
 
     // Normalize: remove control characters and whitespace for obfuscation detection
-    const normalized = trimmed
-      .replace(/[\s\u0000-\u001f]/g, '')
-      .toLowerCase();
+    /* eslint-disable no-control-regex */
+    const normalized = trimmed.replace(/[\s\u0000-\u001f]/g, '').toLowerCase();
+    /* eslint-enable no-control-regex */
 
     // Reject dangerous schemes
     if (DANGEROUS_SCHEME_PATTERN.test(normalized)) return false;
@@ -267,7 +267,7 @@ export class Sanitizer {
    */
   private static sanitizeWithDomParser(
     html: string,
-    allowedTagSet: ReadonlySet<string>,
+    allowedTagSet: ReadonlySet<string>
   ): string {
     let doc: Document;
 
@@ -290,7 +290,7 @@ export class Sanitizer {
    */
   private static walkAndSanitize(
     node: Node,
-    allowedTagSet: ReadonlySet<string>,
+    allowedTagSet: ReadonlySet<string>
   ): void {
     const children = Array.from(node.childNodes);
 
@@ -325,8 +325,7 @@ export class Sanitizer {
    */
   private static sanitizeElement(element: Element): void {
     const tagName = element.tagName.toLowerCase();
-    const allowedAttrs =
-      ALLOWED_ATTRIBUTES.get(tagName) ?? new Set<string>();
+    const allowedAttrs = ALLOWED_ATTRIBUTES.get(tagName) ?? new Set<string>();
 
     const attrNames = Array.from(element.attributes).map((a) => a.name);
 
@@ -394,12 +393,11 @@ export class Sanitizer {
   private static unwrapElement(
     element: Element,
     parent: Node,
-    allowedTagSet: ReadonlySet<string>,
+    allowedTagSet: ReadonlySet<string>
   ): void {
     Sanitizer.walkAndSanitize(element, allowedTagSet);
 
-    const fragment =
-      element.ownerDocument?.createDocumentFragment() ?? null;
+    const fragment = element.ownerDocument?.createDocumentFragment() ?? null;
     if (!fragment) {
       element.parentNode?.removeChild(element);
       return;
@@ -427,7 +425,7 @@ export class Sanitizer {
    */
   private static sanitizeWithRegex(
     html: string,
-    allowedTagSet: ReadonlySet<string>,
+    allowedTagSet: ReadonlySet<string>
   ): string {
     let result = html;
 
@@ -435,22 +433,16 @@ export class Sanitizer {
     for (const tag of REMOVE_WITH_CONTENT_TAGS) {
       result = result.replace(
         new RegExp(`<${tag}[\\s\\S]*?<\\/${tag}>`, 'gi'),
-        '',
+        ''
       );
       result = result.replace(new RegExp(`<${tag}[^>]*\\/?>`, 'gi'), '');
     }
 
     // Step 2: Remove all event handler attributes
-    result = result.replace(
-      /\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi,
-      '',
-    );
+    result = result.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '');
 
     // Step 3: Remove script/style even without proper closing tags
-    result = result.replace(
-      /<script[^>]*>[\s\S]*?(<\/script>|$)/gi,
-      '',
-    );
+    result = result.replace(/<script[^>]*>[\s\S]*?(<\/script>|$)/gi, '');
     result = result.replace(/<style[^>]*>[\s\S]*?(<\/style>|$)/gi, '');
 
     // Step 4: Strip disallowed tags (keep text content)
@@ -462,7 +454,7 @@ export class Sanitizer {
           return Sanitizer.sanitizeTagAttributesRegex(match, tag);
         }
         return '';
-      },
+      }
     );
 
     return result;
@@ -477,12 +469,11 @@ export class Sanitizer {
    */
   private static sanitizeTagAttributesRegex(
     tagString: string,
-    tagName: string,
+    tagName: string
   ): string {
     const allowedAttrs = ALLOWED_ATTRIBUTES.get(tagName);
     if (!allowedAttrs || allowedAttrs.size === 0) {
-      const isVoid =
-        tagName === 'br' || tagName === 'img' || tagName === 'hr';
+      const isVoid = tagName === 'br' || tagName === 'img' || tagName === 'hr';
       return isVoid || /\/>$/.test(tagString)
         ? `<${tagName}>`
         : tagString.startsWith('</')
@@ -495,50 +486,34 @@ export class Sanitizer {
     }
 
     const builtAttrs: string[] = [];
-    const attrRegex =
-      /(\w[\w-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/g;
+    const attrRegex = /(\w[\w-]*)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|(\S+)))?/g;
 
-    const attrSection = tagString
-      .replace(/^<\w+/, '')
-      .replace(/\/?>$/, '');
+    const attrSection = tagString.replace(/^<\w+/, '').replace(/\/?>$/, '');
     attrRegex.lastIndex = 0;
 
     let attrMatch: RegExpExecArray | null;
     while ((attrMatch = attrRegex.exec(attrSection)) !== null) {
       const attrName = (attrMatch[1] ?? '').toLowerCase();
-      const attrValue =
-        attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
+      const attrValue = attrMatch[2] ?? attrMatch[3] ?? attrMatch[4] ?? '';
 
       if (attrName.startsWith('on')) continue;
       if (!allowedAttrs.has(attrName)) continue;
-      if (
-        attrName === 'href' &&
-        !Sanitizer.isAllowedHref(attrValue)
-      )
-        continue;
-      if (
-        attrName === 'src' &&
-        !Sanitizer.isAllowedSrc(attrValue)
-      )
-        continue;
+      if (attrName === 'href' && !Sanitizer.isAllowedHref(attrValue)) continue;
+      if (attrName === 'src' && !Sanitizer.isAllowedSrc(attrValue)) continue;
       if (attrName === 'target' && attrValue !== '_blank') continue;
 
       builtAttrs.push(`${attrName}="${Sanitizer.escapeHtml(attrValue)}"`);
     }
 
     // Enforce rel on <a> with href
-    if (
-      tagName === 'a' &&
-      builtAttrs.some((a) => a.startsWith('href='))
-    ) {
+    if (tagName === 'a' && builtAttrs.some((a) => a.startsWith('href='))) {
       builtAttrs.push('rel="noopener noreferrer"');
       if (!builtAttrs.some((a) => a.startsWith('target='))) {
         builtAttrs.push('target="_blank"');
       }
     }
 
-    const attrsStr =
-      builtAttrs.length > 0 ? ' ' + builtAttrs.join(' ') : '';
+    const attrsStr = builtAttrs.length > 0 ? ' ' + builtAttrs.join(' ') : '';
 
     return `<${tagName}${attrsStr}>`;
   }
@@ -555,9 +530,9 @@ export class Sanitizer {
    */
   private static isAllowedHref(value: string): boolean {
     const trimmed = value.trim();
-    const normalized = trimmed
-      .replace(/[\s\u0000-\u001f]/g, '')
-      .toLowerCase();
+    /* eslint-disable no-control-regex */
+    const normalized = trimmed.replace(/[\s\u0000-\u001f]/g, '').toLowerCase();
+    /* eslint-enable no-control-regex */
 
     if (DANGEROUS_SCHEME_PATTERN.test(normalized)) return false;
 
@@ -578,9 +553,9 @@ export class Sanitizer {
     const trimmed = value.trim();
     if (!trimmed) return false;
 
-    const normalized = trimmed
-      .replace(/[\s\u0000-\u001f]/g, '')
-      .toLowerCase();
+    /* eslint-disable no-control-regex */
+    const normalized = trimmed.replace(/[\s\u0000-\u001f]/g, '').toLowerCase();
+    /* eslint-enable no-control-regex */
     if (DANGEROUS_SCHEME_PATTERN.test(normalized)) return false;
 
     return ALLOWED_SRC_SCHEMES.test(trimmed);

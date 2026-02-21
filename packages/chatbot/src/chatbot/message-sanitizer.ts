@@ -89,7 +89,9 @@ const CHATBOT_ALLOWED_TAGS: readonly string[] = [
  * ReadonlySet version of the allowed tags for efficient lookups and
  * public API exposure.
  */
-const CHATBOT_ALLOWED_TAGS_SET: ReadonlySet<string> = new Set(CHATBOT_ALLOWED_TAGS);
+const CHATBOT_ALLOWED_TAGS_SET: ReadonlySet<string> = new Set(
+  CHATBOT_ALLOWED_TAGS
+);
 
 /**
  * Permitted attributes per tag name.
@@ -137,7 +139,8 @@ export class MessageSanitizer {
    * Permitted attributes per tag name.
    * Exposed as a static readonly property for testability and introspection.
    */
-  static readonly ALLOWED_ATTRIBUTES: ReadonlyMap<string, ReadonlySet<string>> = ALLOWED_ATTRIBUTES;
+  static readonly ALLOWED_ATTRIBUTES: ReadonlyMap<string, ReadonlySet<string>> =
+    ALLOWED_ATTRIBUTES;
 
   // --------------------------------------------------------------------------
   // Public API (delegating to core)
@@ -258,11 +261,17 @@ export class MessageSanitizer {
     EVENT_HANDLER_ATTR_PATTERN.lastIndex = 0;
 
     // Detect dangerous URI schemes in attribute values
-    if (/\bhref\s*=\s*["']?\s*(javascript|data|vbscript):/i.test(html)) return true;
-    if (/\bsrc\s*=\s*["']?\s*(javascript|data|vbscript):/i.test(html)) return true;
+    if (/\bhref\s*=\s*["']?\s*(javascript|data|vbscript):/i.test(html))
+      return true;
+    if (/\bsrc\s*=\s*["']?\s*(javascript|data|vbscript):/i.test(html))
+      return true;
 
     // Detect SVG with embedded event handlers or scripts
-    if (/<svg[\s>]/i.test(html) && (/<script/i.test(html) || /\bon\w+/i.test(html))) return true;
+    if (
+      /<svg[\s>]/i.test(html) &&
+      (/<script/i.test(html) || /\bon\w+/i.test(html))
+    )
+      return true;
 
     // Detect iframe, object, embed
     if (/<(iframe|object|embed|applet)[\s>]/i.test(html)) return true;

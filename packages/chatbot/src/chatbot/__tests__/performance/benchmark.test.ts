@@ -132,8 +132,12 @@ describe('Performance: Widget initialization', () => {
   });
 
   afterEach(() => {
-    document.querySelectorAll('#nevent-chatbot-host').forEach((el) => el.remove());
-    document.querySelectorAll('.nevent-chatbot-root').forEach((el) => el.remove());
+    document
+      .querySelectorAll('#nevent-chatbot-host')
+      .forEach((el) => el.remove());
+    document
+      .querySelectorAll('.nevent-chatbot-root')
+      .forEach((el) => el.remove());
     document.querySelectorAll('style').forEach((el) => el.remove());
     mockApi.reset();
     vi.unstubAllGlobals();
@@ -145,7 +149,7 @@ describe('Performance: Widget initialization', () => {
     const start = performance.now();
 
     const widget = new ChatbotWidget(
-      createMockConfig({ analytics: false, persistConversation: false }),
+      createMockConfig({ analytics: false, persistConversation: false })
     );
     await widget.init();
 
@@ -168,7 +172,12 @@ describe('Performance: Message rendering', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     resetFactorySequences();
-    renderer = new MessageRenderer(undefined, undefined, new I18nManager('en'), MessageSanitizer);
+    renderer = new MessageRenderer(
+      undefined,
+      undefined,
+      new I18nManager('en'),
+      MessageSanitizer
+    );
     container = renderer.render();
     document.body.appendChild(container);
   });
@@ -180,11 +189,14 @@ describe('Performance: Message rendering', () => {
 
   it(`should render 100 messages in < ${RENDER_100_MESSAGES_THRESHOLD_MS}ms`, () => {
     const messages = Array.from({ length: 50 }, (_, i) =>
-      createMockMessage({ id: `perf-user-${i}`, content: `User message ${i}` }),
+      createMockMessage({ id: `perf-user-${i}`, content: `User message ${i}` })
     ).concat(
       Array.from({ length: 50 }, (_, i) =>
-        createMockBotMessage({ id: `perf-bot-${i}`, content: `Bot response ${i}` }),
-      ),
+        createMockBotMessage({
+          id: `perf-bot-${i}`,
+          content: `Bot response ${i}`,
+        })
+      )
     );
 
     const start = performance.now();
@@ -208,9 +220,16 @@ describe('Performance: Message rendering', () => {
   it('should handle 50 rapid message additions without errors or missing elements', () => {
     // Add 50 messages in quick succession (synchronous, no async gap)
     for (let i = 0; i < 50; i++) {
-      const msg = i % 2 === 0
-        ? createMockMessage({ id: `rapid-user-${i}`, content: `Message ${i}` })
-        : createMockBotMessage({ id: `rapid-bot-${i}`, content: `Response ${i}` });
+      const msg =
+        i % 2 === 0
+          ? createMockMessage({
+              id: `rapid-user-${i}`,
+              content: `Message ${i}`,
+            })
+          : createMockBotMessage({
+              id: `rapid-bot-${i}`,
+              content: `Response ${i}`,
+            });
       renderer.addMessage(msg);
     }
 
@@ -235,10 +254,15 @@ describe('Performance: Message rendering', () => {
             title: `Card ${i}`,
             description: `Description for card ${i}`,
             buttons: [
-              { id: `btn-${i}`, label: 'Click', type: 'postback', value: `action_${i}` },
+              {
+                id: `btn-${i}`,
+                label: 'Click',
+                type: 'postback',
+                value: `action_${i}`,
+              },
             ],
           },
-        }),
+        })
       );
     }
 
@@ -282,7 +306,7 @@ describe('Performance: StateManager', () => {
         createMockMessage({
           id: `bulk-msg-${i}`,
           content: `Message number ${i}`,
-        }),
+        })
       );
     }
 
@@ -366,7 +390,9 @@ describe('Performance: MarkdownRenderer', () => {
     const start = performance.now();
 
     for (let i = 0; i < 1000; i++) {
-      MarkdownRenderer.render('Hello, this is a plain text message without any markdown.');
+      MarkdownRenderer.render(
+        'Hello, this is a plain text message without any markdown.'
+      );
     }
 
     const elapsed = performance.now() - start;
@@ -396,7 +422,8 @@ describe('Performance: MessageSanitizer', () => {
   });
 
   it('should sanitize 1000 simple strings in < 500ms', () => {
-    const simpleHtml = '<p>Hello <b>world</b>! Visit <a href="https://example.com">here</a>.</p>';
+    const simpleHtml =
+      '<p>Hello <b>world</b>! Visit <a href="https://example.com">here</a>.</p>';
 
     const start = performance.now();
 

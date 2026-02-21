@@ -160,42 +160,31 @@ describe('ConfigManager', () => {
 
     it('should throw error if apiUrl is invalid', () => {
       expect(
-        () =>
-          new ConfigManager(createMinimalConfig({ apiUrl: 'not-a-url' }))
+        () => new ConfigManager(createMinimalConfig({ apiUrl: 'not-a-url' }))
       ).toThrow('apiUrl must be a valid http or https URL');
     });
 
     it('should throw error if locale is not supported', () => {
       expect(
-        () =>
-          new ConfigManager(
-            createMinimalConfig({ locale: 'fr' as never })
-          )
+        () => new ConfigManager(createMinimalConfig({ locale: 'fr' as never }))
       ).toThrow('locale must be one of');
     });
 
     it('should throw error if theme is not supported', () => {
       expect(
-        () =>
-          new ConfigManager(
-            createMinimalConfig({ theme: 'neon' as never })
-          )
+        () => new ConfigManager(createMinimalConfig({ theme: 'neon' as never }))
       ).toThrow('theme must be one of');
     });
 
     it('should throw error if autoOpenDelay is not positive', () => {
       expect(
-        () =>
-          new ConfigManager(createMinimalConfig({ autoOpenDelay: -1 }))
+        () => new ConfigManager(createMinimalConfig({ autoOpenDelay: -1 }))
       ).toThrow('autoOpenDelay must be a positive number');
     });
 
     it('should throw error if styles.zIndex is not a positive integer', () => {
       expect(
-        () =>
-          new ConfigManager(
-            createMinimalConfig({ styles: { zIndex: 0 } })
-          )
+        () => new ConfigManager(createMinimalConfig({ styles: { zIndex: 0 } }))
       ).toThrow('styles.zIndex must be a positive integer');
     });
 
@@ -252,9 +241,7 @@ describe('ConfigManager', () => {
       const manager = new ConfigManager(createMinimalConfig());
       manager.mergeServerConfig(createServerConfig());
 
-      expect(manager.getConfig().welcomeMessage).toBe(
-        'Hola desde el servidor'
-      );
+      expect(manager.getConfig().welcomeMessage).toBe('Hola desde el servidor');
     });
 
     it('should preserve user welcome message over server value', () => {
@@ -292,9 +279,7 @@ describe('ConfigManager', () => {
     });
 
     it('should preserve user theme when explicitly set (non-default)', () => {
-      const manager = new ConfigManager(
-        createMinimalConfig({ theme: 'auto' })
-      );
+      const manager = new ConfigManager(createMinimalConfig({ theme: 'auto' }));
       manager.mergeServerConfig(
         createServerConfig({ theme: { primaryColor: '#ff0000', mode: 'dark' } })
       );
@@ -369,9 +354,7 @@ describe('ConfigManager', () => {
     });
 
     it('getLocale() returns correct locale', () => {
-      const manager = new ConfigManager(
-        createMinimalConfig({ locale: 'en' })
-      );
+      const manager = new ConfigManager(createMinimalConfig({ locale: 'en' }));
       expect(manager.getLocale()).toBe('en');
     });
 
@@ -381,9 +364,7 @@ describe('ConfigManager', () => {
     });
 
     it('getTheme() returns correct theme', () => {
-      const manager = new ConfigManager(
-        createMinimalConfig({ theme: 'dark' })
-      );
+      const manager = new ConfigManager(createMinimalConfig({ theme: 'dark' }));
       expect(manager.getTheme()).toBe('dark');
     });
 
@@ -393,9 +374,7 @@ describe('ConfigManager', () => {
     });
 
     it('isDebug() returns true when set', () => {
-      const manager = new ConfigManager(
-        createMinimalConfig({ debug: true })
-      );
+      const manager = new ConfigManager(createMinimalConfig({ debug: true }));
       expect(manager.isDebug()).toBe(true);
     });
 

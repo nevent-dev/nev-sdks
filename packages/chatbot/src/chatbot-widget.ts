@@ -96,7 +96,10 @@ import { TypingRenderer } from './chatbot/ui/typing-renderer';
  * @returns A unique string identifier
  */
 function generateMessageId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+  if (
+    typeof crypto !== 'undefined' &&
+    typeof crypto.randomUUID === 'function'
+  ) {
     return crypto.randomUUID();
   }
   // Fallback: 16 random hex characters
@@ -334,14 +337,14 @@ export class ChatbotWidget {
     // Initialize state manager with persistence preference
     this.stateManager = new StateManager(
       resolvedConfig.chatbotId,
-      resolvedConfig.persistConversation,
+      resolvedConfig.persistConversation
     );
 
     // Initialize CSS generator with theme, styles, and z-index
     this.cssGenerator = new CSSGenerator(
       resolvedConfig.theme,
       resolvedConfig.styles,
-      resolvedConfig.styles.zIndex ?? 9999,
+      resolvedConfig.styles.zIndex ?? 9999
     );
 
     // Initialize font loader for Google Fonts and custom @font-face loading
@@ -351,7 +354,10 @@ export class ChatbotWidget {
     // In public mode (default), authManager remains null and all existing
     // behaviour is preserved (X-API-Key header only).
     if (resolvedConfig.auth) {
-      this.authManager = new AuthManager(resolvedConfig.auth, resolvedConfig.debug);
+      this.authManager = new AuthManager(
+        resolvedConfig.auth,
+        resolvedConfig.debug
+      );
     }
 
     this.logger.debug('ChatbotWidget constructed', {
@@ -396,319 +402,341 @@ export class ChatbotWidget {
     }
 
     return this.errorBoundary.guardAsync(async () => {
-    const config = this.configManager.getConfig();
+      const config = this.configManager.getConfig();
 
-    try {
-      // Step 1: Find container if containerId provided (inline mode)
-      if (config.containerId) {
-        this.container = document.querySelector(`#${config.containerId}`);
-        if (!this.container) {
+      try {
+        // Step 1: Find container if containerId provided (inline mode)
+        if (config.containerId) {
+          this.container = document.querySelector(`#${config.containerId}`);
+          if (!this.container) {
+            const error: ChatbotError = {
+              code: 'CONTAINER_NOT_FOUND',
+              message: `Container element with id "${config.containerId}" not found`,
+            };
+            config.onError(error);
+            throw Object.assign(new Error(error.message), error);
+          }
+        }
+
+        // Step 2: Create Shadow DOM host element for style isolation.
+        // The host element acts as the shadow boundary; all widget DOM and
+        // styles live inside the shadow root so host-page CSS cannot leak in
+        // and widget CSS cannot leak out.
+        this.hostElement = document.createElement('div');
+        this.hostElement.id = 'nevent-chatbot-host';
+
+        if (this.container) {
+          // Inline mode: host fills the container naturally
+          this.hostElement.style.cssText =
+            'all: initial; position: relative; display: block; width: 100%; height: 100%;';
+        } else {
+          // Floating mode: host is a zero-size fixed overlay at maximum z-index
+          this.hostElement.style.cssText =
+            'all: initial; position: fixed; z-index: 2147483647; top: 0; left: 0; width: 0; height: 0;';
+        }
+
+        // Attach Shadow DOM (open mode) with fallback to direct DOM
+        if (this.hostElement.attachShadow) {
+          this.shadow = this.hostElement.attachShadow({ mode: 'open' });
+        } else {
+          this.shadow = null;
+        }
+
+        const renderTarget = this.shadow ?? this.hostElement;
+
+        // Create root element inside the shadow boundary
+        this.rootElement = document.createElement('div');
+        this.rootElement.className = 'nevent-chatbot-root';
+        this.rootElement.setAttribute('data-theme', config.theme);
+        renderTarget.appendChild(this.rootElement);
+
+        // Mount host element into the DOM
+        const mountPoint = this.container ?? document.body;
+        mountPoint.appendChild(this.hostElement);
+
+        // Step 3: Inject CSS into the shadow root (or document.head as fallback)
+        this.cssGenerator.inject(this.shadow ?? undefined);
+
+        // Step 4: Fetch server configuration
+        let serverConfig: ServerChatbotConfig;
+        try {
+          // Use a temporary ConversationService for the initial config fetch.
+          // The config endpoint is public and does not require a token.
+          const tempService = new ConversationService(
+            config.apiUrl,
+            '',
+            config.chatbotId,
+            config.debug
+          );
+          serverConfig = await tempService.fetchConfig(config.tenantId);
+          this.logger.debug('Server config fetched successfully');
+        } catch (fetchError) {
+          this.logger.error('Failed to fetch server config', fetchError);
           const error: ChatbotError = {
-            code: 'CONTAINER_NOT_FOUND',
-            message: `Container element with id "${config.containerId}" not found`,
+            code: 'CONFIG_LOAD_FAILED',
+            message: 'Failed to load chatbot configuration from server',
           };
           config.onError(error);
           throw Object.assign(new Error(error.message), error);
         }
-      }
 
-      // Step 2: Create Shadow DOM host element for style isolation.
-      // The host element acts as the shadow boundary; all widget DOM and
-      // styles live inside the shadow root so host-page CSS cannot leak in
-      // and widget CSS cannot leak out.
-      this.hostElement = document.createElement('div');
-      this.hostElement.id = 'nevent-chatbot-host';
+        // Step 5: Merge server config into resolved config
+        this.configManager.mergeServerConfig(serverConfig);
+        const mergedConfig = this.configManager.getConfig();
 
-      if (this.container) {
-        // Inline mode: host fills the container naturally
-        this.hostElement.style.cssText =
-          'all: initial; position: relative; display: block; width: 100%; height: 100%;';
-      } else {
-        // Floating mode: host is a zero-size fixed overlay at maximum z-index
-        this.hostElement.style.cssText =
-          'all: initial; position: fixed; z-index: 2147483647; top: 0; left: 0; width: 0; height: 0;';
-      }
-
-      // Attach Shadow DOM (open mode) with fallback to direct DOM
-      if (this.hostElement.attachShadow) {
-        this.shadow = this.hostElement.attachShadow({ mode: 'open' });
-      } else {
-        this.shadow = null;
-      }
-
-      const renderTarget = this.shadow ?? this.hostElement;
-
-      // Create root element inside the shadow boundary
-      this.rootElement = document.createElement('div');
-      this.rootElement.className = 'nevent-chatbot-root';
-      this.rootElement.setAttribute('data-theme', config.theme);
-      renderTarget.appendChild(this.rootElement);
-
-      // Mount host element into the DOM
-      const mountPoint = this.container ?? document.body;
-      mountPoint.appendChild(this.hostElement);
-
-      // Step 3: Inject CSS into the shadow root (or document.head as fallback)
-      this.cssGenerator.inject(this.shadow ?? undefined);
-
-      // Step 4: Fetch server configuration
-      let serverConfig: ServerChatbotConfig;
-      try {
-        // Use a temporary ConversationService for the initial config fetch.
-        // The config endpoint is public and does not require a token.
-        const tempService = new ConversationService(
-          config.apiUrl,
-          '',
-          config.chatbotId,
-          config.debug,
-        );
-        serverConfig = await tempService.fetchConfig(config.tenantId);
-        this.logger.debug('Server config fetched successfully');
-      } catch (fetchError) {
-        this.logger.error('Failed to fetch server config', fetchError);
-        const error: ChatbotError = {
-          code: 'CONFIG_LOAD_FAILED',
-          message: 'Failed to load chatbot configuration from server',
-        };
-        config.onError(error);
-        throw Object.assign(new Error(error.message), error);
-      }
-
-      // Step 5: Merge server config into resolved config
-      this.configManager.mergeServerConfig(serverConfig);
-      const mergedConfig = this.configManager.getConfig();
-
-      // Step 5b: Apply advanced theming from merged config.
-      // Priority order (highest wins):
-      //   1. brandColor — auto-generate full theme from a single hex color
-      //   2. themePreset — named preset (e.g. 'midnight', 'ocean')
-      //   3. server theme.primaryColor — apply as a brand-color generated theme
-      //   4. Base light/dark tokens — already in the injected stylesheet
-      if (mergedConfig.brandColor) {
-        this.cssGenerator.setThemeFromColor(mergedConfig.brandColor);
-        this.logger.debug('Brand color theme applied', { brandColor: mergedConfig.brandColor });
-      } else if (mergedConfig.themePreset) {
-        const applied = this.cssGenerator.setThemePreset(mergedConfig.themePreset);
-        if (!applied) {
-          this.logger.warn(`Unknown theme preset: "${mergedConfig.themePreset}" — ignoring`);
-        } else {
-          this.logger.debug('Theme preset applied', { preset: mergedConfig.themePreset });
+        // Step 5b: Apply advanced theming from merged config.
+        // Priority order (highest wins):
+        //   1. brandColor — auto-generate full theme from a single hex color
+        //   2. themePreset — named preset (e.g. 'midnight', 'ocean')
+        //   3. server theme.primaryColor — apply as a brand-color generated theme
+        //   4. Base light/dark tokens — already in the injected stylesheet
+        if (mergedConfig.brandColor) {
+          this.cssGenerator.setThemeFromColor(mergedConfig.brandColor);
+          this.logger.debug('Brand color theme applied', {
+            brandColor: mergedConfig.brandColor,
+          });
+        } else if (mergedConfig.themePreset) {
+          const applied = this.cssGenerator.setThemePreset(
+            mergedConfig.themePreset
+          );
+          if (!applied) {
+            this.logger.warn(
+              `Unknown theme preset: "${mergedConfig.themePreset}" — ignoring`
+            );
+          } else {
+            this.logger.debug('Theme preset applied', {
+              preset: mergedConfig.themePreset,
+            });
+          }
+        } else if (serverConfig.theme?.primaryColor) {
+          // Apply server brand color as a generated theme when no client-side preset
+          this.cssGenerator.setThemeFromColor(serverConfig.theme.primaryColor);
+          this.logger.debug('Server primary color theme applied', {
+            primaryColor: serverConfig.theme.primaryColor,
+          });
         }
-      } else if (serverConfig.theme?.primaryColor) {
-        // Apply server brand color as a generated theme when no client-side preset
-        this.cssGenerator.setThemeFromColor(serverConfig.theme.primaryColor);
-        this.logger.debug('Server primary color theme applied', {
-          primaryColor: serverConfig.theme.primaryColor,
-        });
-      }
 
-      // Step 5c: Inject custom CSS from merged config.
-      // Precedence: client customCSS > serverConfig.customCSS > styles.customCSS
-      const effectiveCustomCSS =
-        mergedConfig.customCSS ||
-        serverConfig.customCSS ||
-        mergedConfig.styles.customCSS ||
-        '';
-      if (effectiveCustomCSS) {
-        this.cssGenerator.injectCustomCSS(effectiveCustomCSS, this.shadow ?? undefined);
-        this.logger.debug('Custom CSS injected');
-      }
+        // Step 5c: Inject custom CSS from merged config.
+        // Precedence: client customCSS > serverConfig.customCSS > styles.customCSS
+        const effectiveCustomCSS =
+          mergedConfig.customCSS ||
+          serverConfig.customCSS ||
+          mergedConfig.styles.customCSS ||
+          '';
+        if (effectiveCustomCSS) {
+          this.cssGenerator.injectCustomCSS(
+            effectiveCustomCSS,
+            this.shadow ?? undefined
+          );
+          this.logger.debug('Custom CSS injected');
+        }
 
-      // Step 5d: Load fonts declared in config.fonts and server theme.font.
-      // Google Fonts are loaded first (async, concurrent), custom @font-face is synchronous.
-      await this.loadFonts(mergedConfig, serverConfig);
+        // Step 5d: Load fonts declared in config.fonts and server theme.font.
+        // Google Fonts are loaded first (async, concurrent), custom @font-face is synchronous.
+        await this.loadFonts(mergedConfig, serverConfig);
 
-      // Step 6: Initialize ConversationService with the token from server config.
-      // Pass the AuthManager (if present) so auth headers are injected into
-      // every API request and 401 responses trigger automatic token refresh.
-      // Backend context options (tenantId, eventId, source, userContext) are
-      // forwarded so that X-Tenant-ID, X-User-Context headers and eventId/source
-      // query parameters are included in all API requests.
-      // Build backend context options, only including properties that have actual
-      // values. exactOptionalPropertyTypes forbids assigning `undefined` to optional
-      // properties, so we conditionally add each field.
-      const backendContextOptions: {
-        tenantId?: string;
-        eventId?: string;
-        source?: string;
-        userContext?: { lat: number; lng: number };
-      } = {
-        tenantId: mergedConfig.tenantId,
-      };
-      if (mergedConfig.eventId) {
-        backendContextOptions.eventId = mergedConfig.eventId;
-      }
-      if (mergedConfig.source) {
-        backendContextOptions.source = mergedConfig.source;
-      }
-      if (mergedConfig.userContext) {
-        backendContextOptions.userContext = mergedConfig.userContext;
-      }
+        // Step 6: Initialize ConversationService with the token from server config.
+        // Pass the AuthManager (if present) so auth headers are injected into
+        // every API request and 401 responses trigger automatic token refresh.
+        // Backend context options (tenantId, eventId, source, userContext) are
+        // forwarded so that X-Tenant-ID, X-User-Context headers and eventId/source
+        // query parameters are included in all API requests.
+        // Build backend context options, only including properties that have actual
+        // values. exactOptionalPropertyTypes forbids assigning `undefined` to optional
+        // properties, so we conditionally add each field.
+        const backendContextOptions: {
+          tenantId?: string;
+          eventId?: string;
+          source?: string;
+          userContext?: { lat: number; lng: number };
+        } = {
+          tenantId: mergedConfig.tenantId,
+        };
+        if (mergedConfig.eventId) {
+          backendContextOptions.eventId = mergedConfig.eventId;
+        }
+        if (mergedConfig.source) {
+          backendContextOptions.source = mergedConfig.source;
+        }
+        if (mergedConfig.userContext) {
+          backendContextOptions.userContext = mergedConfig.userContext;
+        }
 
-      this.conversationService = new ConversationService(
-        mergedConfig.apiUrl,
-        serverConfig.token,
-        mergedConfig.chatbotId,
-        mergedConfig.debug,
-        this.authManager ?? undefined,
-        backendContextOptions,
-        mergedConfig.rateLimit,
-      );
-
-      // Step 6b: Initialize StreamingClient when the server feature flag is enabled.
-      // The StreamingClient uses the same token and API URL as ConversationService
-      // but implements SSE-based streaming via fetch + ReadableStream.
-      // The same backend context options are forwarded for consistent header/param usage.
-      if (serverConfig.features.streaming) {
-        this.streamingClient = new StreamingClient(
+        this.conversationService = new ConversationService(
           mergedConfig.apiUrl,
           serverConfig.token,
           mergedConfig.chatbotId,
           mergedConfig.debug,
           this.authManager ?? undefined,
           backendContextOptions,
-        );
-        this.logger.debug('StreamingClient initialized — streaming mode active');
-      }
-
-      // Step 6c: Initialize FileUploadService when file uploads are enabled.
-      // Uses the same token and tenant ID for authenticated uploads.
-      if (mergedConfig.fileUpload?.enabled !== false) {
-        this.fileUploadService = new FileUploadService(
-          mergedConfig.fileUpload,
-          mergedConfig.apiUrl,
-          mergedConfig.tenantId,
-          serverConfig.token,
-          mergedConfig.debug,
-        );
-        this.logger.debug('FileUploadService initialized');
-      }
-
-      // Step 6d: Initialize TypingStatusService for bidirectional typing notifications.
-      // Enabled by default unless explicitly disabled via typingStatus.enabled === false.
-      if (mergedConfig.typingStatus?.enabled !== false) {
-        this.typingStatusService = new TypingStatusService(
-          mergedConfig.typingStatus,
-          mergedConfig.apiUrl,
-          mergedConfig.tenantId,
-          () => this.stateManager.getState().conversation?.id ?? null,
-          serverConfig.token,
-          mergedConfig.debug,
+          mergedConfig.rateLimit
         );
 
-        // Wire server typing events to the typing renderer
-        this.typingStatusService.onServerTyping((event) => {
-          if (event.isTyping) {
-            this.typingRenderer?.showWithName(event.displayName);
-          } else {
-            this.typingRenderer?.hide();
-          }
+        // Step 6b: Initialize StreamingClient when the server feature flag is enabled.
+        // The StreamingClient uses the same token and API URL as ConversationService
+        // but implements SSE-based streaming via fetch + ReadableStream.
+        // The same backend context options are forwarded for consistent header/param usage.
+        if (serverConfig.features.streaming) {
+          this.streamingClient = new StreamingClient(
+            mergedConfig.apiUrl,
+            serverConfig.token,
+            mergedConfig.chatbotId,
+            mergedConfig.debug,
+            this.authManager ?? undefined,
+            backendContextOptions
+          );
+          this.logger.debug(
+            'StreamingClient initialized — streaming mode active'
+          );
+        }
+
+        // Step 6c: Initialize FileUploadService when file uploads are enabled.
+        // Uses the same token and tenant ID for authenticated uploads.
+        if (mergedConfig.fileUpload?.enabled !== false) {
+          this.fileUploadService = new FileUploadService(
+            mergedConfig.fileUpload,
+            mergedConfig.apiUrl,
+            mergedConfig.tenantId,
+            serverConfig.token,
+            mergedConfig.debug
+          );
+          this.logger.debug('FileUploadService initialized');
+        }
+
+        // Step 6d: Initialize TypingStatusService for bidirectional typing notifications.
+        // Enabled by default unless explicitly disabled via typingStatus.enabled === false.
+        if (mergedConfig.typingStatus?.enabled !== false) {
+          this.typingStatusService = new TypingStatusService(
+            mergedConfig.typingStatus,
+            mergedConfig.apiUrl,
+            mergedConfig.tenantId,
+            () => this.stateManager.getState().conversation?.id ?? null,
+            serverConfig.token,
+            mergedConfig.debug
+          );
+
+          // Wire server typing events to the typing renderer
+          this.typingStatusService.onServerTyping((event) => {
+            if (event.isTyping) {
+              this.typingRenderer?.showWithName(event.displayName);
+            } else {
+              this.typingRenderer?.hide();
+            }
+          });
+
+          this.logger.debug('TypingStatusService initialized');
+        }
+
+        // Step 6e: Initialize ConnectionManager for heartbeat / reconnection.
+        // Uses the same API URL as ConversationService so pings hit the same host.
+        this.connectionManager = new ConnectionManager(mergedConfig.apiUrl, {
+          debug: mergedConfig.debug,
         });
 
-        this.logger.debug('TypingStatusService initialized');
-      }
-
-      // Step 6e: Initialize ConnectionManager for heartbeat / reconnection.
-      // Uses the same API URL as ConversationService so pings hit the same host.
-      this.connectionManager = new ConnectionManager(mergedConfig.apiUrl, {
-        debug: mergedConfig.debug,
-      });
-
-      // Step 7: Initialize analytics tracker (non-critical)
-      try {
-        if (mergedConfig.analytics) {
-          this.tracker = new ChatbotTracker({
-            chatbotId: mergedConfig.chatbotId,
-            tenantId: mergedConfig.tenantId,
-            analyticsUrl: mergedConfig.analyticsUrl,
-            debug: mergedConfig.debug,
-          });
-        }
-      } catch (analyticsError) {
-        this.logger.warn('Analytics initialization failed (non-fatal)', analyticsError);
-      }
-
-      // Step 8: Restore persisted state (non-critical)
-      let persistedState: PersistedConversationState | null = null;
-      try {
-        persistedState = this.stateManager.restore();
-        if (persistedState) {
-          // Check TTL expiration
-          const ttlHours = mergedConfig.conversationTTL;
-          const lastActivity = new Date(persistedState.lastActivity).getTime();
-          const now = Date.now();
-          const ttlMs = ttlHours * 60 * 60 * 1000;
-
-          if (now - lastActivity > ttlMs) {
-            this.logger.debug('Persisted conversation expired — clearing');
-            this.stateManager.clearPersisted();
-            persistedState = null;
-          } else {
-            this.logger.debug('Persisted conversation restored', {
-              conversationId: persistedState.conversationId,
-              messageCount: persistedState.messages.length,
+        // Step 7: Initialize analytics tracker (non-critical)
+        try {
+          if (mergedConfig.analytics) {
+            this.tracker = new ChatbotTracker({
+              chatbotId: mergedConfig.chatbotId,
+              tenantId: mergedConfig.tenantId,
+              analyticsUrl: mergedConfig.analyticsUrl,
+              debug: mergedConfig.debug,
             });
           }
+        } catch (analyticsError) {
+          this.logger.warn(
+            'Analytics initialization failed (non-fatal)',
+            analyticsError
+          );
         }
-      } catch (restoreError) {
-        this.logger.warn('State restoration failed (non-fatal)', restoreError);
-      }
 
-      // Step 9: Render UI
-      this.renderUI(serverConfig, persistedState);
+        // Step 8: Restore persisted state (non-critical)
+        let persistedState: PersistedConversationState | null = null;
+        try {
+          persistedState = this.stateManager.restore();
+          if (persistedState) {
+            // Check TTL expiration
+            const ttlHours = mergedConfig.conversationTTL;
+            const lastActivity = new Date(
+              persistedState.lastActivity
+            ).getTime();
+            const now = Date.now();
+            const ttlMs = ttlHours * 60 * 60 * 1000;
 
-      // Step 9b: Wire ConnectionManager status changes → banner UI.
-      // Must be done after renderUI() so this.connectionBanner exists.
-      if (this.connectionManager) {
-        this.connectionStatusUnsubscribe = this.connectionManager.onStatusChange(
-          (status) => { this.onConnectionStatusChange(status); },
+            if (now - lastActivity > ttlMs) {
+              this.logger.debug('Persisted conversation expired — clearing');
+              this.stateManager.clearPersisted();
+              persistedState = null;
+            } else {
+              this.logger.debug('Persisted conversation restored', {
+                conversationId: persistedState.conversationId,
+                messageCount: persistedState.messages.length,
+              });
+            }
+          }
+        } catch (restoreError) {
+          this.logger.warn(
+            'State restoration failed (non-fatal)',
+            restoreError
+          );
+        }
+
+        // Step 9: Render UI
+        this.renderUI(serverConfig, persistedState);
+
+        // Step 9b: Wire ConnectionManager status changes → banner UI.
+        // Must be done after renderUI() so this.connectionBanner exists.
+        if (this.connectionManager) {
+          this.connectionStatusUnsubscribe =
+            this.connectionManager.onStatusChange((status) => {
+              this.onConnectionStatusChange(status);
+            });
+          this.connectionManager.start();
+        }
+
+        // Step 10: Attach event listeners
+        this.attachEventListeners();
+
+        // Step 11: If restored conversation, load messages into UI
+        if (persistedState) {
+          this.restoreConversation(persistedState);
+        } else {
+          // Show welcome message if configured
+          this.renderWelcomeMessage();
+        }
+
+        // Step 12: If autoOpen, schedule open after delay
+        if (mergedConfig.autoOpen) {
+          this.autoOpenTimer = setTimeout(
+            this.errorBoundary.guardTimer(() => {
+              this.open();
+            }, 'autoOpenTimer'),
+            mergedConfig.autoOpenDelay
+          );
+        }
+
+        // Step 13: Subscribe to state changes
+        this.stateUnsubscribe = this.stateManager.subscribe(
+          this.onStateChange.bind(this)
         );
-        this.connectionManager.start();
+
+        // Step 14: Set up persistence on page leave
+        this.beforeUnloadHandler = () => {
+          this.stateManager.persist();
+        };
+        window.addEventListener('beforeunload', this.beforeUnloadHandler);
+
+        // Step 15: Mark as initialized and fire onReady callback
+        this.initialized = true;
+        mergedConfig.onReady();
+
+        this.logger.info('ChatbotWidget initialized successfully');
+      } catch (initError) {
+        this.logger.error('Widget initialization failed', initError);
+        // Clean up any partially rendered UI
+        this.cleanupPartialInit();
+        throw initError;
       }
-
-      // Step 10: Attach event listeners
-      this.attachEventListeners();
-
-      // Step 11: If restored conversation, load messages into UI
-      if (persistedState) {
-        this.restoreConversation(persistedState);
-      } else {
-        // Show welcome message if configured
-        this.renderWelcomeMessage();
-      }
-
-      // Step 12: If autoOpen, schedule open after delay
-      if (mergedConfig.autoOpen) {
-        this.autoOpenTimer = setTimeout(
-          this.errorBoundary.guardTimer(() => {
-            this.open();
-          }, 'autoOpenTimer'),
-          mergedConfig.autoOpenDelay,
-        );
-      }
-
-      // Step 13: Subscribe to state changes
-      this.stateUnsubscribe = this.stateManager.subscribe(
-        this.onStateChange.bind(this),
-      );
-
-      // Step 14: Set up persistence on page leave
-      this.beforeUnloadHandler = () => {
-        this.stateManager.persist();
-      };
-      window.addEventListener('beforeunload', this.beforeUnloadHandler);
-
-      // Step 15: Mark as initialized and fire onReady callback
-      this.initialized = true;
-      mergedConfig.onReady();
-
-      this.logger.info('ChatbotWidget initialized successfully');
-    } catch (initError) {
-      this.logger.error('Widget initialization failed', initError);
-      // Clean up any partially rendered UI
-      this.cleanupPartialInit();
-      throw initError;
-    }
     }, 'init');
   }
 
@@ -749,10 +777,13 @@ export class ChatbotWidget {
 
       // Focus the input field after a brief delay for animation
       // and activate the focus trap within the dialog (WCAG 2.1.2).
-      setTimeout(this.errorBoundary.guardTimer(() => {
-        this.inputRenderer?.focus();
-        this.setupFocusTrap();
-      }, 'openFocusTimer'), 150);
+      setTimeout(
+        this.errorBoundary.guardTimer(() => {
+          this.inputRenderer?.focus();
+          this.setupFocusTrap();
+        }, 'openFocusTimer'),
+        150
+      );
 
       if (this.tracker) {
         this.tracker.trackOpen();
@@ -837,9 +868,11 @@ export class ChatbotWidget {
    * ```
    */
   isOpen(): boolean {
-    return this.errorBoundary.guard(() => {
-      return this.stateManager.getState().isOpen;
-    }, 'isOpen') ?? false;
+    return (
+      this.errorBoundary.guard(() => {
+        return this.stateManager.getState().isOpen;
+      }, 'isOpen') ?? false
+    );
   }
 
   /**
@@ -866,7 +899,7 @@ export class ChatbotWidget {
       if (!this.authManager) {
         this.logger.warn(
           'setAuthToken() called but no auth config was provided — ignoring. ' +
-          'Configure auth in ChatbotConfig to enable authenticated sessions.',
+            'Configure auth in ChatbotConfig to enable authenticated sessions.'
         );
         return;
       }
@@ -921,7 +954,10 @@ export class ChatbotWidget {
    * await widget.sendFeedback('msg-456', 'NEGATIVE');
    * ```
    */
-  async sendFeedback(messageId: string, feedbackType: FeedbackType): Promise<void> {
+  async sendFeedback(
+    messageId: string,
+    feedbackType: FeedbackType
+  ): Promise<void> {
     if (!this.initialized || this.destroyed) return;
     if (!this.conversationService) return;
 
@@ -932,16 +968,18 @@ export class ChatbotWidget {
       } catch (feedbackError) {
         this.logger.error('Failed to submit feedback', feedbackError);
 
-        const chatbotError: ChatbotError = (feedbackError !== null &&
+        const chatbotError: ChatbotError =
+          feedbackError !== null &&
           typeof feedbackError === 'object' &&
-          'code' in feedbackError)
-          ? feedbackError as ChatbotError
-          : {
-              code: 'FEEDBACK_FAILED',
-              message: feedbackError instanceof Error
-                ? feedbackError.message
-                : 'Failed to submit message feedback',
-            };
+          'code' in feedbackError
+            ? (feedbackError as ChatbotError)
+            : {
+                code: 'FEEDBACK_FAILED',
+                message:
+                  feedbackError instanceof Error
+                    ? feedbackError.message
+                    : 'Failed to submit message feedback',
+              };
 
         const config = this.configManager.getConfig();
         config.onError(chatbotError);
@@ -973,191 +1011,203 @@ export class ChatbotWidget {
     if (!this.conversationService) return;
 
     return this.errorBoundary.guardAsync(async () => {
-    // Validate text and attachments
-    const trimmedText = text.trim();
-    const pendingAttachments = this.inputRenderer?.getAttachments() ?? [];
-    if (!trimmedText && pendingAttachments.length === 0) return;
+      // Validate text and attachments
+      const trimmedText = text.trim();
+      const pendingAttachments = this.inputRenderer?.getAttachments() ?? [];
+      if (!trimmedText && pendingAttachments.length === 0) return;
 
-    // Client-side rate limiting via ConversationService's RateLimiter.
-    // If the limit is exceeded, show a countdown message and temporarily
-    // disable input until the cooldown expires.
-    try {
-      this.conversationService!.checkRateLimit();
-    } catch (rateLimitError) {
-      if (
-        rateLimitError !== null &&
-        typeof rateLimitError === 'object' &&
-        'code' in rateLimitError &&
-        (rateLimitError as { code: string }).code === 'RATE_LIMITED'
-      ) {
-        const details = (rateLimitError as { details?: { retryAfterMs?: number } }).details;
-        const retryAfterMs = details?.retryAfterMs ?? 5000;
-        const retrySeconds = Math.ceil(retryAfterMs / 1000);
+      // Client-side rate limiting via ConversationService's RateLimiter.
+      // If the limit is exceeded, show a countdown message and temporarily
+      // disable input until the cooldown expires.
+      try {
+        this.conversationService!.checkRateLimit();
+      } catch (rateLimitError) {
+        if (
+          rateLimitError !== null &&
+          typeof rateLimitError === 'object' &&
+          'code' in rateLimitError &&
+          (rateLimitError as { code: string }).code === 'RATE_LIMITED'
+        ) {
+          const details = (
+            rateLimitError as { details?: { retryAfterMs?: number } }
+          ).details;
+          const retryAfterMs = details?.retryAfterMs ?? 5000;
+          const retrySeconds = Math.ceil(retryAfterMs / 1000);
 
-        this.logger.debug('Rate limited — cooldown active', { retryAfterMs });
+          this.logger.debug('Rate limited — cooldown active', { retryAfterMs });
 
-        // Show countdown message in the chat window
+          // Show countdown message in the chat window
+          this.showInlineError(
+            this.i18n.format('rateLimitCountdown', { seconds: retrySeconds })
+          );
+
+          // Disable input during cooldown and re-enable when it expires
+          this.inputRenderer?.setDisabled(true);
+          this.scheduleRateLimitRecovery(retryAfterMs);
+
+          return;
+        }
+        // Re-throw non-rate-limit errors
+        throw rateLimitError;
+      }
+
+      const config = this.configManager.getConfig();
+      const state = this.stateManager.getState();
+
+      // Upload any pending file attachments before building the user message.
+      // Each file is uploaded in parallel; failed uploads are filtered out.
+      let uploadedAttachments: FileAttachment[] = [];
+      if (pendingAttachments.length > 0 && this.fileUploadService) {
+        const uploadPromises = pendingAttachments.map(async (attachment) => {
+          if (attachment.status === 'uploaded' && attachment.url) {
+            return attachment; // Already uploaded
+          }
+          try {
+            const result = await this.fileUploadService!.upload(
+              attachment.file,
+              (progress) => {
+                this.inputRenderer?.updateAttachment(attachment.id, {
+                  progress,
+                  status: 'uploading',
+                });
+              }
+            );
+            const updateData: Partial<FileAttachment> = {
+              status: result.status,
+              progress: result.progress,
+            };
+            if (result.url) updateData.url = result.url;
+            if (result.error) updateData.error = result.error;
+            this.inputRenderer?.updateAttachment(attachment.id, updateData);
+            return result;
+          } catch {
+            this.inputRenderer?.updateAttachment(attachment.id, {
+              status: 'error',
+              error: 'Upload failed',
+            });
+            return null;
+          }
+        });
+
+        const results = await Promise.all(uploadPromises);
+        uploadedAttachments = results.filter(
+          (r): r is FileAttachment => r !== null && r.status === 'uploaded'
+        );
+      }
+
+      // Create optimistic user message
+      const userMessage: ChatMessage = {
+        id: generateMessageId(),
+        conversationId: state.conversation?.id ?? '',
+        role: 'user',
+        content: trimmedText,
+        type: 'text',
+        timestamp: new Date().toISOString(),
+        status: 'sending',
+        ...(uploadedAttachments.length > 0
+          ? { attachments: uploadedAttachments }
+          : {}),
+      };
+
+      // Ensure a conversation exists (create lazily on first message)
+      if (!state.conversation) {
+        try {
+          await this.createConversation();
+          // Update the conversation ID on the user message
+          const updatedState = this.stateManager.getState();
+          userMessage.conversationId = updatedState.conversation?.id ?? '';
+        } catch (createError) {
+          this.logger.error('Failed to create conversation', createError);
+          const error: ChatbotError = {
+            code: 'CONVERSATION_CREATE_FAILED',
+            message: 'Failed to start a new conversation',
+          };
+          config.onError(error);
+          return;
+        }
+      }
+
+      // Add optimistic message to state and render
+      this.stateManager.addMessage(userMessage);
+      this.messageRenderer?.addMessage(userMessage);
+
+      // Clear quick replies from previous turn
+      this.messageRenderer?.clearQuickReplies();
+
+      // Clear input and disable while waiting for response
+      this.inputRenderer?.clear();
+      this.inputRenderer?.setDisabled(true);
+      this.stateManager.setLoading(true);
+
+      // Track analytics
+      if (this.tracker) {
+        const conversationId =
+          this.stateManager.getState().conversation?.id ?? '';
+        this.tracker.trackMessageSent(conversationId, trimmedText.length);
+      }
+
+      try {
+        const conversationId = this.stateManager.getState().conversation!.id;
+
+        // Update message status to 'sent'
+        this.stateManager.updateMessageStatus(userMessage.id, 'sent');
+        this.messageRenderer?.updateMessage(userMessage.id, { status: 'sent' });
+
+        // Choose streaming or polling based on server feature flags
+        const serverConfig = this.configManager.getServerConfig();
+        const useStreaming =
+          this.streamingClient !== null &&
+          serverConfig?.features.streaming === true;
+
+        if (useStreaming) {
+          await this.sendMessageWithStreaming(conversationId, trimmedText);
+        } else {
+          await this.sendMessageWithPolling(conversationId, trimmedText);
+        }
+
+        // Persist state after successful response
+        this.stateManager.persist();
+      } catch (sendError) {
+        this.logger.error('Failed to send message', sendError);
+
+        // Hide typing indicator
+        this.stateManager.setTyping(false);
+        this.typingRenderer?.hide();
+
+        // Update message status to 'error'
+        this.stateManager.updateMessageStatus(userMessage.id, 'error');
+        this.messageRenderer?.updateMessage(userMessage.id, {
+          status: 'error',
+        });
+
+        // Surface error
+        const chatbotError: ChatbotError =
+          sendError !== null &&
+          typeof sendError === 'object' &&
+          'code' in sendError
+            ? (sendError as ChatbotError)
+            : {
+                code: 'MESSAGE_SEND_FAILED',
+                message:
+                  sendError instanceof Error
+                    ? sendError.message
+                    : 'Failed to send message',
+              };
+
         this.showInlineError(
-          this.i18n.format('rateLimitCountdown', { seconds: retrySeconds }),
+          chatbotError.code === 'RATE_LIMIT_EXCEEDED' ||
+            chatbotError.code === 'RATE_LIMITED'
+            ? this.i18n.t('rateLimitError')
+            : this.i18n.t('messageSendError')
         );
 
-        // Disable input during cooldown and re-enable when it expires
-        this.inputRenderer?.setDisabled(true);
-        this.scheduleRateLimitRecovery(retryAfterMs);
-
-        return;
+        config.onError(chatbotError);
+      } finally {
+        // Re-enable input
+        this.stateManager.setLoading(false);
+        this.inputRenderer?.setDisabled(false);
+        this.inputRenderer?.focus();
       }
-      // Re-throw non-rate-limit errors
-      throw rateLimitError;
-    }
-
-    const config = this.configManager.getConfig();
-    const state = this.stateManager.getState();
-
-    // Upload any pending file attachments before building the user message.
-    // Each file is uploaded in parallel; failed uploads are filtered out.
-    let uploadedAttachments: FileAttachment[] = [];
-    if (pendingAttachments.length > 0 && this.fileUploadService) {
-      const uploadPromises = pendingAttachments.map(async (attachment) => {
-        if (attachment.status === 'uploaded' && attachment.url) {
-          return attachment; // Already uploaded
-        }
-        try {
-          const result = await this.fileUploadService!.upload(
-            attachment.file,
-            (progress) => {
-              this.inputRenderer?.updateAttachment(attachment.id, {
-                progress,
-                status: 'uploading',
-              });
-            },
-          );
-          const updateData: Partial<FileAttachment> = {
-            status: result.status,
-            progress: result.progress,
-          };
-          if (result.url) updateData.url = result.url;
-          if (result.error) updateData.error = result.error;
-          this.inputRenderer?.updateAttachment(attachment.id, updateData);
-          return result;
-        } catch {
-          this.inputRenderer?.updateAttachment(attachment.id, {
-            status: 'error',
-            error: 'Upload failed',
-          });
-          return null;
-        }
-      });
-
-      const results = await Promise.all(uploadPromises);
-      uploadedAttachments = results.filter(
-        (r): r is FileAttachment => r !== null && r.status === 'uploaded',
-      );
-    }
-
-    // Create optimistic user message
-    const userMessage: ChatMessage = {
-      id: generateMessageId(),
-      conversationId: state.conversation?.id ?? '',
-      role: 'user',
-      content: trimmedText,
-      type: 'text',
-      timestamp: new Date().toISOString(),
-      status: 'sending',
-      ...(uploadedAttachments.length > 0 ? { attachments: uploadedAttachments } : {}),
-    };
-
-    // Ensure a conversation exists (create lazily on first message)
-    if (!state.conversation) {
-      try {
-        await this.createConversation();
-        // Update the conversation ID on the user message
-        const updatedState = this.stateManager.getState();
-        userMessage.conversationId = updatedState.conversation?.id ?? '';
-      } catch (createError) {
-        this.logger.error('Failed to create conversation', createError);
-        const error: ChatbotError = {
-          code: 'CONVERSATION_CREATE_FAILED',
-          message: 'Failed to start a new conversation',
-        };
-        config.onError(error);
-        return;
-      }
-    }
-
-    // Add optimistic message to state and render
-    this.stateManager.addMessage(userMessage);
-    this.messageRenderer?.addMessage(userMessage);
-
-    // Clear quick replies from previous turn
-    this.messageRenderer?.clearQuickReplies();
-
-    // Clear input and disable while waiting for response
-    this.inputRenderer?.clear();
-    this.inputRenderer?.setDisabled(true);
-    this.stateManager.setLoading(true);
-
-    // Track analytics
-    if (this.tracker) {
-      const conversationId = this.stateManager.getState().conversation?.id ?? '';
-      this.tracker.trackMessageSent(conversationId, trimmedText.length);
-    }
-
-    try {
-      const conversationId = this.stateManager.getState().conversation!.id;
-
-      // Update message status to 'sent'
-      this.stateManager.updateMessageStatus(userMessage.id, 'sent');
-      this.messageRenderer?.updateMessage(userMessage.id, { status: 'sent' });
-
-      // Choose streaming or polling based on server feature flags
-      const serverConfig = this.configManager.getServerConfig();
-      const useStreaming =
-        this.streamingClient !== null &&
-        serverConfig?.features.streaming === true;
-
-      if (useStreaming) {
-        await this.sendMessageWithStreaming(conversationId, trimmedText);
-      } else {
-        await this.sendMessageWithPolling(conversationId, trimmedText);
-      }
-
-      // Persist state after successful response
-      this.stateManager.persist();
-    } catch (sendError) {
-      this.logger.error('Failed to send message', sendError);
-
-      // Hide typing indicator
-      this.stateManager.setTyping(false);
-      this.typingRenderer?.hide();
-
-      // Update message status to 'error'
-      this.stateManager.updateMessageStatus(userMessage.id, 'error');
-      this.messageRenderer?.updateMessage(userMessage.id, { status: 'error' });
-
-      // Surface error
-      const chatbotError: ChatbotError = (sendError !== null &&
-        typeof sendError === 'object' &&
-        'code' in sendError)
-        ? sendError as ChatbotError
-        : {
-            code: 'MESSAGE_SEND_FAILED',
-            message: sendError instanceof Error ? sendError.message : 'Failed to send message',
-          };
-
-      this.showInlineError(
-        (chatbotError.code === 'RATE_LIMIT_EXCEEDED' || chatbotError.code === 'RATE_LIMITED')
-          ? this.i18n.t('rateLimitError')
-          : this.i18n.t('messageSendError'),
-      );
-
-      config.onError(chatbotError);
-    } finally {
-      // Re-enable input
-      this.stateManager.setLoading(false);
-      this.inputRenderer?.setDisabled(false);
-      this.inputRenderer?.focus();
-    }
     }, 'sendMessage');
   }
 
@@ -1197,7 +1247,9 @@ export class ChatbotWidget {
 
       // Create a pending attachment with a local preview
       const thumbnailUrl = this.fileUploadService.createPreview(file);
-      const id = crypto?.randomUUID?.() ?? `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const id =
+        crypto?.randomUUID?.() ??
+        `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
       const attachment: FileAttachment = {
         id,
@@ -1270,7 +1322,7 @@ export class ChatbotWidget {
    */
   private async sendMessageWithStreaming(
     conversationId: string,
-    content: string,
+    content: string
   ): Promise<void> {
     if (!this.streamingClient) return;
 
@@ -1302,7 +1354,11 @@ export class ChatbotWidget {
     this.messageRenderer?.scrollToBottom(true);
 
     // Build the streaming request, including ticketId from config if available
-    const streamingRequest: { content: string; type?: string; metadata?: Record<string, unknown> } = { content };
+    const streamingRequest: {
+      content: string;
+      type?: string;
+      metadata?: Record<string, unknown>;
+    } = { content };
     if (config.ticketId) {
       streamingRequest.metadata = { ticketId: config.ticketId };
     }
@@ -1338,7 +1394,11 @@ export class ChatbotWidget {
           }
 
           // Update the streaming bubble with the accumulated text so far
-          this.messageRenderer?.updateMessageContent(botMessageId, accumulated, true);
+          this.messageRenderer?.updateMessageContent(
+            botMessageId,
+            accumulated,
+            true
+          );
         },
 
         onComplete: (completedMessage) => {
@@ -1347,7 +1407,10 @@ export class ChatbotWidget {
 
           // If the server assigned a different ID we still update our local element,
           // then re-register it under the server ID for future lookups.
-          this.messageRenderer?.finalizeStreamingMessage(botMessageId, completedMessage.content);
+          this.messageRenderer?.finalizeStreamingMessage(
+            botMessageId,
+            completedMessage.content
+          );
 
           // Add the completed message to state so it persists
           this.stateManager.addMessage(completedMessage);
@@ -1394,7 +1457,7 @@ export class ChatbotWidget {
           this.showInlineError(
             streamError.code === 'RATE_LIMIT_EXCEEDED'
               ? this.i18n.t('rateLimitError')
-              : this.i18n.t('messageSendError'),
+              : this.i18n.t('messageSendError')
           );
 
           config.onError(streamError);
@@ -1405,13 +1468,16 @@ export class ChatbotWidget {
             replies,
             (reply: QuickReply) => {
               void this.handleQuickReply(reply);
-            },
+            }
           );
 
           // Focus first quick reply for keyboard users (WCAG 2.4.3)
-          setTimeout(this.errorBoundary.guardTimer(() => {
-            this.focusFirstQuickReply();
-          }, 'streamingQuickReplyFocus'), 50);
+          setTimeout(
+            this.errorBoundary.guardTimer(() => {
+              this.focusFirstQuickReply();
+            }, 'streamingQuickReplyFocus'),
+            50
+          );
         },
 
         // Server → Client: agent typing status via SSE
@@ -1422,7 +1488,7 @@ export class ChatbotWidget {
         onAgentTypingStop: (event) => {
           this.typingStatusService?.handleServerTypingEvent(event);
         },
-      },
+      }
     );
   }
 
@@ -1440,7 +1506,7 @@ export class ChatbotWidget {
    */
   private async sendMessageWithPolling(
     conversationId: string,
-    content: string,
+    content: string
   ): Promise<void> {
     if (!this.conversationService) return;
 
@@ -1456,10 +1522,9 @@ export class ChatbotWidget {
     // re-throws so the outer catch in sendMessage() handles the UI update.
     let response: import('./types').SendMessageResponse;
     try {
-      response = await this.conversationService.sendMessage(
-        conversationId,
-        { content },
-      );
+      response = await this.conversationService.sendMessage(conversationId, {
+        content,
+      });
       // Report success to reset retry counter and restore 'connected' status.
       this.connectionManager?.reportSuccess();
     } catch (pollError) {
@@ -1485,14 +1550,17 @@ export class ChatbotWidget {
         response.quickReplies,
         (reply: QuickReply) => {
           void this.handleQuickReply(reply);
-        },
+        }
       );
 
       // Focus the first quick reply button so keyboard users can navigate
       // immediately with Arrow keys (WCAG 2.1.1, 2.4.3).
-      setTimeout(this.errorBoundary.guardTimer(() => {
-        this.focusFirstQuickReply();
-      }, 'pollingQuickReplyFocus'), 50);
+      setTimeout(
+        this.errorBoundary.guardTimer(() => {
+          this.focusFirstQuickReply();
+        }, 'pollingQuickReplyFocus'),
+        50
+      );
     }
 
     // Scroll to show the new message
@@ -1539,7 +1607,9 @@ export class ChatbotWidget {
       // Close existing conversation on the server (fire-and-forget)
       if (state.conversation && this.conversationService) {
         try {
-          await this.conversationService.closeConversation(state.conversation.id);
+          await this.conversationService.closeConversation(
+            state.conversation.id
+          );
         } catch {
           // Non-fatal: logged inside ConversationService
         }
@@ -1581,9 +1651,11 @@ export class ChatbotWidget {
    * ```
    */
   getState(): Readonly<ConversationState> {
-    return this.errorBoundary.guard(() => {
-      return this.stateManager.getState();
-    }, 'getState') ?? this.getDefaultState();
+    return (
+      this.errorBoundary.guard(() => {
+        return this.stateManager.getState();
+      }, 'getState') ?? this.getDefaultState()
+    );
   }
 
   /**
@@ -1746,7 +1818,7 @@ export class ChatbotWidget {
    */
   private async loadFonts(
     config: Readonly<Required<import('./types').ChatbotConfig>>,
-    serverConfig: import('./types').ServerChatbotConfig,
+    serverConfig: import('./types').ServerChatbotConfig
   ): Promise<void> {
     const fontLoadPromises: Promise<void>[] = [];
     let primaryFontFamily: string | null = null;
@@ -1755,11 +1827,15 @@ export class ChatbotWidget {
     // Custom @font-face rules are injected into both document.head and the
     // shadow root for cross-browser compatibility (some browsers do not
     // inherit @font-face from the outer document into shadow DOM).
-    const queueFont = (fontConfig: import('./types').FontConfig | undefined | null): void => {
+    const queueFont = (
+      fontConfig: import('./types').FontConfig | undefined | null
+    ): void => {
       if (!fontConfig?.family) return;
 
       if (fontConfig.type === 'GOOGLE_FONT') {
-        fontLoadPromises.push(this.fontLoader.loadGoogleFont(fontConfig.family));
+        fontLoadPromises.push(
+          this.fontLoader.loadGoogleFont(fontConfig.family)
+        );
         if (!primaryFontFamily) primaryFontFamily = fontConfig.family;
       } else if (fontConfig.type === 'CUSTOM_FONT') {
         this.fontLoader.loadCustomFont(fontConfig, this.shadow ?? undefined);
@@ -1770,7 +1846,9 @@ export class ChatbotWidget {
 
     // 1. Explicit fonts array from host app config (cast through unknown since
     //    fonts is declared in ChatbotConfig but Required<> preserves it as optional)
-    const fontsArray = (config as unknown as { fonts?: import('./types').FontConfig[] }).fonts;
+    const fontsArray = (
+      config as unknown as { fonts?: import('./types').FontConfig[] }
+    ).fonts;
     if (Array.isArray(fontsArray)) {
       for (const fontConfig of fontsArray) {
         queueFont(fontConfig);
@@ -1793,7 +1871,8 @@ export class ChatbotWidget {
       !primaryFontFamily &&
       /^[A-Z]/.test(plainFamily.trim())
     ) {
-      const cleanFamily = plainFamily.split(',')[0]?.trim().replace(/['"]/g, '') ?? plainFamily;
+      const cleanFamily =
+        plainFamily.split(',')[0]?.trim().replace(/['"]/g, '') ?? plainFamily;
       fontLoadPromises.push(this.fontLoader.loadGoogleFont(cleanFamily));
       primaryFontFamily = cleanFamily;
     }
@@ -1811,9 +1890,11 @@ export class ChatbotWidget {
     if (primaryFontFamily && this.rootElement) {
       this.rootElement.style.setProperty(
         '--nev-cb-font-family',
-        `'${primaryFontFamily}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`,
+        `'${primaryFontFamily}', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`
       );
-      this.logger.debug('Font family applied', { fontFamily: primaryFontFamily });
+      this.logger.debug('Font family applied', {
+        fontFamily: primaryFontFamily,
+      });
     }
   }
 
@@ -1830,7 +1911,7 @@ export class ChatbotWidget {
    */
   private renderUI(
     serverConfig: ServerChatbotConfig,
-    persistedState: PersistedConversationState | null,
+    persistedState: PersistedConversationState | null
   ): void {
     if (!this.rootElement) return;
 
@@ -1839,7 +1920,8 @@ export class ChatbotWidget {
 
     // Determine header content from server config
     const headerTitle = serverConfig.name || this.i18n.t('defaultTitle');
-    const headerSubtitle = serverConfig.description || this.i18n.t('statusOnline');
+    const headerSubtitle =
+      serverConfig.description || this.i18n.t('statusOnline');
     const headerAvatar = serverConfig.avatar;
 
     // Render bubble (floating mode only).
@@ -1848,7 +1930,7 @@ export class ChatbotWidget {
       this.bubbleRenderer = new BubbleRenderer(
         config.position,
         config.styles.bubble,
-        this.i18n,
+        this.i18n
       );
       const renderTarget = this.shadow ?? this.rootElement;
       this.bubbleRenderer.render(() => {
@@ -1863,7 +1945,7 @@ export class ChatbotWidget {
       config.styles.window,
       config.styles.header,
       this.i18n,
-      this.shadow ?? undefined,
+      this.shadow ?? undefined
     );
 
     const windowRenderOptions: {
@@ -1903,7 +1985,7 @@ export class ChatbotWidget {
       config.styles.messages,
       config.styles.quickReplies,
       this.i18n,
-      MessageSanitizer,
+      MessageSanitizer
     );
 
     const messageListElement = this.messageRenderer.render();
@@ -1920,21 +2002,19 @@ export class ChatbotWidget {
     this.typingRenderer = new TypingRenderer(
       config.styles.messages,
       this.i18n,
-      this.shadow ?? undefined,
+      this.shadow ?? undefined
     );
 
     const typingElement = this.typingRenderer.render();
     this.windowRenderer.getBody().appendChild(typingElement);
 
     // Render input in window footer
-    this.inputRenderer = new InputRenderer(
-      config.styles.input,
-      this.i18n,
-    );
+    this.inputRenderer = new InputRenderer(config.styles.input, this.i18n);
 
-    const placeholder = config.placeholder
-      || serverConfig.placeholder
-      || this.i18n.t('inputPlaceholder');
+    const placeholder =
+      config.placeholder ||
+      serverConfig.placeholder ||
+      this.i18n.t('inputPlaceholder');
 
     const inputRenderOptions: Parameters<InputRenderer['render']>[0] = {
       onSend: (text: string) => {
@@ -1947,8 +2027,12 @@ export class ChatbotWidget {
     // Properties are added conditionally to satisfy exactOptionalPropertyTypes.
     if (this.typingStatusService) {
       const typingSvc = this.typingStatusService;
-      inputRenderOptions.onTyping = () => { typingSvc.notifyTyping(); };
-      inputRenderOptions.onStoppedTyping = () => { typingSvc.notifyStoppedTyping(); };
+      inputRenderOptions.onTyping = () => {
+        typingSvc.notifyTyping();
+      };
+      inputRenderOptions.onStoppedTyping = () => {
+        typingSvc.notifyStoppedTyping();
+      };
     }
 
     if (this.fileUploadService) {
@@ -1988,7 +2072,8 @@ export class ChatbotWidget {
   private renderWelcomeMessage(): void {
     const config = this.configManager.getConfig();
     const serverConfig = this.configManager.getServerConfig();
-    const welcomeText = config.welcomeMessage || serverConfig?.welcomeMessage || '';
+    const welcomeText =
+      config.welcomeMessage || serverConfig?.welcomeMessage || '';
 
     if (welcomeText && this.messageRenderer) {
       this.messageRenderer.renderWelcome(welcomeText);
@@ -2101,13 +2186,20 @@ export class ChatbotWidget {
    *
    * @param action - The {@link ActionButton} that was activated
    */
-  private async handleRichContentAction(action: import('./types').ActionButton): Promise<void> {
+  private async handleRichContentAction(
+    action: import('./types').ActionButton
+  ): Promise<void> {
     if (this.tracker) {
-      const conversationId = this.stateManager.getState().conversation?.id ?? '';
+      const conversationId =
+        this.stateManager.getState().conversation?.id ?? '';
       // Re-use the quick-reply tracking event; the action id / label carry the
       // rich content context.  A dedicated rich_content event can be added to
       // ChatbotTracker in a follow-up without changing this call-site.
-      this.tracker.trackQuickReplyClick(conversationId, action.id, action.label);
+      this.tracker.trackQuickReplyClick(
+        conversationId,
+        action.id,
+        action.label
+      );
     }
 
     if (action.type === 'postback') {
@@ -2264,12 +2356,17 @@ export class ChatbotWidget {
     // The bubble's button element is not directly exposed, so we query for it.
     // In Shadow DOM the element lives inside the shadow root, not the document.
     const searchRoot: ParentNode = this.shadow ?? document;
-    const bubbleButton = searchRoot.querySelector<HTMLButtonElement>('.nevent-chatbot-bubble');
+    const bubbleButton = searchRoot.querySelector<HTMLButtonElement>(
+      '.nevent-chatbot-bubble'
+    );
     if (bubbleButton) {
       // Small delay to let the window close animation complete
-      setTimeout(this.errorBoundary.guardTimer(() => {
-        bubbleButton.focus();
-      }, 'returnFocusToBubble'), 160);
+      setTimeout(
+        this.errorBoundary.guardTimer(() => {
+          bubbleButton.focus();
+        }, 'returnFocusToBubble'),
+        160
+      );
     }
   }
 
@@ -2283,7 +2380,7 @@ export class ChatbotWidget {
     // In Shadow DOM the quick reply buttons live inside the shadow root.
     const searchRoot: ParentNode = this.shadow ?? document;
     const firstQR = searchRoot.querySelector<HTMLButtonElement>(
-      '.nevent-chatbot-quick-reply-button',
+      '.nevent-chatbot-quick-reply-button'
     );
     if (firstQR) {
       firstQR.focus();
@@ -2341,9 +2438,12 @@ export class ChatbotWidget {
     body.appendChild(errorEl);
 
     // Auto-remove after 4 seconds
-    setTimeout(this.errorBoundary.guardTimer(() => {
-      errorEl.remove();
-    }, 'errorAutoRemove'), 4000);
+    setTimeout(
+      this.errorBoundary.guardTimer(() => {
+        errorEl.remove();
+      }, 'errorAutoRemove'),
+      4000
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -2376,7 +2476,7 @@ export class ChatbotWidget {
           this.inputRenderer?.focus();
         }
       }, 'rateLimitRecovery'),
-      delayMs,
+      delayMs
     );
   }
 
@@ -2405,7 +2505,10 @@ export class ChatbotWidget {
         break;
 
       case 'reconnecting':
-        this.showConnectionBanner('reconnecting', this.i18n.t('connectionReconnecting'));
+        this.showConnectionBanner(
+          'reconnecting',
+          this.i18n.t('connectionReconnecting')
+        );
         this.inputRenderer?.setDisabled(true);
         break;
 
@@ -2417,7 +2520,10 @@ export class ChatbotWidget {
 
       case 'connected':
         // Only show recovery banner when recovering from a degraded state.
-        this.showConnectionBanner('connected', this.i18n.t('connectionReconnected'));
+        this.showConnectionBanner(
+          'connected',
+          this.i18n.t('connectionReconnected')
+        );
         this.inputRenderer?.setDisabled(false);
 
         // Auto-hide the "Reconnected" banner after 3 seconds.
@@ -2429,7 +2535,7 @@ export class ChatbotWidget {
             this.hideConnectionBanner();
             this.connectionBannerTimer = null;
           }, 'connectionBannerAutoHide'),
-          3000,
+          3000
         );
         break;
     }
@@ -2447,7 +2553,7 @@ export class ChatbotWidget {
    */
   private showConnectionBanner(
     variant: 'offline' | 'reconnecting' | 'connected',
-    message: string,
+    message: string
   ): void {
     if (!this.connectionBanner) return;
 
@@ -2487,7 +2593,9 @@ export class ChatbotWidget {
     }
 
     this.connectionBanner.innerHTML = `${iconHtml}<span>${message}</span>`;
-    this.connectionBanner.classList.add(`nevent-chatbot-connection-banner--${variant}`);
+    this.connectionBanner.classList.add(
+      `nevent-chatbot-connection-banner--${variant}`
+    );
   }
 
   /**

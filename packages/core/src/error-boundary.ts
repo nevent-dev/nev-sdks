@@ -169,7 +169,7 @@ export class ErrorBoundary {
    */
   async guardAsync<T>(
     fn: () => Promise<T>,
-    context?: string,
+    context?: string
   ): Promise<T | undefined> {
     try {
       return await fn();
@@ -204,7 +204,7 @@ export class ErrorBoundary {
    */
   wrapCallback<T extends (...args: unknown[]) => unknown>(
     fn: T | undefined | null,
-    context?: string,
+    context?: string
   ): T {
     if (!fn) return (() => {}) as unknown as T;
 
@@ -356,7 +356,7 @@ export class ErrorBoundary {
     if (this.debug) {
       console.error(
         `${this.logPrefix} Error in ${context ?? 'unknown'}:`,
-        error,
+        error
       );
     }
 
@@ -368,7 +368,7 @@ export class ErrorBoundary {
       // In debug mode, log this meta-error separately.
       if (this.debug) {
         console.error(
-          `${this.logPrefix} Error handler itself threw -- swallowed`,
+          `${this.logPrefix} Error handler itself threw -- swallowed`
         );
       }
     }

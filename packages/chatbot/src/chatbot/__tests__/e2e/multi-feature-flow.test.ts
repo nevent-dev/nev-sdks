@@ -16,7 +16,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ChatbotWidget } from '../../../chatbot-widget';
 import { createMockApi } from '../helpers/mock-api';
-import { createMockConfig, createMockServerConfig } from '../helpers/mock-factories';
+import {
+  createMockConfig,
+  createMockServerConfig,
+} from '../helpers/mock-factories';
 import {
   createInitializedWidget,
   flushPromises,
@@ -42,7 +45,9 @@ describe('E2E: Multi-Feature Flow', () => {
   afterEach(() => {
     cleanup?.();
     cleanup = null;
-    document.querySelectorAll('#nevent-chatbot-host').forEach((el) => el.remove());
+    document
+      .querySelectorAll('#nevent-chatbot-host')
+      .forEach((el) => el.remove());
     localStorage.clear();
   });
 
@@ -52,7 +57,11 @@ describe('E2E: Multi-Feature Flow', () => {
 
   describe('Text message with bot response', () => {
     it('should show user message and bot response in correct order', async () => {
-      const { widget, shadowRoot, cleanup: c } = await createInitializedWidget();
+      const {
+        widget,
+        shadowRoot,
+        cleanup: c,
+      } = await createInitializedWidget();
       cleanup = c;
 
       widget.open();
@@ -86,7 +95,11 @@ describe('E2E: Multi-Feature Flow', () => {
 
   describe('Theme configuration', () => {
     it('should initialize with light theme by default', async () => {
-      const { widget, shadowRoot, cleanup: c } = await createInitializedWidget({
+      const {
+        widget,
+        shadowRoot,
+        cleanup: c,
+      } = await createInitializedWidget({
         theme: 'light',
       });
       cleanup = c;
@@ -97,7 +110,11 @@ describe('E2E: Multi-Feature Flow', () => {
     });
 
     it('should initialize with dark theme when configured', async () => {
-      const { widget, shadowRoot, cleanup: c } = await createInitializedWidget({
+      const {
+        widget,
+        shadowRoot,
+        cleanup: c,
+      } = await createInitializedWidget({
         theme: 'dark',
       });
       cleanup = c;
@@ -109,7 +126,11 @@ describe('E2E: Multi-Feature Flow', () => {
     });
 
     it('should initialize with auto theme', async () => {
-      const { widget, shadowRoot, cleanup: c } = await createInitializedWidget({
+      const {
+        widget,
+        shadowRoot,
+        cleanup: c,
+      } = await createInitializedWidget({
         theme: 'auto',
       });
       cleanup = c;
@@ -119,7 +140,11 @@ describe('E2E: Multi-Feature Flow', () => {
     });
 
     it('should apply server theme mode when user uses default', async () => {
-      const { widget, shadowRoot, cleanup: c } = await createInitializedWidget(
+      const {
+        widget,
+        shadowRoot,
+        cleanup: c,
+      } = await createInitializedWidget(
         {}, // default theme is 'light'
         {
           serverConfig: {
@@ -147,7 +172,9 @@ describe('E2E: Multi-Feature Flow', () => {
       cleanup = c;
 
       // Check for Spanish placeholder or UI element
-      const textarea = shadowRoot.querySelector('textarea') as HTMLTextAreaElement;
+      const textarea = shadowRoot.querySelector(
+        'textarea'
+      ) as HTMLTextAreaElement;
       if (textarea) {
         // Spanish placeholder should be set
         expect(textarea.placeholder).toBeDefined();
@@ -161,7 +188,9 @@ describe('E2E: Multi-Feature Flow', () => {
       });
       cleanup = c;
 
-      const textarea = shadowRoot.querySelector('textarea') as HTMLTextAreaElement;
+      const textarea = shadowRoot.querySelector(
+        'textarea'
+      ) as HTMLTextAreaElement;
       if (textarea) {
         expect(textarea.placeholder).toBeDefined();
         expect(textarea.placeholder.length).toBeGreaterThan(0);
@@ -174,7 +203,9 @@ describe('E2E: Multi-Feature Flow', () => {
       });
       cleanup = c;
 
-      const textarea = shadowRoot.querySelector('textarea') as HTMLTextAreaElement;
+      const textarea = shadowRoot.querySelector(
+        'textarea'
+      ) as HTMLTextAreaElement;
       if (textarea) {
         expect(textarea.placeholder).toBeDefined();
       }
@@ -186,7 +217,9 @@ describe('E2E: Multi-Feature Flow', () => {
       });
       cleanup = c;
 
-      const textarea = shadowRoot.querySelector('textarea') as HTMLTextAreaElement;
+      const textarea = shadowRoot.querySelector(
+        'textarea'
+      ) as HTMLTextAreaElement;
       if (textarea) {
         expect(textarea.placeholder).toBeDefined();
       }
@@ -518,15 +551,14 @@ describe('E2E: Multi-Feature Flow', () => {
 
     it('should strip dangerous CSS patterns', async () => {
       const { shadowRoot, cleanup: c } = await createInitializedWidget({
-        customCSS: '@import url("https://evil.com/steal.css"); .safe { color: blue; }',
+        customCSS:
+          '@import url("https://evil.com/steal.css"); .safe { color: blue; }',
       });
       cleanup = c;
 
       // @import should be stripped
       const styles = Array.from(shadowRoot.querySelectorAll('style'));
-      const hasImport = styles.some((s) =>
-        s.textContent?.includes('@import')
-      );
+      const hasImport = styles.some((s) => s.textContent?.includes('@import'));
       expect(hasImport).toBe(false);
     });
   });

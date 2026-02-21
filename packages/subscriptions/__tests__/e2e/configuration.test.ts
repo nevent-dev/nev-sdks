@@ -580,7 +580,9 @@ describe('Configuration Variations (E2E)', () => {
       await widget.init();
 
       const shadow = getShadowRoot(container)!;
-      const labels = shadow.querySelectorAll('.nevent-field-label:not(.nevent-sr-only)');
+      const labels = shadow.querySelectorAll(
+        '.nevent-field-label:not(.nevent-sr-only)'
+      );
       expect(labels.length).toBeGreaterThan(0);
 
       widget.destroy();
@@ -710,7 +712,12 @@ describe('Configuration Variations (E2E)', () => {
                 { type: 'field', key: 'email', width: 50, order: 1 },
                 { type: 'field', key: 'firstName', width: 50, order: 2 },
                 { type: 'legalTerms', key: 'legalTerms', width: 100, order: 3 },
-                { type: 'submitButton', key: 'submitButton', width: 100, order: 4 },
+                {
+                  type: 'submitButton',
+                  key: 'submitButton',
+                  width: 100,
+                  order: 4,
+                },
               ],
             },
           },
@@ -756,7 +763,12 @@ describe('Configuration Variations (E2E)', () => {
             global: {
               layoutElements: [
                 { type: 'field', key: 'email', width: 75, order: 1 },
-                { type: 'submitButton', key: 'submitButton', width: 25, order: 2 },
+                {
+                  type: 'submitButton',
+                  key: 'submitButton',
+                  width: 25,
+                  order: 2,
+                },
                 { type: 'legalTerms', key: 'legalTerms', width: 100, order: 3 },
               ],
             },
@@ -770,13 +782,15 @@ describe('Configuration Variations (E2E)', () => {
       const shadow = getShadowRoot(container)!;
 
       // Email field should have 75% width
-      const emailField = shadow.querySelector('[data-field-name="email"]') as HTMLElement;
+      const emailField = shadow.querySelector(
+        '[data-field-name="email"]'
+      ) as HTMLElement;
       expect(emailField).not.toBeNull();
       expect(emailField.style.width).toContain('75%');
 
       // Submit button container should have 25% width
       const submitContainer = shadow.querySelector(
-        '.nevent-submit-button-container',
+        '.nevent-submit-button-container'
       ) as HTMLElement;
       expect(submitContainer).not.toBeNull();
       expect(submitContainer.style.width).toContain('25%');
@@ -831,7 +845,9 @@ describe('Configuration Variations (E2E)', () => {
       const { widget } = createWidget();
       await widget.init();
 
-      const fontLink = document.getElementById('nevent-google-fonts') as HTMLLinkElement;
+      const fontLink = document.getElementById(
+        'nevent-google-fonts'
+      ) as HTMLLinkElement;
       expect(fontLink).not.toBeNull();
       expect(fontLink.href).toContain('fonts.googleapis.com');
       expect(fontLink.href).toContain('Open+Sans');
@@ -879,7 +895,9 @@ describe('Configuration Variations (E2E)', () => {
       });
       await widget.init();
 
-      const hostEl = container.querySelector('[data-nevent-widget="newsletter"]');
+      const hostEl = container.querySelector(
+        '[data-nevent-widget="newsletter"]'
+      );
       expect(hostEl).not.toBeNull();
 
       widget.destroy();
@@ -898,7 +916,7 @@ describe('Configuration Variations (E2E)', () => {
       await widget.init();
 
       const hostEl = classContainer.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       );
       expect(hostEl).not.toBeNull();
 

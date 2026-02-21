@@ -131,7 +131,9 @@ export function createMockApi(options: MockApiOptions = {}): MockApiHandle {
    * @param responseFactory - Function returning a mock Response
    * @returns A Promise resolving to the mocked Response
    */
-  async function withLatency(responseFactory: () => Response): Promise<Response> {
+  async function withLatency(
+    responseFactory: () => Response
+  ): Promise<Response> {
     if (latency <= 0) {
       return responseFactory();
     }
@@ -157,11 +159,12 @@ export function createMockApi(options: MockApiOptions = {}): MockApiHandle {
   const mockFetch = async (input: RequestInfo | URL): Promise<Response> => {
     _callCount++;
 
-    const url = typeof input === 'string'
-      ? input
-      : input instanceof URL
-        ? input.href
-        : (input as Request).url;
+    const url =
+      typeof input === 'string'
+        ? input
+        : input instanceof URL
+          ? input.href
+          : (input as Request).url;
 
     // Route: GET /public/chatbot/{id}/config
     if (url.includes('/config')) {
@@ -175,11 +178,14 @@ export function createMockApi(options: MockApiOptions = {}): MockApiHandle {
 
     // Route: POST /chatbot/typing (typing status notifications)
     if (url.includes('/chatbot/typing')) {
-      return withLatency(() => ({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as unknown as Response));
+      return withLatency(
+        () =>
+          ({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ success: true }),
+          }) as unknown as Response
+      );
     }
 
     // Route: GET /chatbot/messages (message history)
@@ -197,11 +203,14 @@ export function createMockApi(options: MockApiOptions = {}): MockApiHandle {
 
     // Route: POST .../close (conversation close — respond with 200)
     if (url.includes('/close')) {
-      return withLatency(() => ({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ success: true }),
-      } as unknown as Response));
+      return withLatency(
+        () =>
+          ({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({ success: true }),
+          }) as unknown as Response
+      );
     }
 
     // Fallback: unknown endpoint
@@ -209,7 +218,8 @@ export function createMockApi(options: MockApiOptions = {}): MockApiHandle {
     return {
       ok: false,
       status: 404,
-      json: () => Promise.resolve({ success: false, message: `Not found: ${url}` }),
+      json: () =>
+        Promise.resolve({ success: false, message: `Not found: ${url}` }),
     } as unknown as Response;
   };
 
@@ -227,6 +237,8 @@ export function createMockApi(options: MockApiOptions = {}): MockApiHandle {
   return {
     mockFetch: mockFetch as typeof fetch,
     reset,
-    get callCount() { return _callCount; },
+    get callCount() {
+      return _callCount;
+    },
   };
 }

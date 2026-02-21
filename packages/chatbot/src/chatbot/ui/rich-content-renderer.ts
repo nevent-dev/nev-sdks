@@ -87,7 +87,7 @@ export class RichContentRenderer {
    */
   constructor(
     private readonly sanitizer: typeof MessageSanitizer,
-    private readonly i18n: I18nManager,
+    private readonly i18n: I18nManager
   ) {}
 
   // --------------------------------------------------------------------------
@@ -106,7 +106,10 @@ export class RichContentRenderer {
    *   is activated.  Receives the full `ActionButton` object.
    * @returns A fully-constructed `HTMLElement` for the given content type.
    */
-  render(content: RichContent, onAction?: (action: ActionButton) => void): HTMLElement {
+  render(
+    content: RichContent,
+    onAction?: (action: ActionButton) => void
+  ): HTMLElement {
     switch (content.type) {
       case 'card':
         return this.renderCard(content, onAction);
@@ -140,13 +143,19 @@ export class RichContentRenderer {
    * @param onAction - Callback for button interactions.
    * @returns Card `HTMLElement`.
    */
-  renderCard(content: RichContent, onAction?: (action: ActionButton) => void): HTMLElement {
+  renderCard(
+    content: RichContent,
+    onAction?: (action: ActionButton) => void
+  ): HTMLElement {
     const card = document.createElement('div');
     card.className = 'nevent-chatbot-card';
 
     // ---------- Image ----------
     if (content.imageUrl) {
-      const imgWrapper = this.buildCardImage(content.imageUrl, content.alt ?? content.title ?? '');
+      const imgWrapper = this.buildCardImage(
+        content.imageUrl,
+        content.alt ?? content.title ?? ''
+      );
       card.appendChild(imgWrapper);
     }
 
@@ -198,7 +207,10 @@ export class RichContentRenderer {
    * @param onAction - Callback forwarded to each card's action buttons.
    * @returns Carousel wrapper `HTMLElement`.
    */
-  renderCarousel(content: RichContent, onAction?: (action: ActionButton) => void): HTMLElement {
+  renderCarousel(
+    content: RichContent,
+    onAction?: (action: ActionButton) => void
+  ): HTMLElement {
     const wrapper = document.createElement('div');
     wrapper.className = 'nevent-chatbot-carousel-wrapper';
 
@@ -240,7 +252,8 @@ export class RichContentRenderer {
     const updateNavVisibility = () => {
       prevBtn.style.display = track.scrollLeft > 0 ? 'flex' : 'none';
       const maxScroll = track.scrollWidth - track.clientWidth;
-      nextBtn.style.display = track.scrollLeft < maxScroll - 4 ? 'flex' : 'none';
+      nextBtn.style.display =
+        track.scrollLeft < maxScroll - 4 ? 'flex' : 'none';
     };
 
     track.addEventListener('scroll', updateNavVisibility, { passive: true });
@@ -312,7 +325,7 @@ export class RichContentRenderer {
     });
     img.setAttribute(
       'aria-label',
-      content.alt ? content.alt : this.getOpenImageLabel(),
+      content.alt ? content.alt : this.getOpenImageLabel()
     );
     img.setAttribute('role', 'link');
     img.setAttribute('tabindex', '0');
@@ -353,7 +366,7 @@ export class RichContentRenderer {
    */
   renderButtonGroup(
     content: RichContent,
-    onAction?: (action: ActionButton) => void,
+    onAction?: (action: ActionButton) => void
   ): HTMLElement {
     const group = document.createElement('div');
     group.className = 'nevent-chatbot-button-group';
@@ -361,7 +374,11 @@ export class RichContentRenderer {
     const buttons = (content.buttons ?? []).slice(0, MAX_BUTTON_GROUP_BUTTONS);
 
     buttons.forEach((btn) => {
-      const buttonEl = this.buildActionButton(btn, onAction, /* isCardAction */ false);
+      const buttonEl = this.buildActionButton(
+        btn,
+        onAction,
+        /* isCardAction */ false
+      );
       group.appendChild(buttonEl);
     });
 
@@ -427,7 +444,7 @@ export class RichContentRenderer {
    */
   private buildCardActions(
     buttons: ActionButton[],
-    onAction?: (action: ActionButton) => void,
+    onAction?: (action: ActionButton) => void
   ): HTMLElement {
     const actions = document.createElement('div');
     actions.className = 'nevent-chatbot-card-actions';
@@ -439,7 +456,11 @@ export class RichContentRenderer {
         sep.className = 'nevent-chatbot-card-action-separator';
         actions.appendChild(sep);
       }
-      const buttonEl = this.buildActionButton(btn, onAction, /* isCardAction */ true);
+      const buttonEl = this.buildActionButton(
+        btn,
+        onAction,
+        /* isCardAction */ true
+      );
       actions.appendChild(buttonEl);
     });
 
@@ -467,7 +488,7 @@ export class RichContentRenderer {
   private buildActionButton(
     btn: ActionButton,
     onAction: ((action: ActionButton) => void) | undefined,
-    isCardAction: boolean,
+    isCardAction: boolean
   ): HTMLElement {
     const baseClass = isCardAction
       ? 'nevent-chatbot-card-action'
@@ -549,7 +570,11 @@ export class RichContentRenderer {
    * @param label - Plain-text button label.
    * @param iconSvg - SVG markup string for the icon (trusted internal constant).
    */
-  private populateButtonContent(el: HTMLElement, label: string, iconSvg: string): void {
+  private populateButtonContent(
+    el: HTMLElement,
+    label: string,
+    iconSvg: string
+  ): void {
     const iconSpan = document.createElement('span');
     iconSpan.className = 'nevent-chatbot-action-button-icon';
     iconSpan.innerHTML = iconSvg; // trusted internal SVG constant
@@ -573,12 +598,15 @@ export class RichContentRenderer {
    * @param direction - `'prev'` for left arrow, `'next'` for right arrow.
    * @returns Styled `<button>` element (initially hidden for prev).
    */
-  private buildCarouselNavButton(direction: 'prev' | 'next'): HTMLButtonElement {
+  private buildCarouselNavButton(
+    direction: 'prev' | 'next'
+  ): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `nevent-chatbot-carousel-nav nevent-chatbot-carousel-nav--${direction}`;
     btn.setAttribute('aria-label', this.getCarouselNavAriaLabel(direction));
-    btn.innerHTML = direction === 'prev' ? ICON_CHEVRON_LEFT : ICON_CHEVRON_RIGHT;
+    btn.innerHTML =
+      direction === 'prev' ? ICON_CHEVRON_LEFT : ICON_CHEVRON_RIGHT;
 
     // Start hidden; visibility is managed by updateNavVisibility
     btn.style.display = 'none';
@@ -622,6 +650,7 @@ export class RichContentRenderer {
     const trimmed = value.trim();
 
     // Reject dangerous schemes (case-insensitive, handles obfuscation)
+    // eslint-disable-next-line no-control-regex
     const normalized = trimmed.replace(/[\s\u0000-\u001f]/g, '').toLowerCase();
     if (/^(javascript|data|vbscript):/.test(normalized)) return null;
 

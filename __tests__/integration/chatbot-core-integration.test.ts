@@ -61,7 +61,7 @@ describe('Chatbot ErrorBoundary extends Core ErrorBoundary', () => {
 
     const wrapped = chatbotBoundary.wrapCallback(
       () => 'callback-ok',
-      'testCallback',
+      'testCallback'
     );
     expect(wrapped()).toBe('callback-ok');
 
@@ -109,7 +109,7 @@ describe('Chatbot ErrorBoundary extends Core ErrorBoundary', () => {
   it('should override normalize() returning ChatbotError-compatible shape', () => {
     const normalized = ChatbotErrorBoundary.normalize(
       new Error('chatbot fail'),
-      'render',
+      'render'
     );
 
     // Should have the same NormalizedError structure
@@ -146,7 +146,7 @@ describe('Chatbot ErrorBoundary extends Core ErrorBoundary', () => {
 
     coreBoundary.setErrorHandler((err) => coreErrors.push(err));
     chatbotBoundary.setErrorHandler((err) =>
-      chatbotErrors.push(err as NormalizedError),
+      chatbotErrors.push(err as NormalizedError)
     );
 
     // Error in core
@@ -183,7 +183,7 @@ describe('Chatbot MessageSanitizer delegates to Core Sanitizer', () => {
 
     for (const input of testCases) {
       expect(MessageSanitizer.escapeHtml(input)).toBe(
-        CoreSanitizer.escapeHtml(input),
+        CoreSanitizer.escapeHtml(input)
       );
     }
   });
@@ -202,8 +202,7 @@ describe('Chatbot MessageSanitizer delegates to Core Sanitizer', () => {
   });
 
   it('sanitize() uses chatbot-specific ALLOWED_TAGS (no h1, h2, h6)', () => {
-    const html =
-      '<h1>Title</h1><h2>Sub</h2><h3>Small</h3><h6>Tiny</h6>';
+    const html = '<h1>Title</h1><h2>Sub</h2><h3>Small</h3><h6>Tiny</h6>';
 
     const chatbotResult = MessageSanitizer.sanitize(html);
 
@@ -231,10 +230,10 @@ describe('Chatbot MessageSanitizer delegates to Core Sanitizer', () => {
     expect(typeof MessageSanitizer.isDangerous).toBe('function');
 
     expect(MessageSanitizer.stripHtml('<b>Hello</b> <em>world</em>')).toBe(
-      'Hello world',
+      'Hello world'
     );
     expect(MessageSanitizer.isDangerous('<script>alert(1)</script>')).toBe(
-      true,
+      true
     );
     expect(MessageSanitizer.isDangerous('<b>safe</b>')).toBe(false);
   });

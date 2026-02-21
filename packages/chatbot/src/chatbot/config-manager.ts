@@ -65,7 +65,11 @@ const DEFAULTS: Omit<Required<ChatbotConfig>, 'chatbotId' | 'tenantId'> = {
   ticketId: undefined as unknown as string,
   userContext: undefined as unknown as { lat: number; lng: number },
   // Rate limit defaults — undefined means use RateLimiter defaults
-  rateLimit: undefined as unknown as { maxRequests?: number; windowMs?: number; cooldownMs?: number },
+  rateLimit: undefined as unknown as {
+    maxRequests?: number;
+    windowMs?: number;
+    cooldownMs?: number;
+  },
   // File upload defaults — undefined means use FileUploadService defaults
   fileUpload: undefined as unknown as import('../types').FileUploadConfig,
   // Typing status defaults — undefined means use TypingStatusService defaults
@@ -224,32 +228,50 @@ export class ConfigManager {
     const errors: string[] = [];
 
     // Required fields
-    if (!config.chatbotId || typeof config.chatbotId !== 'string' || config.chatbotId.trim() === '') {
+    if (
+      !config.chatbotId ||
+      typeof config.chatbotId !== 'string' ||
+      config.chatbotId.trim() === ''
+    ) {
       errors.push('chatbotId is required and must be a non-empty string');
     }
 
-    if (!config.tenantId || typeof config.tenantId !== 'string' || config.tenantId.trim() === '') {
+    if (
+      !config.tenantId ||
+      typeof config.tenantId !== 'string' ||
+      config.tenantId.trim() === ''
+    ) {
       errors.push('tenantId is required and must be a non-empty string');
     }
 
     // Optional URL validation
     if (config.apiUrl !== undefined && !isValidUrl(config.apiUrl)) {
-      errors.push(`apiUrl must be a valid http or https URL, received: "${config.apiUrl}"`);
+      errors.push(
+        `apiUrl must be a valid http or https URL, received: "${config.apiUrl}"`
+      );
     }
 
     if (config.analyticsUrl !== undefined && !isValidUrl(config.analyticsUrl)) {
-      errors.push(`analyticsUrl must be a valid http or https URL, received: "${config.analyticsUrl}"`);
+      errors.push(
+        `analyticsUrl must be a valid http or https URL, received: "${config.analyticsUrl}"`
+      );
     }
 
     // Locale validation
-    if (config.locale !== undefined && !SUPPORTED_LOCALES.includes(config.locale)) {
+    if (
+      config.locale !== undefined &&
+      !SUPPORTED_LOCALES.includes(config.locale)
+    ) {
       errors.push(
         `locale must be one of [${SUPPORTED_LOCALES.join(', ')}], received: "${config.locale}"`
       );
     }
 
     // Theme validation
-    if (config.theme !== undefined && !SUPPORTED_THEMES.includes(config.theme)) {
+    if (
+      config.theme !== undefined &&
+      !SUPPORTED_THEMES.includes(config.theme)
+    ) {
       errors.push(
         `theme must be one of [${SUPPORTED_THEMES.join(', ')}], received: "${config.theme}"`
       );
@@ -257,15 +279,25 @@ export class ConfigManager {
 
     // autoOpenDelay must be a positive number
     if (config.autoOpenDelay !== undefined) {
-      if (typeof config.autoOpenDelay !== 'number' || config.autoOpenDelay <= 0) {
-        errors.push(`autoOpenDelay must be a positive number, received: ${config.autoOpenDelay}`);
+      if (
+        typeof config.autoOpenDelay !== 'number' ||
+        config.autoOpenDelay <= 0
+      ) {
+        errors.push(
+          `autoOpenDelay must be a positive number, received: ${config.autoOpenDelay}`
+        );
       }
     }
 
     // conversationTTL must be a positive number
     if (config.conversationTTL !== undefined) {
-      if (typeof config.conversationTTL !== 'number' || config.conversationTTL <= 0) {
-        errors.push(`conversationTTL must be a positive number (hours), received: ${config.conversationTTL}`);
+      if (
+        typeof config.conversationTTL !== 'number' ||
+        config.conversationTTL <= 0
+      ) {
+        errors.push(
+          `conversationTTL must be a positive number (hours), received: ${config.conversationTTL}`
+        );
       }
     }
 
@@ -276,7 +308,9 @@ export class ConfigManager {
         !Number.isInteger(config.styles.zIndex) ||
         config.styles.zIndex <= 0
       ) {
-        errors.push(`styles.zIndex must be a positive integer, received: ${config.styles.zIndex}`);
+        errors.push(
+          `styles.zIndex must be a positive integer, received: ${config.styles.zIndex}`
+        );
       }
     }
 
@@ -296,9 +330,12 @@ export class ConfigManager {
       if (config.auth.mode === 'custom') {
         if (
           config.auth.headerName !== undefined &&
-          (typeof config.auth.headerName !== 'string' || config.auth.headerName.trim() === '')
+          (typeof config.auth.headerName !== 'string' ||
+            config.auth.headerName.trim() === '')
         ) {
-          errors.push('auth.headerName must be a non-empty string when provided');
+          errors.push(
+            'auth.headerName must be a non-empty string when provided'
+          );
         }
         if (
           config.auth.headerPrefix !== undefined &&
@@ -323,14 +360,18 @@ export class ConfigManager {
           typeof config.auth.userIdentity.userId !== 'string' ||
           config.auth.userIdentity.userId.trim() === ''
         ) {
-          errors.push('auth.userIdentity.userId is required and must be a non-empty string');
+          errors.push(
+            'auth.userIdentity.userId is required and must be a non-empty string'
+          );
         }
       }
     }
 
     if (errors.length > 0) {
       throw Object.assign(
-        new Error(`[NeventChatbot] Invalid configuration:\n  - ${errors.join('\n  - ')}`),
+        new Error(
+          `[NeventChatbot] Invalid configuration:\n  - ${errors.join('\n  - ')}`
+        ),
         {
           code: 'INVALID_CONFIG' as const,
           details: { errors },
@@ -369,13 +410,13 @@ export class ConfigManager {
     const welcomeMessage =
       this.config.welcomeMessage !== ''
         ? this.config.welcomeMessage
-        : serverCfg.welcomeMessage ?? '';
+        : (serverCfg.welcomeMessage ?? '');
 
     // Placeholder: same precedence rule
     const placeholder =
       this.config.placeholder !== ''
         ? this.config.placeholder
-        : serverCfg.placeholder ?? '';
+        : (serverCfg.placeholder ?? '');
 
     // Theme: apply server's theme.mode only when user is using the default ('light')
     const theme: ThemeMode =

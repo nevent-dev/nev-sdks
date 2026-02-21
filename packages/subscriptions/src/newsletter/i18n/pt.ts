@@ -24,8 +24,7 @@ export const pt: NewsletterLabels = {
   // GDPR
   gdprText:
     'Aceito o tratamento dos meus dados pessoais para receber comunicacoes comerciais e promocoes relacionadas com {{companyName}}, de acordo com a {{privacyPolicyLink}}.',
-  gdprRequired:
-    'Deve aceitar a politica de privacidade para continuar.',
+  gdprRequired: 'Deve aceitar a politica de privacidade para continuar.',
   privacyPolicyLabel: 'Politica de Privacidade',
 
   // Validation

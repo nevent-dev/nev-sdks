@@ -61,40 +61,40 @@ await chatbot.init();
 
 ### Required Options
 
-| Option | Type | Description |
-|--------|------|-------------|
+| Option      | Type     | Description                                           |
+| ----------- | -------- | ----------------------------------------------------- |
 | `chatbotId` | `string` | Chatbot identifier from the Nevent platform dashboard |
-| `tenantId` | `string` | Your tenant identifier for multi-tenancy scoping |
+| `tenantId`  | `string` | Your tenant identifier for multi-tenancy scoping      |
 
 ### Optional Options
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `apiUrl` | `string` | `'https://api.nevent.es'` | Base URL for API requests |
-| `containerId` | `string \| null` | `null` | DOM element ID for inline mode. When `null`, renders as a floating bubble |
-| `position` | `'bottom-right' \| 'bottom-left'` | `'bottom-right'` | Position of the floating bubble |
-| `theme` | `'light' \| 'dark' \| 'auto'` | `'light'` | Color theme mode. `'auto'` follows `prefers-color-scheme` |
-| `themePreset` | `string` | `undefined` | Named preset: `'light'`, `'dark'`, `'midnight'`, `'ocean'`, `'sunset'`, `'forest'`, `'rose'` |
-| `brandColor` | `string` | `undefined` | Hex color to auto-generate a full theme (e.g. `'#6366F1'`). Takes precedence over `themePreset` |
-| `locale` | `'es' \| 'en' \| 'ca' \| 'pt'` | `'es'` | Language for UI strings |
-| `styles` | `ChatbotStyles` | `{}` | Granular visual style overrides for each widget component |
-| `customCSS` | `string` | `undefined` | Raw CSS string injected after all base widget styles |
-| `fonts` | `FontConfig[]` | `[]` | Custom fonts to load (Google Fonts or custom `@font-face`) |
-| `analytics` | `boolean` | `true` | Enable analytics event tracking |
-| `analyticsUrl` | `string` | `'https://events.neventapis.com'` | Analytics ingestion endpoint |
-| `debug` | `boolean` | `false` | Enable verbose debug logging to the browser console |
-| `welcomeMessage` | `string` | _(server configured)_ | Override the server-configured welcome message |
-| `placeholder` | `string` | _(server configured)_ | Override the input field placeholder text |
-| `autoOpen` | `boolean` | `false` | Automatically open the chat window on page load |
-| `autoOpenDelay` | `number` | `3000` | Milliseconds to wait before auto-opening |
-| `persistConversation` | `boolean` | `true` | Persist conversation state in `localStorage` across page navigations |
-| `conversationTTL` | `number` | `24` | Hours before a persisted conversation expires |
-| `showBranding` | `boolean` | `true` | Show "Powered by Nevent" branding in the footer |
-| `onOpen` | `() => void` | `undefined` | Callback fired when the chat window opens |
-| `onClose` | `() => void` | `undefined` | Callback fired when the chat window closes |
-| `onMessage` | `(message: ChatMessage) => void` | `undefined` | Callback fired on every new message (sent or received) |
-| `onError` | `(error: ChatbotError) => void` | `undefined` | Callback fired when an API error occurs |
-| `onReady` | `() => void` | `undefined` | Callback fired when the widget is fully initialized |
+| Option                | Type                              | Default                           | Description                                                                                     |
+| --------------------- | --------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `apiUrl`              | `string`                          | `'https://api.nevent.es'`         | Base URL for API requests                                                                       |
+| `containerId`         | `string \| null`                  | `null`                            | DOM element ID for inline mode. When `null`, renders as a floating bubble                       |
+| `position`            | `'bottom-right' \| 'bottom-left'` | `'bottom-right'`                  | Position of the floating bubble                                                                 |
+| `theme`               | `'light' \| 'dark' \| 'auto'`     | `'light'`                         | Color theme mode. `'auto'` follows `prefers-color-scheme`                                       |
+| `themePreset`         | `string`                          | `undefined`                       | Named preset: `'light'`, `'dark'`, `'midnight'`, `'ocean'`, `'sunset'`, `'forest'`, `'rose'`    |
+| `brandColor`          | `string`                          | `undefined`                       | Hex color to auto-generate a full theme (e.g. `'#6366F1'`). Takes precedence over `themePreset` |
+| `locale`              | `'es' \| 'en' \| 'ca' \| 'pt'`    | `'es'`                            | Language for UI strings                                                                         |
+| `styles`              | `ChatbotStyles`                   | `{}`                              | Granular visual style overrides for each widget component                                       |
+| `customCSS`           | `string`                          | `undefined`                       | Raw CSS string injected after all base widget styles                                            |
+| `fonts`               | `FontConfig[]`                    | `[]`                              | Custom fonts to load (Google Fonts or custom `@font-face`)                                      |
+| `analytics`           | `boolean`                         | `true`                            | Enable analytics event tracking                                                                 |
+| `analyticsUrl`        | `string`                          | `'https://events.neventapis.com'` | Analytics ingestion endpoint                                                                    |
+| `debug`               | `boolean`                         | `false`                           | Enable verbose debug logging to the browser console                                             |
+| `welcomeMessage`      | `string`                          | _(server configured)_             | Override the server-configured welcome message                                                  |
+| `placeholder`         | `string`                          | _(server configured)_             | Override the input field placeholder text                                                       |
+| `autoOpen`            | `boolean`                         | `false`                           | Automatically open the chat window on page load                                                 |
+| `autoOpenDelay`       | `number`                          | `3000`                            | Milliseconds to wait before auto-opening                                                        |
+| `persistConversation` | `boolean`                         | `true`                            | Persist conversation state in `localStorage` across page navigations                            |
+| `conversationTTL`     | `number`                          | `24`                              | Hours before a persisted conversation expires                                                   |
+| `showBranding`        | `boolean`                         | `true`                            | Show "Powered by Nevent" branding in the footer                                                 |
+| `onOpen`              | `() => void`                      | `undefined`                       | Callback fired when the chat window opens                                                       |
+| `onClose`             | `() => void`                      | `undefined`                       | Callback fired when the chat window closes                                                      |
+| `onMessage`           | `(message: ChatMessage) => void`  | `undefined`                       | Callback fired on every new message (sent or received)                                          |
+| `onError`             | `(error: ChatbotError) => void`   | `undefined`                       | Callback fired when an API error occurs                                                         |
+| `onReady`             | `() => void`                      | `undefined`                       | Callback fired when the widget is fully initialized                                             |
 
 ---
 
@@ -484,7 +484,7 @@ export function NeventChatbot(props: NeventChatbotProps) {
       widgetRef.current?.destroy();
       widgetRef.current = null;
     };
-  // Re-initialize only when the chatbot identity changes
+    // Re-initialize only when the chatbot identity changes
   }, [props.chatbotId, props.tenantId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The widget renders as a floating bubble — no DOM output needed here
@@ -603,7 +603,9 @@ interface ChatbotProps {
 }
 
 export function NeventChatbot({ chatbotId, tenantId }: ChatbotProps) {
-  const widgetRef = useRef<import('@nevent/chatbot').ChatbotWidget | null>(null);
+  const widgetRef = useRef<import('@nevent/chatbot').ChatbotWidget | null>(
+    null
+  );
 
   useEffect(() => {
     let mounted = true;
@@ -640,10 +642,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   return (
     <>
       {children}
-      <NeventChatbot
-        chatbotId="your-chatbot-id"
-        tenantId="your-tenant-id"
-      />
+      <NeventChatbot chatbotId="your-chatbot-id" tenantId="your-tenant-id" />
     </>
   );
 }
@@ -669,21 +668,21 @@ The widget is built to WCAG 2.1 Level AA standards:
 
 The widget tracks the following events automatically when `analytics: true` (default):
 
-| Event | Fired when |
-|-------|-----------|
-| `chatbot_loaded` | Widget finishes initializing |
-| `chatbot_opened` | Chat window opens |
-| `chatbot_closed` | Chat window closes |
-| `chatbot_error` | An API error occurs |
-| `conversation_started` | User sends their first message |
-| `conversation_resumed` | A persisted conversation is restored |
-| `message_sent` | User submits a message |
-| `message_received` | Bot response arrives |
-| `quick_reply_clicked` | User clicks a quick reply chip |
+| Event                  | Fired when                                 |
+| ---------------------- | ------------------------------------------ |
+| `chatbot_loaded`       | Widget finishes initializing               |
+| `chatbot_opened`       | Chat window opens                          |
+| `chatbot_closed`       | Chat window closes                         |
+| `chatbot_error`        | An API error occurs                        |
+| `conversation_started` | User sends their first message             |
+| `conversation_resumed` | A persisted conversation is restored       |
+| `message_sent`         | User submits a message                     |
+| `message_received`     | Bot response arrives                       |
+| `quick_reply_clicked`  | User clicks a quick reply chip             |
 | `rich_content_clicked` | User clicks a button in a card or carousel |
-| `link_clicked` | User clicks a URL in a bot message |
-| `typing_started` | Bot typing indicator appears |
-| `typing_stopped` | Bot typing indicator disappears |
+| `link_clicked`         | User clicks a URL in a bot message         |
+| `typing_started`       | Bot typing indicator appears               |
+| `typing_stopped`       | Bot typing indicator disappears            |
 
 To disable all analytics tracking:
 
@@ -701,13 +700,13 @@ const chatbot = new ChatbotWidget({
 
 The SDK targets **ES2020** and supports all evergreen browsers:
 
-| Browser | Minimum version |
-|---------|----------------|
-| Chrome / Edge | 88+ |
-| Firefox | 90+ |
-| Safari | 14+ |
-| iOS Safari | 14+ |
-| Samsung Internet | 14+ |
+| Browser          | Minimum version |
+| ---------------- | --------------- |
+| Chrome / Edge    | 88+             |
+| Firefox          | 90+             |
+| Safari           | 14+             |
+| iOS Safari       | 14+             |
+| Samsung Internet | 14+             |
 
 The UMD bundle (`nevent-chatbot.umd.cjs`) provides CommonJS compatibility for build tools that do not support ES modules natively.
 
@@ -740,6 +739,7 @@ document.addEventListener('DOMContentLoaded', () => {
 **`CONFIG_LOAD_FAILED` error**
 
 The widget could not fetch its configuration from the Nevent API. Common causes:
+
 - Network connectivity issue
 - Incorrect `apiUrl` — defaults to `https://api.nevent.es`
 - The chatbot has been deleted or deactivated in the Nevent platform

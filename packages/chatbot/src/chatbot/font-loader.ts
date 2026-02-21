@@ -154,7 +154,8 @@ export class FontLoader {
     // Idempotency check — uses the sanitised family as the key
     if (this.loadedFonts.has(`gfont:${sanitised}`)) return;
 
-    const resolvedWeights = (weights && weights.length > 0) ? weights : DEFAULT_FONT_WEIGHTS;
+    const resolvedWeights =
+      weights && weights.length > 0 ? weights : DEFAULT_FONT_WEIGHTS;
 
     // Build Google Fonts v2 URL
     // Format: https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap
@@ -251,11 +252,11 @@ export class FontLoader {
 
       rules.push(
         `@font-face{` +
-        `font-family:'${this.escapeCssString(family)}';` +
-        `src:url('${this.escapeCssUrl(url)}')${formatHint};` +
-        `font-weight:${numericWeight};` +
-        `font-display:swap;` +
-        `}`,
+          `font-family:'${this.escapeCssString(family)}';` +
+          `src:url('${this.escapeCssUrl(url)}')${formatHint};` +
+          `font-weight:${numericWeight};` +
+          `font-display:swap;` +
+          `}`
       );
     }
 
@@ -373,7 +374,7 @@ export class FontLoader {
   private sanitiseFontFamily(family: string): string | null {
     // Allow letters (including Unicode), digits, spaces, and hyphens
     // This covers all valid Google Font names
-    const sanitised = family.replace(/[^a-zA-Z0-9\s\-]/g, '').trim();
+    const sanitised = family.replace(/[^a-zA-Z0-9\s-]/g, '').trim();
     return sanitised.length > 0 ? sanitised : null;
   }
 
@@ -423,6 +424,9 @@ export class FontLoader {
    * @returns Lowercase hyphen-separated slug (e.g. 'Open Sans' → 'open-sans')
    */
   private slugify(family: string): string {
-    return family.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    return family
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 }

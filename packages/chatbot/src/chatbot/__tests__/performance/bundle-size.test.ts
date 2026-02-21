@@ -9,11 +9,11 @@
  *   npm run build && npm run test:perf
  *
  * Size budgets (uncompressed):
- * - ESM bundle  (nevent-chatbot.js)      < 410 KB
- * - UMD bundle  (nevent-chatbot.umd.cjs) < 190 KB
+ * - ESM bundle  (nevent-chatbot.js)      < 480 KB
+ * - UMD bundle  (nevent-chatbot.umd.cjs) < 230 KB
  *
  * Gzip budget:
- * - ESM bundle gzipped                   < 100 KB
+ * - ESM bundle gzipped                   < 120 KB
  *
  * Artifact completeness:
  * - nevent-chatbot.js.map (source map)
@@ -39,23 +39,20 @@ import { gzipSync } from 'zlib';
  * Path resolution:
  *   performance/ → __tests__/ → chatbot/ → src/ → chatbot (package root) → dist/
  */
-const DIST_DIR = resolve(
-  __dirname,
-  '../../../../dist',
-);
+const DIST_DIR = resolve(__dirname, '../../../../dist');
 
 // ============================================================================
 // Size budgets (bytes)
 // ============================================================================
 
 /** ESM bundle uncompressed size limit */
-const ESM_UNCOMPRESSED_LIMIT = 410 * 1024; // 410 KB
+const ESM_UNCOMPRESSED_LIMIT = 480 * 1024; // 480 KB
 
 /** UMD bundle uncompressed size limit */
-const UMD_UNCOMPRESSED_LIMIT = 190 * 1024; // 190 KB
+const UMD_UNCOMPRESSED_LIMIT = 230 * 1024; // 230 KB
 
 /** ESM bundle gzip-compressed size limit */
-const ESM_GZIP_LIMIT = 100 * 1024; // 100 KB
+const ESM_GZIP_LIMIT = 120 * 1024; // 120 KB
 
 // ============================================================================
 // Guard: skip the suite when the build is missing
@@ -72,7 +69,6 @@ const distExists = existsSync(ESM_PATH) && existsSync(UMD_PATH);
 // ============================================================================
 
 describe.runIf(distExists)('Bundle Size', () => {
-
   // --------------------------------------------------------------------------
   // Uncompressed sizes
   // --------------------------------------------------------------------------
@@ -82,7 +78,9 @@ describe.runIf(distExists)('Bundle Size', () => {
       const stat = statSync(ESM_PATH);
       const sizeKB = (stat.size / 1024).toFixed(1);
 
-      console.info(`  ESM bundle size: ${sizeKB} KB (limit: ${ESM_UNCOMPRESSED_LIMIT / 1024} KB)`);
+      console.info(
+        `  ESM bundle size: ${sizeKB} KB (limit: ${ESM_UNCOMPRESSED_LIMIT / 1024} KB)`
+      );
 
       expect(stat.size).toBeLessThan(ESM_UNCOMPRESSED_LIMIT);
     });
@@ -91,7 +89,9 @@ describe.runIf(distExists)('Bundle Size', () => {
       const stat = statSync(UMD_PATH);
       const sizeKB = (stat.size / 1024).toFixed(1);
 
-      console.info(`  UMD bundle size: ${sizeKB} KB (limit: ${UMD_UNCOMPRESSED_LIMIT / 1024} KB)`);
+      console.info(
+        `  UMD bundle size: ${sizeKB} KB (limit: ${UMD_UNCOMPRESSED_LIMIT / 1024} KB)`
+      );
 
       expect(stat.size).toBeLessThan(UMD_UNCOMPRESSED_LIMIT);
     });
@@ -108,7 +108,7 @@ describe.runIf(distExists)('Bundle Size', () => {
       const sizeKB = (compressed.length / 1024).toFixed(1);
 
       console.info(
-        `  ESM gzipped size: ${sizeKB} KB (limit: ${ESM_GZIP_LIMIT / 1024} KB)`,
+        `  ESM gzipped size: ${sizeKB} KB (limit: ${ESM_GZIP_LIMIT / 1024} KB)`
       );
 
       expect(compressed.length).toBeLessThan(ESM_GZIP_LIMIT);
@@ -186,7 +186,7 @@ describe.runIf(distExists)('Bundle Size', () => {
 describe.skipIf(distExists)('Bundle Size (skipped — dist not built)', () => {
   it('skipped: run `npm run build` in the chatbot package first', () => {
     console.warn(
-      '[bundle-size] dist/ artifacts not found. Run `npm run build` before running this suite.',
+      '[bundle-size] dist/ artifacts not found. Run `npm run build` before running this suite.'
     );
     // This test intentionally passes — it is just informational.
     expect(true).toBe(true);

@@ -409,10 +409,7 @@ describe('StateManager', () => {
         messages: [createMessage({ id: 'msg-r1' })],
         lastActivity: '2025-01-01T00:00:00Z',
       };
-      localStorage.setItem(
-        'nevent_chatbot_bot-123',
-        JSON.stringify(persisted)
-      );
+      localStorage.setItem('nevent_chatbot_bot-123', JSON.stringify(persisted));
 
       const result = manager.restore();
 
@@ -442,10 +439,7 @@ describe('StateManager', () => {
 
     it('should return null and clear storage if data is malformed (missing fields)', () => {
       const malformed = { conversationId: '', chatbotId: '' };
-      localStorage.setItem(
-        'nevent_chatbot_bot-123',
-        JSON.stringify(malformed)
-      );
+      localStorage.setItem('nevent_chatbot_bot-123', JSON.stringify(malformed));
 
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const result = manager.restore();
@@ -466,10 +460,7 @@ describe('StateManager', () => {
         messages: [],
         lastActivity: '2025-01-01T00:00:00Z',
       };
-      localStorage.setItem(
-        'nevent_chatbot_bot-np',
-        JSON.stringify(persisted)
-      );
+      localStorage.setItem('nevent_chatbot_bot-np', JSON.stringify(persisted));
 
       const result = noPersistManager.restore();
       expect(result).toBeNull();
@@ -484,10 +475,7 @@ describe('StateManager', () => {
         messages: [],
         lastActivity: '2025-01-01T00:00:00Z',
       };
-      localStorage.setItem(
-        'nevent_chatbot_bot-123',
-        JSON.stringify(persisted)
-      );
+      localStorage.setItem('nevent_chatbot_bot-123', JSON.stringify(persisted));
 
       manager.clearPersisted();
 
@@ -536,10 +524,7 @@ describe('StateManager', () => {
         messages: [],
         lastActivity: '2025-01-01T00:00:00Z',
       };
-      localStorage.setItem(
-        'nevent_chatbot_bot-123',
-        JSON.stringify(persisted)
-      );
+      localStorage.setItem('nevent_chatbot_bot-123', JSON.stringify(persisted));
 
       manager.reset();
 

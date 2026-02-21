@@ -47,7 +47,7 @@ export const DEFAULT_LOCALE = 'es';
  * ```
  */
 export function createNewsletterI18n(
-  locale?: string,
+  locale?: string
 ): I18nManager<NewsletterLabels> {
   const detected = locale || I18nManager.detectLocale();
   const resolvedLocale = NEWSLETTER_LOCALES[detected]
@@ -56,7 +56,7 @@ export function createNewsletterI18n(
 
   const i18n = new I18nManager<NewsletterLabels>(
     NEWSLETTER_LOCALES,
-    DEFAULT_LOCALE,
+    DEFAULT_LOCALE
   );
   i18n.setLocale(resolvedLocale);
 

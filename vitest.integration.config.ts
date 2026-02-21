@@ -14,17 +14,14 @@ export default defineConfig({
       '@nevent/core': resolve(__dirname, 'packages/core/src/index.ts'),
       '@nevent/subscriptions/src': resolve(
         __dirname,
-        'packages/subscriptions/src',
+        'packages/subscriptions/src'
       ),
       '@nevent/subscriptions': resolve(
         __dirname,
-        'packages/subscriptions/src/index.ts',
+        'packages/subscriptions/src/index.ts'
       ),
       '@nevent/chatbot/src': resolve(__dirname, 'packages/chatbot/src'),
-      '@nevent/chatbot': resolve(
-        __dirname,
-        'packages/chatbot/src/index.ts',
-      ),
+      '@nevent/chatbot': resolve(__dirname, 'packages/chatbot/src/index.ts'),
     },
   },
   test: {

@@ -69,7 +69,12 @@ describe('MessageRenderer — rendering', () => {
 
   beforeEach(() => {
     document.body.innerHTML = '';
-    renderer = new MessageRenderer(undefined, undefined, createI18n(), MessageSanitizer);
+    renderer = new MessageRenderer(
+      undefined,
+      undefined,
+      createI18n(),
+      MessageSanitizer
+    );
     container = renderer.render();
     document.body.appendChild(container);
   });
@@ -96,7 +101,9 @@ describe('MessageRenderer — rendering', () => {
     const msg = createMockBotMessage({ content: 'Hello, human!' });
     renderer.addMessage(msg);
 
-    const bubble = container.querySelector('.nevent-chatbot-message--assistant');
+    const bubble = container.querySelector(
+      '.nevent-chatbot-message--assistant'
+    );
     expect(bubble).not.toBeNull();
     expect(bubble?.textContent).toContain('Hello, human!');
   });
@@ -113,13 +120,17 @@ describe('MessageRenderer — rendering', () => {
     const msg = createMockBotMessage({ content: 'Left side' });
     renderer.addMessage(msg);
 
-    const messageEl = container.querySelector('.nevent-chatbot-message--assistant');
+    const messageEl = container.querySelector(
+      '.nevent-chatbot-message--assistant'
+    );
     expect(messageEl).not.toBeNull();
   });
 
   it('should render multiple messages in order', () => {
     renderer.addMessage(createMockMessage({ id: 'msg-1', content: 'First' }));
-    renderer.addMessage(createMockBotMessage({ id: 'msg-2', content: 'Second' }));
+    renderer.addMessage(
+      createMockBotMessage({ id: 'msg-2', content: 'Second' })
+    );
     renderer.addMessage(createMockMessage({ id: 'msg-3', content: 'Third' }));
 
     const messages = container.querySelectorAll('.nevent-chatbot-message');
@@ -137,30 +148,43 @@ describe('MessageRenderer — rendering', () => {
     const msg = createMockBotMessage({ content: '**Important update**' });
     renderer.addMessage(msg);
 
-    const bubble = container.querySelector('.nevent-chatbot-message--assistant');
+    const bubble = container.querySelector(
+      '.nevent-chatbot-message--assistant'
+    );
     expect(bubble?.innerHTML).toContain('<strong>');
   });
 
   it('should render bot message italic markdown as <em>', () => {
     // Use content that also includes ** so containsMarkdown() triggers,
     // then the italic conversion runs on the same pass.
-    const msg = createMockBotMessage({ content: '**bold** and *italic emphasis*' });
+    const msg = createMockBotMessage({
+      content: '**bold** and *italic emphasis*',
+    });
     renderer.addMessage(msg);
 
-    const bubble = container.querySelector('.nevent-chatbot-message--assistant');
+    const bubble = container.querySelector(
+      '.nevent-chatbot-message--assistant'
+    );
     expect(bubble?.innerHTML).toContain('<em>');
   });
 
   it('should render bot message code markdown as <code>', () => {
-    const msg = createMockBotMessage({ content: 'Use `npm install` to set up' });
+    const msg = createMockBotMessage({
+      content: 'Use `npm install` to set up',
+    });
     renderer.addMessage(msg);
 
-    const bubble = container.querySelector('.nevent-chatbot-message--assistant');
+    const bubble = container.querySelector(
+      '.nevent-chatbot-message--assistant'
+    );
     expect(bubble?.innerHTML).toContain('<code>');
   });
 
   it('should NOT render markdown in user messages (text should be escaped)', () => {
-    const msg = createMockMessage({ role: 'user', content: '**bold** attempt' });
+    const msg = createMockMessage({
+      role: 'user',
+      content: '**bold** attempt',
+    });
     renderer.addMessage(msg);
 
     const bubble = container.querySelector('.nevent-chatbot-message--user');
@@ -175,7 +199,9 @@ describe('MessageRenderer — rendering', () => {
     });
     renderer.addMessage(msg);
 
-    const bubble = container.querySelector('.nevent-chatbot-message--assistant');
+    const bubble = container.querySelector(
+      '.nevent-chatbot-message--assistant'
+    );
     expect(bubble?.innerHTML).not.toContain('<script>');
     expect(bubble?.innerHTML).not.toContain('alert(');
   });
@@ -236,7 +262,9 @@ describe('MessageRenderer — rendering', () => {
 
     renderer.renderQuickReplies(quickReplies, () => {});
 
-    const qrButtons = container.querySelectorAll('.nevent-chatbot-quick-reply-button');
+    const qrButtons = container.querySelectorAll(
+      '.nevent-chatbot-quick-reply-button'
+    );
     expect(qrButtons).toHaveLength(2);
     expect(qrButtons[0]?.textContent).toContain('Yes');
     expect(qrButtons[1]?.textContent).toContain('No');
@@ -248,12 +276,14 @@ describe('MessageRenderer — rendering', () => {
 
     renderer.renderQuickReplies(quickReplies, onReply);
 
-    const btn = container.querySelector('.nevent-chatbot-quick-reply-button') as HTMLButtonElement;
+    const btn = container.querySelector(
+      '.nevent-chatbot-quick-reply-button'
+    ) as HTMLButtonElement;
     btn?.click();
 
     expect(onReply).toHaveBeenCalledTimes(1);
     expect(onReply).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'qr-1', value: 'clicked' }),
+      expect.objectContaining({ id: 'qr-1', value: 'clicked' })
     );
   });
 
@@ -261,11 +291,15 @@ describe('MessageRenderer — rendering', () => {
     const quickReplies = [{ id: 'qr-1', label: 'Yes', value: 'yes' }];
     renderer.renderQuickReplies(quickReplies, () => {});
 
-    expect(container.querySelector('.nevent-chatbot-quick-reply-button')).not.toBeNull();
+    expect(
+      container.querySelector('.nevent-chatbot-quick-reply-button')
+    ).not.toBeNull();
 
     renderer.clearQuickReplies();
 
-    expect(container.querySelector('.nevent-chatbot-quick-reply-button')).toBeNull();
+    expect(
+      container.querySelector('.nevent-chatbot-quick-reply-button')
+    ).toBeNull();
   });
 
   // --------------------------------------------------------------------------
@@ -280,11 +314,15 @@ describe('MessageRenderer — rendering', () => {
     renderer.addMessage(createMockMessage({ id: 'clear-1' }));
     renderer.addMessage(createMockBotMessage({ id: 'clear-2' }));
 
-    expect(container.querySelectorAll('.nevent-chatbot-message').length).toBe(2);
+    expect(container.querySelectorAll('.nevent-chatbot-message').length).toBe(
+      2
+    );
 
     renderer.clear();
 
-    expect(container.querySelectorAll('.nevent-chatbot-message').length).toBe(0);
+    expect(container.querySelectorAll('.nevent-chatbot-message').length).toBe(
+      0
+    );
   });
 });
 
@@ -409,8 +447,12 @@ describe('ChatbotWidget — mobile responsive rendering', () => {
   });
 
   afterEach(() => {
-    document.querySelectorAll('#nevent-chatbot-host').forEach((el) => el.remove());
-    document.querySelectorAll('.nevent-chatbot-root').forEach((el) => el.remove());
+    document
+      .querySelectorAll('#nevent-chatbot-host')
+      .forEach((el) => el.remove());
+    document
+      .querySelectorAll('.nevent-chatbot-root')
+      .forEach((el) => el.remove());
     mockApi.reset();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -420,7 +462,10 @@ describe('ChatbotWidget — mobile responsive rendering', () => {
   it('should initialize on a narrow (mobile) viewport without errors', async () => {
     // Simulate a 375px wide viewport
     Object.defineProperty(window, 'innerWidth', { value: 375, writable: true });
-    Object.defineProperty(window, 'innerHeight', { value: 667, writable: true });
+    Object.defineProperty(window, 'innerHeight', {
+      value: 667,
+      writable: true,
+    });
 
     const onReady = vi.fn();
     const widget = new ChatbotWidget(createMockConfig({ onReady }));
@@ -434,7 +479,10 @@ describe('ChatbotWidget — mobile responsive rendering', () => {
     widget.destroy();
 
     // Restore default viewport
-    Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true });
+    Object.defineProperty(window, 'innerWidth', {
+      value: 1024,
+      writable: true,
+    });
   });
 
   it('should not throw when opening the window on a mobile viewport', async () => {
@@ -446,6 +494,9 @@ describe('ChatbotWidget — mobile responsive rendering', () => {
     expect(() => widget.open()).not.toThrow();
 
     widget.destroy();
-    Object.defineProperty(window, 'innerWidth', { value: 1024, writable: true });
+    Object.defineProperty(window, 'innerWidth', {
+      value: 1024,
+      writable: true,
+    });
   });
 });

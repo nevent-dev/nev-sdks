@@ -1,4 +1,8 @@
-import type { ConsentData, I18nDictionary, NormalizedError } from '@nevent/core';
+import type {
+  ConsentData,
+  I18nDictionary,
+  NormalizedError,
+} from '@nevent/core';
 
 /**
  * Widget layout direction

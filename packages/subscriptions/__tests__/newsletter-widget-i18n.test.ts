@@ -24,7 +24,7 @@ import { pt } from '../src/newsletter/i18n/pt';
 describe('Newsletter i18n locale registry', () => {
   it('should export all four locales', () => {
     expect(Object.keys(NEWSLETTER_LOCALES)).toEqual(
-      expect.arrayContaining(['es', 'en', 'ca', 'pt']),
+      expect.arrayContaining(['es', 'en', 'ca', 'pt'])
     );
   });
 
@@ -107,7 +107,7 @@ describe('createNewsletterI18n()', () => {
   it('should list all available locales', () => {
     const i18n = createNewsletterI18n('es');
     expect(i18n.getAvailableLocales()).toEqual(
-      expect.arrayContaining(['es', 'en', 'ca', 'pt']),
+      expect.arrayContaining(['es', 'en', 'ca', 'pt'])
     );
   });
 });

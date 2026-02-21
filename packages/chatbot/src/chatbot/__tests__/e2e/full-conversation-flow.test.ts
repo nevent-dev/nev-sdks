@@ -270,10 +270,13 @@ describe('E2E: Full Conversation Flow', () => {
     widget.destroy();
 
     const { ChatbotWidget } = await import('../../../chatbot-widget');
-    const { createMockConfig: mkConfig } = await import('../helpers/mock-factories');
+    const { createMockConfig: mkConfig } =
+      await import('../helpers/mock-factories');
     const uninitWidget = new ChatbotWidget(mkConfig());
 
     // Should not throw, should be a no-op
-    await expect(uninitWidget.sendMessage('Before init')).resolves.toBeUndefined();
+    await expect(
+      uninitWidget.sendMessage('Before init')
+    ).resolves.toBeUndefined();
   });
 });

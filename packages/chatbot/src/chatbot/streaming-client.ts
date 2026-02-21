@@ -227,7 +227,10 @@ export interface StreamingOptions {
    * @param content - The result content from the tool call (if any)
    * @param metadata - Tool call result metadata
    */
-  onToolCallResult?: (content: string | null | undefined, metadata: unknown) => void;
+  onToolCallResult?: (
+    content: string | null | undefined,
+    metadata: unknown
+  ) => void;
 
   /**
    * Called when a `TYPING_START` SSE event is received from the backend,
@@ -356,7 +359,7 @@ export class StreamingClient {
       eventId?: string;
       source?: string;
       userContext?: { lat: number; lng: number };
-    },
+    }
   ) {
     this.apiUrl = apiUrl.replace(/\/$/, ''); // Strip trailing slash
     this.token = token;
@@ -404,8 +407,12 @@ export class StreamingClient {
    */
   async sendMessageStreaming(
     conversationId: string,
-    request: { content: string; type?: string; metadata?: Record<string, unknown> },
-    options: StreamingOptions,
+    request: {
+      content: string;
+      type?: string;
+      metadata?: Record<string, unknown>;
+    },
+    options: StreamingOptions
   ): Promise<void> {
     // Abort any existing stream for this conversation
     this.abort(conversationId);
@@ -430,9 +437,9 @@ export class StreamingClient {
       // allowing JWT/custom tokens to override the server config token.
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'Accept': 'text/event-stream',
+        Accept: 'text/event-stream',
         'Cache-Control': 'no-cache',
-        'Authorization': `Bearer ${this.token}`,
+        Authorization: `Bearer ${this.token}`,
       };
 
       // Add tenant ID header (required for unauthenticated, useful for all)
@@ -457,7 +464,10 @@ export class StreamingClient {
       };
 
       // Include ticketId from request metadata if provided
-      if (request.metadata?.ticketId && typeof request.metadata.ticketId === 'string') {
+      if (
+        request.metadata?.ticketId &&
+        typeof request.metadata.ticketId === 'string'
+      ) {
         backendBody.ticketId = request.metadata.ticketId;
       }
 
@@ -475,7 +485,10 @@ export class StreamingClient {
           body: errorText,
         });
         options.onError({
-          code: response.status === 429 ? 'RATE_LIMIT_EXCEEDED' : 'MESSAGE_SEND_FAILED',
+          code:
+            response.status === 429
+              ? 'RATE_LIMIT_EXCEEDED'
+              : 'MESSAGE_SEND_FAILED',
           message: `Streaming request failed with HTTP ${response.status}`,
           status: response.status,
         });
@@ -509,7 +522,8 @@ export class StreamingClient {
       this.logger.error('Stream connection error', error);
       options.onError({
         code: 'NETWORK_ERROR',
-        message: error instanceof Error ? error.message : 'Unknown streaming error',
+        message:
+          error instanceof Error ? error.message : 'Unknown streaming error',
       });
     } finally {
       this.activeStreams.delete(conversationId);
@@ -542,7 +556,9 @@ export class StreamingClient {
   abortAll(): void {
     if (this.activeStreams.size === 0) return;
 
-    this.logger.debug('Aborting all active streams', { count: this.activeStreams.size });
+    this.logger.debug('Aborting all active streams', {
+      count: this.activeStreams.size,
+    });
     for (const [conversationId, controller] of this.activeStreams) {
       controller.abort();
       this.logger.debug('Aborted stream', { conversationId });
@@ -628,7 +644,7 @@ export class StreamingClient {
   private async parseSSEStream(
     reader: ReadableStreamDefaultReader<Uint8Array>,
     conversationId: string,
-    options: StreamingOptions,
+    options: StreamingOptions
   ): Promise<void> {
     const decoder = new TextDecoder('utf-8');
 
@@ -664,8 +680,12 @@ export class StreamingClient {
         // Flush any remaining buffer content (handles streams without trailing \n)
         if (buffer.trim()) {
           this.processSSELine(buffer, {
-            onEvent: (event) => { currentEvent = event; },
-            onData: (data) => { currentData += data; },
+            onEvent: (event) => {
+              currentEvent = event;
+            },
+            onData: (data) => {
+              currentData += data;
+            },
           });
         }
 
@@ -676,8 +696,12 @@ export class StreamingClient {
             currentData,
             { accumulated, streamingMessageId },
             options,
-            (newAccumulated) => { accumulated = newAccumulated; },
-            (msgId) => { streamingMessageId = msgId; },
+            (newAccumulated) => {
+              accumulated = newAccumulated;
+            },
+            (msgId) => {
+              streamingMessageId = msgId;
+            }
           );
         }
 
@@ -701,8 +725,12 @@ export class StreamingClient {
               currentData,
               { accumulated, streamingMessageId },
               options,
-              (newAccumulated) => { accumulated = newAccumulated; },
-              (msgId) => { streamingMessageId = msgId; },
+              (newAccumulated) => {
+                accumulated = newAccumulated;
+              },
+              (msgId) => {
+                streamingMessageId = msgId;
+              }
             );
           }
           // Reset for next event block
@@ -710,7 +738,9 @@ export class StreamingClient {
           currentData = '';
         } else {
           this.processSSELine(line, {
-            onEvent: (event) => { currentEvent = event; },
+            onEvent: (event) => {
+              currentEvent = event;
+            },
             onData: (data) => {
               // SSE allows multiple `data:` lines — they are concatenated with newlines
               currentData = currentData ? `${currentData}\n${data}` : data;
@@ -738,7 +768,7 @@ export class StreamingClient {
     callbacks: {
       onEvent: (event: StreamEventType) => void;
       onData: (data: string) => void;
-    },
+    }
   ): void {
     // SSE comment — skip
     if (line.startsWith(':')) return;
@@ -802,7 +832,7 @@ export class StreamingClient {
     state: { accumulated: string; streamingMessageId: string },
     options: StreamingOptions,
     setAccumulated: (v: string) => void,
-    setMessageId: (v: string) => void,
+    setMessageId: (v: string) => void
   ): void {
     // [DONE] sentinel — some APIs send this instead of a proper complete event
     if (rawData.trim() === '[DONE]') {
@@ -823,18 +853,36 @@ export class StreamingClient {
         const parsed = JSON.parse(rawData);
         // Detect backend event format by checking for the 'type' field
         // containing a BackendStreamEventType value
-        if (parsed.type && ['TOKEN', 'THINKING', 'DONE', 'ERROR', 'TOOL_CALL_START', 'TOOL_CALL_RESULT', 'TYPING_START', 'TYPING_STOP'].includes(parsed.type)) {
+        if (
+          parsed.type &&
+          [
+            'TOKEN',
+            'THINKING',
+            'DONE',
+            'ERROR',
+            'TOOL_CALL_START',
+            'TOOL_CALL_RESULT',
+            'TYPING_START',
+            'TYPING_STOP',
+          ].includes(parsed.type)
+        ) {
           backendEvent = parsed as BackendStreamEvent;
         } else {
           data = parsed as StreamEventData;
         }
       } catch (parseError) {
-        this.logger.debug('Failed to parse SSE data as JSON', { rawData, parseError });
+        this.logger.debug('Failed to parse SSE data as JSON', {
+          rawData,
+          parseError,
+        });
         return;
       }
     }
 
-    this.logger.debug('SSE event dispatched', { type, hasBackendEvent: backendEvent !== null });
+    this.logger.debug('SSE event dispatched', {
+      type,
+      hasBackendEvent: backendEvent !== null,
+    });
 
     // =======================================================================
     // Backend (nev-api) SSE event handling
@@ -866,7 +914,8 @@ export class StreamingClient {
         case 'DONE': {
           // Stream is complete — build a ChatMessage from accumulated text
           const finalContent = state.accumulated;
-          const messageId = state.streamingMessageId || this.generateFallbackId();
+          const messageId =
+            state.streamingMessageId || this.generateFallbackId();
 
           const completedMessage: ChatMessage = {
             id: messageId,
@@ -885,7 +934,9 @@ export class StreamingClient {
         case 'ERROR': {
           const chatbotError: import('../types').ChatbotError = {
             code: 'STREAM_ERROR',
-            message: backendEvent.content ?? 'An error occurred during response generation',
+            message:
+              backendEvent.content ??
+              'An error occurred during response generation',
           };
           options.onError(chatbotError);
           break;
@@ -896,15 +947,19 @@ export class StreamingClient {
           break;
 
         case 'TOOL_CALL_RESULT':
-          options.onToolCallResult?.(backendEvent.content, backendEvent.metadata);
+          options.onToolCallResult?.(
+            backendEvent.content,
+            backendEvent.metadata
+          );
           break;
 
         case 'TYPING_START': {
           // Live agent started typing — parse metadata for agent identity
           const typingStartEvent: TypingStatusEvent = {
             isTyping: true,
-            ...(backendEvent.metadata && typeof backendEvent.metadata === 'object'
-              ? backendEvent.metadata as Partial<TypingStatusEvent>
+            ...(backendEvent.metadata &&
+            typeof backendEvent.metadata === 'object'
+              ? (backendEvent.metadata as Partial<TypingStatusEvent>)
               : {}),
           };
           options.onAgentTypingStart?.(typingStartEvent);
@@ -915,8 +970,9 @@ export class StreamingClient {
           // Live agent stopped typing
           const typingStopEvent: TypingStatusEvent = {
             isTyping: false,
-            ...(backendEvent.metadata && typeof backendEvent.metadata === 'object'
-              ? backendEvent.metadata as Partial<TypingStatusEvent>
+            ...(backendEvent.metadata &&
+            typeof backendEvent.metadata === 'object'
+              ? (backendEvent.metadata as Partial<TypingStatusEvent>)
               : {}),
           };
           options.onAgentTypingStop?.(typingStopEvent);
@@ -924,7 +980,9 @@ export class StreamingClient {
         }
 
         default:
-          this.logger.debug('Unhandled backend event type', { type: backendEvent.type });
+          this.logger.debug('Unhandled backend event type', {
+            type: backendEvent.type,
+          });
       }
 
       return;
@@ -960,7 +1018,9 @@ export class StreamingClient {
 
       case 'done': {
         const finalContent = data.content ?? state.accumulated;
-        const messageId = data.messageId ?? (state.streamingMessageId || this.generateFallbackId());
+        const messageId =
+          data.messageId ??
+          (state.streamingMessageId || this.generateFallbackId());
 
         const completedMessage: ChatMessage = {
           id: messageId,
@@ -977,7 +1037,10 @@ export class StreamingClient {
       }
 
       case 'error': {
-        const errorMessage = data.content ?? data.error?.message ?? 'An error occurred during response generation';
+        const errorMessage =
+          data.content ??
+          data.error?.message ??
+          'An error occurred during response generation';
         const chatbotError: import('../types').ChatbotError = {
           code: 'STREAM_ERROR',
           message: errorMessage,
@@ -1012,7 +1075,9 @@ export class StreamingClient {
       case 'message.start':
         if (data.messageId) {
           setMessageId(data.messageId);
-          this.logger.debug('Streaming message started', { messageId: data.messageId });
+          this.logger.debug('Streaming message started', {
+            messageId: data.messageId,
+          });
         }
         break;
 
@@ -1058,7 +1123,9 @@ export class StreamingClient {
         const serverError = data.error;
         const chatbotError: import('../types').ChatbotError = {
           code: 'API_ERROR',
-          message: serverError?.message ?? 'An error occurred during response generation',
+          message:
+            serverError?.message ??
+            'An error occurred during response generation',
         };
         // Only assign details when the server provided an error code
         // (exactOptionalPropertyTypes forbids assigning undefined explicitly)
@@ -1095,7 +1162,10 @@ export class StreamingClient {
    * @param secondary - Optional consumer-provided signal
    * @returns A combined signal, or `primary` when `secondary` is absent
    */
-  private combineSignals(primary: AbortSignal, secondary?: AbortSignal): AbortSignal {
+  private combineSignals(
+    primary: AbortSignal,
+    secondary?: AbortSignal
+  ): AbortSignal {
     if (!secondary) return primary;
 
     // Use AbortSignal.any() when available (Chrome 116+, Firefox 124+, Safari 17.4+)
@@ -1120,7 +1190,10 @@ export class StreamingClient {
    * @returns A unique string identifier
    */
   private generateFallbackId(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    if (
+      typeof crypto !== 'undefined' &&
+      typeof crypto.randomUUID === 'function'
+    ) {
       return crypto.randomUUID();
     }
     return `stream-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;

@@ -35,13 +35,13 @@ function stubFetch(overrides: Record<string, unknown> = {}) {
           privacyPolicyUrl: 'https://example.com/privacy',
           ...overrides,
         }),
-    }),
+    })
   );
 }
 
 function getShadowRoot(): ShadowRoot | null {
   const hostEl = document.querySelector(
-    '[data-nevent-widget="newsletter"]',
+    '[data-nevent-widget="newsletter"]'
   ) as HTMLElement;
   return hostEl?.shadowRoot ?? null;
 }
@@ -54,13 +54,13 @@ describe('Sanitizer (core)', () => {
   describe('escapeHtml', () => {
     it('should escape HTML special characters', () => {
       expect(Sanitizer.escapeHtml('<script>alert(1)</script>')).toBe(
-        '&lt;script&gt;alert(1)&lt;/script&gt;',
+        '&lt;script&gt;alert(1)&lt;/script&gt;'
       );
     });
 
     it('should escape quotes', () => {
       expect(Sanitizer.escapeHtml('"hello" & \'world\'')).toBe(
-        '&quot;hello&quot; &amp; &#39;world&#39;',
+        '&quot;hello&quot; &amp; &#39;world&#39;'
       );
     });
 
@@ -72,7 +72,7 @@ describe('Sanitizer (core)', () => {
   describe('sanitizeHtml', () => {
     it('should remove script tags', () => {
       const result = Sanitizer.sanitizeHtml(
-        '<b>Hello</b><script>alert(1)</script>',
+        '<b>Hello</b><script>alert(1)</script>'
       );
       expect(result).toContain('<b>Hello</b>');
       expect(result).not.toContain('<script>');
@@ -81,7 +81,7 @@ describe('Sanitizer (core)', () => {
 
     it('should preserve allowed tags', () => {
       const result = Sanitizer.sanitizeHtml(
-        '<a href="https://example.com" target="_blank">Link</a>',
+        '<a href="https://example.com" target="_blank">Link</a>'
       );
       expect(result).toContain('<a');
       expect(result).toContain('href="https://example.com"');
@@ -90,14 +90,14 @@ describe('Sanitizer (core)', () => {
 
     it('should remove event handlers', () => {
       const result = Sanitizer.sanitizeHtml(
-        '<a href="#" onclick="alert(1)">Click</a>',
+        '<a href="#" onclick="alert(1)">Click</a>'
       );
       expect(result).not.toContain('onclick');
     });
 
     it('should block javascript: URLs', () => {
       const result = Sanitizer.sanitizeHtml(
-        '<a href="javascript:alert(1)">XSS</a>',
+        '<a href="javascript:alert(1)">XSS</a>'
       );
       expect(result).not.toContain('javascript:');
     });
@@ -246,7 +246,7 @@ describe('Newsletter Widget Sanitization', () => {
 
       const shadow = getShadowRoot();
       const status = shadow?.querySelector(
-        '.nevent-status-message',
+        '.nevent-status-message'
       ) as HTMLElement;
 
       // Verify status element exists and uses textContent by default

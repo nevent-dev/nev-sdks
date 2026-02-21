@@ -85,7 +85,7 @@ export class BubbleRenderer {
   constructor(
     private position: BubblePosition,
     private styles: BubbleStyles | undefined,
-    private i18n: I18nManager,
+    private i18n: I18nManager
   ) {}
 
   // --------------------------------------------------------------------------
@@ -124,13 +124,15 @@ export class BubbleRenderer {
 
     // Chat icon (visible by default)
     this.chatIcon = document.createElement('span');
-    this.chatIcon.className = 'nevent-chatbot-bubble-icon nevent-chatbot-bubble-icon--chat';
+    this.chatIcon.className =
+      'nevent-chatbot-bubble-icon nevent-chatbot-bubble-icon--chat';
     this.chatIcon.innerHTML = CHAT_ICON_SVG;
     this.applyChatIconStyles(true);
 
     // Close icon (hidden by default)
     this.closeIcon = document.createElement('span');
-    this.closeIcon.className = 'nevent-chatbot-bubble-icon nevent-chatbot-bubble-icon--close';
+    this.closeIcon.className =
+      'nevent-chatbot-bubble-icon nevent-chatbot-bubble-icon--close';
     this.closeIcon.innerHTML = CLOSE_ICON_SVG;
     this.applyCloseIconStyles(false);
 
@@ -214,7 +216,7 @@ export class BubbleRenderer {
     this.bubble.setAttribute('aria-expanded', String(isOpen));
     this.bubble.setAttribute(
       'aria-label',
-      isOpen ? this.i18n.t('closeChat') : this.i18n.t('openChat'),
+      isOpen ? this.i18n.t('closeChat') : this.i18n.t('openChat')
     );
 
     this.applyChatIconStyles(!isOpen);
@@ -306,7 +308,8 @@ export class BubbleRenderer {
       // Do NOT set outline:none — let CSS handle :focus-visible (see css-generator)
       // Entrance animation: starts at scale(0), transitions to scale(1)
       transform: 'scale(0)',
-      transition: 'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease',
+      transition:
+        'transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), box-shadow 0.2s ease',
     });
 
     // Keyboard focus: show ring only on :focus-visible (not on mouse click).
@@ -393,7 +396,8 @@ export class BubbleRenderer {
       padding: '0 5px',
       boxSizing: 'border-box',
       lineHeight: '1',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily:
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     });
   }
 }

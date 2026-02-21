@@ -105,7 +105,10 @@ const PREVIEWABLE_TYPES = new Set([
 export class FileUploadService {
   /** Resolved upload configuration with defaults applied */
   private readonly config: Required<
-    Pick<FileUploadConfig, 'enabled' | 'maxFileSize' | 'maxFiles' | 'acceptedTypes'>
+    Pick<
+      FileUploadConfig,
+      'enabled' | 'maxFileSize' | 'maxFiles' | 'acceptedTypes'
+    >
   > & { uploadEndpoint: string };
 
   /** Authentication token for the upload endpoint */
@@ -137,7 +140,7 @@ export class FileUploadService {
     apiUrl: string,
     tenantId: string,
     token: string,
-    debug = false,
+    debug = false
   ) {
     const baseUrl = apiUrl.replace(/\/$/, '');
 
@@ -146,7 +149,8 @@ export class FileUploadService {
       maxFileSize: uploadConfig?.maxFileSize ?? DEFAULT_MAX_FILE_SIZE,
       maxFiles: uploadConfig?.maxFiles ?? DEFAULT_MAX_FILES,
       acceptedTypes: uploadConfig?.acceptedTypes ?? [...DEFAULT_ACCEPTED_TYPES],
-      uploadEndpoint: uploadConfig?.uploadEndpoint ?? `${baseUrl}/chatbot/upload`,
+      uploadEndpoint:
+        uploadConfig?.uploadEndpoint ?? `${baseUrl}/chatbot/upload`,
     };
 
     this.tenantId = tenantId;
@@ -249,7 +253,7 @@ export class FileUploadService {
    */
   async upload(
     file: File,
-    onProgress: (progress: number) => void,
+    onProgress: (progress: number) => void
   ): Promise<FileAttachment> {
     const id = this.generateId();
     const thumbnailUrl = this.createPreview(file);
@@ -301,7 +305,10 @@ export class FileUploadService {
             attachment.url = response.url;
             attachment.status = 'uploaded';
             attachment.progress = 100;
-            this.logger.debug('File uploaded successfully', { id, url: response.url });
+            this.logger.debug('File uploaded successfully', {
+              id,
+              url: response.url,
+            });
           } catch {
             attachment.status = 'error';
             attachment.error = 'Invalid server response';
@@ -378,7 +385,9 @@ export class FileUploadService {
       this.blobUrls.add(url);
       return url;
     } catch {
-      this.logger.warn('Failed to create preview blob URL', { name: file.name });
+      this.logger.warn('Failed to create preview blob URL', {
+        name: file.name,
+      });
       return null;
     }
   }
@@ -484,7 +493,10 @@ export class FileUploadService {
    * @returns A unique string identifier
    */
   private generateId(): string {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    if (
+      typeof crypto !== 'undefined' &&
+      typeof crypto.randomUUID === 'function'
+    ) {
       return crypto.randomUUID();
     }
     return `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;

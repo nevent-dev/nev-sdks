@@ -29,11 +29,7 @@ import { FileUploadService } from '../../file-upload-service';
  * @param type - MIME type
  * @returns A File object
  */
-function createMockFile(
-  name: string,
-  size: number,
-  type: string
-): File {
+function createMockFile(name: string, size: number, type: string): File {
   const buffer = new ArrayBuffer(size);
   return new File([buffer], name, { type });
 }
@@ -76,7 +72,11 @@ describe('E2E: File Upload Flow', () => {
     });
 
     it('should accept a valid PDF file', () => {
-      const file = createMockFile('document.pdf', 1024 * 500, 'application/pdf');
+      const file = createMockFile(
+        'document.pdf',
+        1024 * 500,
+        'application/pdf'
+      );
       const result = service.validate(file);
       expect(result.valid).toBe(true);
     });
@@ -140,7 +140,11 @@ describe('E2E: File Upload Flow', () => {
     });
 
     it('should reject an executable file', () => {
-      const file = createMockFile('malware.exe', 1024, 'application/x-msdownload');
+      const file = createMockFile(
+        'malware.exe',
+        1024,
+        'application/x-msdownload'
+      );
       const result = service.validate(file);
       expect(result.valid).toBe(false);
     });
@@ -181,7 +185,11 @@ describe('E2E: File Upload Flow', () => {
       expect(customService.validate(bigImage).valid).toBe(false);
 
       // PDF under 1MB should be accepted
-      const smallPdf = createMockFile('small.pdf', 500 * 1024, 'application/pdf');
+      const smallPdf = createMockFile(
+        'small.pdf',
+        500 * 1024,
+        'application/pdf'
+      );
       expect(customService.validate(smallPdf).valid).toBe(true);
 
       // Image should be rejected (only PDFs accepted)
@@ -217,14 +225,18 @@ describe('E2E: File Upload Flow', () => {
      * Creates a mock XMLHttpRequest that supports addEventListener.
      * The real FileUploadService uses addEventListener for progress, load, error, and abort.
      */
-    function createMockXhr(options: {
-      status?: number;
-      responseText?: string;
-      simulateError?: boolean;
-    } = {}) {
+    function createMockXhr(
+      options: {
+        status?: number;
+        responseText?: string;
+        simulateError?: boolean;
+      } = {}
+    ) {
       const {
         status = 200,
-        responseText = JSON.stringify({ url: 'https://cdn.nevent.es/uploads/file.jpg' }),
+        responseText = JSON.stringify({
+          url: 'https://cdn.nevent.es/uploads/file.jpg',
+        }),
         simulateError = false,
       } = options;
 
@@ -239,16 +251,20 @@ describe('E2E: File Upload Flow', () => {
         status,
         responseText,
         upload: {
-          addEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
-            if (!uploadListeners[event]) uploadListeners[event] = [];
-            uploadListeners[event].push(handler);
-          }),
+          addEventListener: vi.fn(
+            (event: string, handler: (e: unknown) => void) => {
+              if (!uploadListeners[event]) uploadListeners[event] = [];
+              uploadListeners[event].push(handler);
+            }
+          ),
           removeEventListener: vi.fn(),
         },
-        addEventListener: vi.fn((event: string, handler: (e: unknown) => void) => {
-          if (!listeners[event]) listeners[event] = [];
-          listeners[event].push(handler);
-        }),
+        addEventListener: vi.fn(
+          (event: string, handler: (e: unknown) => void) => {
+            if (!listeners[event]) listeners[event] = [];
+            listeners[event].push(handler);
+          }
+        ),
         removeEventListener: vi.fn(),
         abort: vi.fn(),
       };
@@ -281,7 +297,9 @@ describe('E2E: File Upload Flow', () => {
       const mockXhr = createMockXhr();
 
       const OriginalXhr = globalThis.XMLHttpRequest;
-      globalThis.XMLHttpRequest = vi.fn(() => mockXhr) as unknown as typeof XMLHttpRequest;
+      globalThis.XMLHttpRequest = vi.fn(
+        () => mockXhr
+      ) as unknown as typeof XMLHttpRequest;
 
       try {
         const file = createMockFile('test.jpg', 1024, 'image/jpeg');
@@ -290,8 +308,14 @@ describe('E2E: File Upload Flow', () => {
         const result = await service.upload(file, progressCallback);
 
         // Verify XMLHttpRequest was configured correctly
-        expect(mockXhr.open).toHaveBeenCalledWith('POST', expect.stringContaining('/chatbot/upload'));
-        expect(mockXhr.setRequestHeader).toHaveBeenCalledWith('X-Tenant-ID', 'tenant-test-456');
+        expect(mockXhr.open).toHaveBeenCalledWith(
+          'POST',
+          expect.stringContaining('/chatbot/upload')
+        );
+        expect(mockXhr.setRequestHeader).toHaveBeenCalledWith(
+          'X-Tenant-ID',
+          'tenant-test-456'
+        );
         expect(mockXhr.send).toHaveBeenCalled();
 
         // Result should have the CDN URL
@@ -307,7 +331,9 @@ describe('E2E: File Upload Flow', () => {
       const mockXhr = createMockXhr({ simulateError: true });
 
       const OriginalXhr = globalThis.XMLHttpRequest;
-      globalThis.XMLHttpRequest = vi.fn(() => mockXhr) as unknown as typeof XMLHttpRequest;
+      globalThis.XMLHttpRequest = vi.fn(
+        () => mockXhr
+      ) as unknown as typeof XMLHttpRequest;
 
       try {
         const file = createMockFile('fail.jpg', 1024, 'image/jpeg');

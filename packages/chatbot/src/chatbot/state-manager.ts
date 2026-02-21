@@ -350,7 +350,10 @@ export class StateManager {
     } catch (error) {
       // Storage quota exceeded — not a fatal error. The widget continues to work
       // without persistence for this session.
-      console.warn('[NeventChatbot:StateManager] Could not persist state (quota exceeded?):', error);
+      console.warn(
+        '[NeventChatbot:StateManager] Could not persist state (quota exceeded?):',
+        error
+      );
     }
   }
 
@@ -369,7 +372,9 @@ export class StateManager {
     }
 
     try {
-      const persisted = this.storage.get<PersistedConversationState>(this.persistKey);
+      const persisted = this.storage.get<PersistedConversationState>(
+        this.persistKey
+      );
       if (!persisted) {
         return null;
       }
@@ -383,7 +388,9 @@ export class StateManager {
         !Array.isArray(persisted.messages) ||
         typeof persisted.lastActivity !== 'string'
       ) {
-        console.warn('[NeventChatbot:StateManager] Persisted state is malformed — clearing.');
+        console.warn(
+          '[NeventChatbot:StateManager] Persisted state is malformed — clearing.'
+        );
         this.clearPersisted();
         return null;
       }
@@ -391,7 +398,9 @@ export class StateManager {
       return persisted;
     } catch {
       // JSON.parse error or any other unexpected failure
-      console.warn('[NeventChatbot:StateManager] Failed to restore persisted state — clearing.');
+      console.warn(
+        '[NeventChatbot:StateManager] Failed to restore persisted state — clearing.'
+      );
       this.clearPersisted();
       return null;
     }
@@ -441,7 +450,10 @@ export class StateManager {
       try {
         listener(snapshot);
       } catch (error) {
-        console.error('[NeventChatbot:StateManager] Subscriber threw an error:', error);
+        console.error(
+          '[NeventChatbot:StateManager] Subscriber threw an error:',
+          error
+        );
       }
     });
   }

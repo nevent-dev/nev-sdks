@@ -34,13 +34,13 @@ function stubFetch(overrides: Record<string, unknown> = {}) {
           privacyPolicyUrl: 'https://example.com/privacy',
           ...overrides,
         }),
-    }),
+    })
   );
 }
 
 function getShadowRoot(): ShadowRoot | null {
   const hostEl = document.querySelector(
-    '[data-nevent-widget="newsletter"]',
+    '[data-nevent-widget="newsletter"]'
   ) as HTMLElement;
   return hostEl?.shadowRoot ?? null;
 }
@@ -145,7 +145,7 @@ describe('Newsletter Widget Accessibility', () => {
 
       const shadow = getShadowRoot();
       const checkbox = shadow?.querySelector(
-        '.nevent-gdpr-checkbox',
+        '.nevent-gdpr-checkbox'
       ) as HTMLInputElement;
       expect(checkbox?.required).toBe(true);
     });

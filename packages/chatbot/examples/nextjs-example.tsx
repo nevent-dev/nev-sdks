@@ -78,10 +78,7 @@ interface NeventChatbotProps extends ChatbotConfig {
  *   );
  * }
  */
-export function NeventChatbot({
-  handleRef,
-  ...config
-}: NeventChatbotProps) {
+export function NeventChatbot({ handleRef, ...config }: NeventChatbotProps) {
   // Holds the widget instance. Using `any` here avoids importing the class
   // type at module level, which would cause SSR to attempt evaluating the SDK.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,11 +102,11 @@ export function NeventChatbot({
       // Wire the external handle ref if provided
       if (handleRef && 'current' in handleRef) {
         (handleRef as React.MutableRefObject<ChatbotHandle | null>).current = {
-          open:              () => widget.open(),
-          close:             () => widget.close(),
-          toggle:            () => widget.toggle(),
-          isOpen:            () => widget.isOpen(),
-          sendMessage:       (text) => widget.sendMessage(text),
+          open: () => widget.open(),
+          close: () => widget.close(),
+          toggle: () => widget.toggle(),
+          isOpen: () => widget.isOpen(),
+          sendMessage: (text) => widget.sendMessage(text),
           clearConversation: () => widget.clearConversation(),
         };
       }
@@ -121,7 +118,8 @@ export function NeventChatbot({
       widgetRef.current = null;
 
       if (handleRef && 'current' in handleRef) {
-        (handleRef as React.MutableRefObject<ChatbotHandle | null>).current = null;
+        (handleRef as React.MutableRefObject<ChatbotHandle | null>).current =
+          null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

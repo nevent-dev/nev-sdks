@@ -112,7 +112,9 @@ export function createWidget(overrides: Partial<NewsletterConfig> = {}): {
  * @param options - Options for configuring mock responses
  * @returns The mock function for assertions
  */
-export function mockFetch(options: MockFetchOptions = {}): ReturnType<typeof vi.fn> {
+export function mockFetch(
+  options: MockFetchOptions = {}
+): ReturnType<typeof vi.fn> {
   const {
     configResponse = {},
     configOk = true,
@@ -130,7 +132,11 @@ export function mockFetch(options: MockFetchOptions = {}): ReturnType<typeof vi.
   // HttpClient expects from the fetch JSON body.
   const apiResponse = subscriptionOk
     ? { data: subscriptionData, success: true }
-    : { message: (subscriptionData as Record<string, unknown>).message || 'Error', status: subscriptionStatus };
+    : {
+        message:
+          (subscriptionData as Record<string, unknown>).message || 'Error',
+        status: subscriptionStatus,
+      };
 
   const mockFn = vi.fn().mockImplementation((url: string) => {
     const urlStr = typeof url === 'string' ? url : String(url);
@@ -158,7 +164,7 @@ export function mockFetch(options: MockFetchOptions = {}): ReturnType<typeof vi.
 
       if (subscriptionDelay > 0) {
         return new Promise((resolve) =>
-          setTimeout(() => resolve(response), subscriptionDelay),
+          setTimeout(() => resolve(response), subscriptionDelay)
         );
       }
 
@@ -184,7 +190,10 @@ export function mockFetch(options: MockFetchOptions = {}): ReturnType<typeof vi.
  * @returns The mock function
  */
 export function mockFetchSuccess(
-  data: Record<string, unknown> = { success: true, message: 'Subscription successful!' },
+  data: Record<string, unknown> = {
+    success: true,
+    message: 'Subscription successful!',
+  }
 ): ReturnType<typeof vi.fn> {
   return mockFetch({ subscriptionData: data });
 }
@@ -198,7 +207,7 @@ export function mockFetchSuccess(
  */
 export function mockFetchError(
   status: number,
-  body: Record<string, unknown> = { message: 'Server error' },
+  body: Record<string, unknown> = { message: 'Server error' }
 ): ReturnType<typeof vi.fn> {
   return mockFetch({
     subscriptionOk: false,
@@ -219,7 +228,7 @@ export function mockFetchError(
  */
 export function getShadowRoot(container: HTMLElement): ShadowRoot | null {
   const hostEl = container.querySelector(
-    '[data-nevent-widget="newsletter"]',
+    '[data-nevent-widget="newsletter"]'
   ) as HTMLElement | null;
   return hostEl?.shadowRoot ?? null;
 }
@@ -238,7 +247,7 @@ export function getShadowRoot(container: HTMLElement): ShadowRoot | null {
 export function fillInput(
   shadowRoot: ShadowRoot,
   selector: string,
-  value: string,
+  value: string
 ): HTMLInputElement | null {
   const input = shadowRoot.querySelector(selector) as HTMLInputElement | null;
   if (!input) return null;
@@ -250,7 +259,7 @@ export function fillInput(
   // Set value and dispatch events to simulate user typing
   const nativeSetter = Object.getOwnPropertyDescriptor(
     HTMLInputElement.prototype,
-    'value',
+    'value'
   )?.set;
   if (nativeSetter) {
     nativeSetter.call(input, value);
@@ -277,7 +286,7 @@ export function fillInput(
  */
 export function clickElement(
   shadowRoot: ShadowRoot,
-  selector: string,
+  selector: string
 ): HTMLElement | null {
   const element = shadowRoot.querySelector(selector) as HTMLElement | null;
   if (!element) return null;
@@ -299,9 +308,11 @@ export function clickElement(
 export function toggleCheckbox(
   shadowRoot: ShadowRoot,
   selector: string,
-  checked: boolean,
+  checked: boolean
 ): HTMLInputElement | null {
-  const checkbox = shadowRoot.querySelector(selector) as HTMLInputElement | null;
+  const checkbox = shadowRoot.querySelector(
+    selector
+  ) as HTMLInputElement | null;
   if (!checkbox) return null;
 
   checkbox.checked = checked;
@@ -341,7 +352,7 @@ export function submitForm(shadowRoot: ShadowRoot): HTMLFormElement | null {
 export async function waitFor(
   condition: () => boolean,
   timeout = 3000,
-  interval = 50,
+  interval = 50
 ): Promise<void> {
   const start = Date.now();
 
@@ -393,7 +404,9 @@ export function getStatusMessage(shadowRoot: ShadowRoot): {
   isSuccess: boolean;
   isError: boolean;
 } {
-  const status = shadowRoot.querySelector('.nevent-status-message') as HTMLElement | null;
+  const status = shadowRoot.querySelector(
+    '.nevent-status-message'
+  ) as HTMLElement | null;
 
   if (!status) {
     return { text: '', visible: false, isSuccess: false, isError: false };
@@ -413,6 +426,10 @@ export function getStatusMessage(shadowRoot: ShadowRoot): {
  * @param shadowRoot - The shadow root
  * @returns The button element or null
  */
-export function getSubmitButton(shadowRoot: ShadowRoot): HTMLButtonElement | null {
-  return shadowRoot.querySelector('.nevent-submit-button') as HTMLButtonElement | null;
+export function getSubmitButton(
+  shadowRoot: ShadowRoot
+): HTMLButtonElement | null {
+  return shadowRoot.querySelector(
+    '.nevent-submit-button'
+  ) as HTMLButtonElement | null;
 }

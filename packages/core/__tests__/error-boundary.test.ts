@@ -40,7 +40,7 @@ describe('ErrorBoundary', () => {
         expect.objectContaining({
           code: 'UNKNOWN_ERROR',
           message: 'testContext: boom',
-        }),
+        })
       );
     });
 
@@ -55,7 +55,7 @@ describe('ErrorBoundary', () => {
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'no context',
-        }),
+        })
       );
     });
 
@@ -80,7 +80,7 @@ describe('ErrorBoundary', () => {
     it('should return the result of a successful async function', async () => {
       const result = await boundary.guardAsync(
         async () => 'async-result',
-        'test',
+        'test'
       );
       expect(result).toBe('async-result');
     });
@@ -104,7 +104,7 @@ describe('ErrorBoundary', () => {
         expect.objectContaining({
           code: 'UNKNOWN_ERROR',
           message: 'asyncCtx: async error',
-        }),
+        })
       );
     });
   });
@@ -148,7 +148,7 @@ describe('ErrorBoundary', () => {
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'callback:onMessage: callback crash',
-        }),
+        })
       );
     });
   });
@@ -186,7 +186,7 @@ describe('ErrorBoundary', () => {
           throw new Error('timer crash');
         },
         100,
-        'tick',
+        'tick'
       );
 
       vi.advanceTimersByTime(100);
@@ -194,7 +194,7 @@ describe('ErrorBoundary', () => {
       expect(handler).toHaveBeenCalledWith(
         expect.objectContaining({
           message: 'timer:tick: timer crash',
-        }),
+        })
       );
 
       clearInterval(timerId);
@@ -218,7 +218,7 @@ describe('ErrorBoundary', () => {
     it('should normalize Error instances with context', () => {
       const result = ErrorBoundary.normalize(
         new Error('test error'),
-        'myContext',
+        'myContext'
       );
       expect(result).toEqual({
         code: 'UNKNOWN_ERROR',
@@ -270,7 +270,9 @@ describe('ErrorBoundary', () => {
 
   describe('debug mode', () => {
     it('should log errors to console when debug is enabled', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       const debugBoundary = new ErrorBoundary(true);
 
       debugBoundary.guard(() => {
@@ -279,14 +281,16 @@ describe('ErrorBoundary', () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('Error in debugCtx'),
-        expect.any(Error),
+        expect.any(Error)
       );
 
       consoleSpy.mockRestore();
     });
 
     it('should NOT log errors when debug is disabled', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       boundary.guard(() => {
         throw new Error('no debug');
@@ -298,7 +302,9 @@ describe('ErrorBoundary', () => {
     });
 
     it('should use custom log prefix', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       const customBoundary = new ErrorBoundary(true, '[MySDK]');
 
       customBoundary.guard(() => {
@@ -307,14 +313,16 @@ describe('ErrorBoundary', () => {
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('[MySDK]'),
-        expect.any(Error),
+        expect.any(Error)
       );
 
       consoleSpy.mockRestore();
     });
 
     it('should log when error handler itself throws (debug mode)', () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
       const debugBoundary = new ErrorBoundary(true);
 
       debugBoundary.setErrorHandler(() => {

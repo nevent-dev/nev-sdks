@@ -102,7 +102,7 @@ describe('ErrorBoundary', () => {
       await expect(
         boundary.guardAsync(async () => {
           throw new Error('async error');
-        }, 'test'),
+        }, 'test')
       ).resolves.toBeUndefined();
     });
 
@@ -121,7 +121,7 @@ describe('ErrorBoundary', () => {
     it('handles rejected promises (not just thrown errors)', async () => {
       await boundary.guardAsync(
         () => Promise.reject(new Error('rejected')),
-        'test',
+        'test'
       );
 
       expect(errorHandler).toHaveBeenCalledOnce();
@@ -265,7 +265,9 @@ describe('ErrorBoundary', () => {
     it('logs to console.error when debug is true', () => {
       const debugBoundary = new ErrorBoundary(true);
       debugBoundary.setErrorHandler(vi.fn());
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       debugBoundary.guard(() => {
         throw new Error('debug error');
@@ -280,7 +282,9 @@ describe('ErrorBoundary', () => {
     });
 
     it('does not log to console when debug is false', () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       boundary.guard(() => {
         throw new Error('silent error');
@@ -296,7 +300,9 @@ describe('ErrorBoundary', () => {
       debugBoundary.setErrorHandler(() => {
         throw new Error('handler error');
       });
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
 
       debugBoundary.guard(() => {
         throw new Error('trigger');
@@ -429,9 +435,15 @@ describe('ErrorBoundary', () => {
     });
 
     it('multiple sequential errors are all reported', () => {
-      boundary.guard(() => { throw new Error('first'); }, 'op1');
-      boundary.guard(() => { throw new Error('second'); }, 'op2');
-      boundary.guard(() => { throw new Error('third'); }, 'op3');
+      boundary.guard(() => {
+        throw new Error('first');
+      }, 'op1');
+      boundary.guard(() => {
+        throw new Error('second');
+      }, 'op2');
+      boundary.guard(() => {
+        throw new Error('third');
+      }, 'op3');
 
       expect(errorHandler).toHaveBeenCalledTimes(3);
     });

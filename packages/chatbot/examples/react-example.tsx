@@ -148,7 +148,9 @@ export function WithCallbacksExample() {
 
   return (
     <div>
-      <button onClick={() => chatbotRef.current?.open()}>Open Support Chat</button>
+      <button onClick={() => chatbotRef.current?.open()}>
+        Open Support Chat
+      </button>
 
       <NeventChatbot
         chatbotId="your-chatbot-id"
@@ -172,14 +174,19 @@ export function WithCallbacksExample() {
  */
 export function InlineExample() {
   return (
-    <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}>
+    <section
+      style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24 }}
+    >
       <div>
         <h2>Festival Info</h2>
         <p>Parque de la Ciudadela, Barcelona. Doors open at 17:00.</p>
       </div>
 
       {/* The widget renders inside this container */}
-      <div id="chatbot-container" style={{ height: 500, borderRadius: 16, overflow: 'hidden' }} />
+      <div
+        id="chatbot-container"
+        style={{ height: 500, borderRadius: 16, overflow: 'hidden' }}
+      />
 
       <NeventChatbot
         chatbotId="your-chatbot-id"

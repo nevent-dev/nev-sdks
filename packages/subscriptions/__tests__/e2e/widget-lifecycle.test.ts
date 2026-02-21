@@ -48,7 +48,9 @@ describe('Widget Lifecycle (E2E)', () => {
       await widget.init();
 
       // Verify host element exists
-      const hostEl = container.querySelector('[data-nevent-widget="newsletter"]');
+      const hostEl = container.querySelector(
+        '[data-nevent-widget="newsletter"]'
+      );
       expect(hostEl).not.toBeNull();
 
       // Verify Shadow DOM is attached
@@ -114,7 +116,9 @@ describe('Widget Lifecycle (E2E)', () => {
       await widget.init();
 
       const shadow = getShadowRoot(container)!;
-      const emailInput = shadow.querySelector('input[name="email"]') as HTMLInputElement;
+      const emailInput = shadow.querySelector(
+        'input[name="email"]'
+      ) as HTMLInputElement;
       expect(emailInput).not.toBeNull();
       // dataType 'TEXT' maps to HTML input type 'text'; the widget detects email
       // by fieldName/semanticKey rather than HTML input type
@@ -156,7 +160,7 @@ describe('Widget Lifecycle (E2E)', () => {
     it('should fall back to defaults when config endpoint throws network error', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockRejectedValue(new Error('Network error')),
+        vi.fn().mockRejectedValue(new Error('Network error'))
       );
       const { widget, container } = createWidget();
 
@@ -201,8 +205,8 @@ describe('Widget Lifecycle (E2E)', () => {
       await flush();
 
       // Verify subscription API was called
-      const subscriptionCall = fetchMock.mock.calls.find(
-        (call: unknown[]) => String(call[0]).includes('/subscribe'),
+      const subscriptionCall = fetchMock.mock.calls.find((call: unknown[]) =>
+        String(call[0]).includes('/subscribe')
       );
       expect(subscriptionCall).toBeDefined();
 
@@ -457,13 +461,13 @@ describe('Widget Lifecycle (E2E)', () => {
       await widget.init();
 
       expect(
-        container.querySelector('[data-nevent-widget="newsletter"]'),
+        container.querySelector('[data-nevent-widget="newsletter"]')
       ).not.toBeNull();
 
       widget.destroy();
 
       expect(
-        container.querySelector('[data-nevent-widget="newsletter"]'),
+        container.querySelector('[data-nevent-widget="newsletter"]')
       ).toBeNull();
     });
 
@@ -545,10 +549,10 @@ describe('Widget Lifecycle (E2E)', () => {
 
       // Online/offline handlers should have been added
       const onlineAdds = addEventSpy.mock.calls.filter(
-        (call) => call[0] === 'online',
+        (call) => call[0] === 'online'
       );
       const offlineAdds = addEventSpy.mock.calls.filter(
-        (call) => call[0] === 'offline',
+        (call) => call[0] === 'offline'
       );
       expect(onlineAdds.length).toBeGreaterThan(0);
       expect(offlineAdds.length).toBeGreaterThan(0);
@@ -557,10 +561,10 @@ describe('Widget Lifecycle (E2E)', () => {
 
       // Handlers should have been removed
       const onlineRemoves = removeEventSpy.mock.calls.filter(
-        (call) => call[0] === 'online',
+        (call) => call[0] === 'online'
       );
       const offlineRemoves = removeEventSpy.mock.calls.filter(
-        (call) => call[0] === 'offline',
+        (call) => call[0] === 'offline'
       );
       expect(onlineRemoves.length).toBeGreaterThan(0);
       expect(offlineRemoves.length).toBeGreaterThan(0);
@@ -608,8 +612,8 @@ describe('Widget Lifecycle (E2E)', () => {
       await flush();
 
       // 4. Verify API call
-      const subCall = fetchMock.mock.calls.find(
-        (call: unknown[]) => String(call[0]).includes('/subscribe'),
+      const subCall = fetchMock.mock.calls.find((call: unknown[]) =>
+        String(call[0]).includes('/subscribe')
       );
       expect(subCall).toBeDefined();
 
@@ -627,7 +631,7 @@ describe('Widget Lifecycle (E2E)', () => {
 
       // 8. Verify cleanup
       expect(
-        container.querySelector('[data-nevent-widget="newsletter"]'),
+        container.querySelector('[data-nevent-widget="newsletter"]')
       ).toBeNull();
     });
   });

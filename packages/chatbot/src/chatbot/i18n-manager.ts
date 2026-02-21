@@ -152,7 +152,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     uploading: 'Pujant',
     fileTooBig: 'El fitxer és massa gran. Màxim {maxMB} MB.',
     fileTypeNotAllowed: 'Tipus de fitxer no permès.',
-    uploadFailed: "Error en pujar el fitxer. Torna-ho a intentar.",
+    uploadFailed: 'Error en pujar el fitxer. Torna-ho a intentar.',
     dragDropHint: 'Deixa anar els fitxers aquí',
     agentTyping: '{name} està escrivint...',
     someoneTyping: 'Algú està escrivint...',
@@ -200,7 +200,12 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
 /**
  * Ordered list of all supported locales for validation purposes.
  */
-const SUPPORTED_LOCALES: ReadonlyArray<SupportedLocale> = ['es', 'en', 'ca', 'pt'];
+const SUPPORTED_LOCALES: ReadonlyArray<SupportedLocale> = [
+  'es',
+  'en',
+  'ca',
+  'pt',
+];
 
 /**
  * Default fallback locale when browser locale cannot be mapped to a supported one.
@@ -369,11 +374,17 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * i18n.format('minutesAgo', { n: 5 });  // '5 min ago'
    * ```
    */
-  format(key: keyof ChatbotTranslations, params: Record<string, string | number>): string {
+  format(
+    key: keyof ChatbotTranslations,
+    params: Record<string, string | number>
+  ): string {
     let result = this.t(key);
 
     for (const [paramKey, paramValue] of Object.entries(params)) {
-      result = result.replace(new RegExp(`\\{${paramKey}\\}`, 'g'), String(paramValue));
+      result = result.replace(
+        new RegExp(`\\{${paramKey}\\}`, 'g'),
+        String(paramValue)
+      );
     }
 
     return result;
@@ -450,7 +461,10 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
     const primaryTag = rawLocale.split('-')[0] ?? '';
 
     // Direct match against supported locales
-    if (primaryTag && (SUPPORTED_LOCALES as ReadonlyArray<string>).includes(primaryTag)) {
+    if (
+      primaryTag &&
+      (SUPPORTED_LOCALES as ReadonlyArray<string>).includes(primaryTag)
+    ) {
       return primaryTag as SupportedLocale;
     }
 

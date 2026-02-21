@@ -38,7 +38,7 @@ beforeEach(() => {
           newsletterId: 'nl-123',
           tenantId: 'tenant-456',
         }),
-    }),
+    })
   );
 });
 

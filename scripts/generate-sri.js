@@ -240,7 +240,11 @@ function processPackage(pkg) {
   };
 
   const jsonOutputPath = path.join(distDir, 'sri-hashes.json');
-  fs.writeFileSync(jsonOutputPath, JSON.stringify(jsonOutput, null, 2) + '\n', 'utf8');
+  fs.writeFileSync(
+    jsonOutputPath,
+    JSON.stringify(jsonOutput, null, 2) + '\n',
+    'utf8'
+  );
   console.log(`  -> Written: sri-hashes.json`);
 
   // ── Write sri-hashes.txt ────────────────────────────────────────────────────

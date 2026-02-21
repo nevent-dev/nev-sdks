@@ -60,7 +60,7 @@ export interface HttpClientConfig {
  */
 export type RequestInterceptor = (
   url: string,
-  options: RequestInit,
+  options: RequestInit
 ) => RequestInit | Promise<RequestInit>;
 
 /**
@@ -74,7 +74,7 @@ export type RequestInterceptor = (
  * @returns The (possibly modified) Response
  */
 export type ResponseInterceptor = (
-  response: Response,
+  response: Response
 ) => Response | Promise<Response>;
 
 // ============================================================================
@@ -141,11 +141,7 @@ export class HttpClient {
    * @param apiKey - API key for authentication (sent via X-API-Key header)
    * @param config - Optional client configuration for timeout, retry, etc.
    */
-  constructor(
-    baseUrl: string,
-    apiKey: string,
-    config?: HttpClientConfig,
-  ) {
+  constructor(baseUrl: string, apiKey: string, config?: HttpClientConfig) {
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.defaultHeaders = {
       'Content-Type': 'application/json',
@@ -231,7 +227,7 @@ export class HttpClient {
    */
   async request<T>(
     endpoint: string,
-    config: RequestConfig,
+    config: RequestConfig
   ): Promise<ApiResponse<T>> {
     // Offline detection
     if (this.config.offlineDetection && !this.isOnline()) {
@@ -258,7 +254,10 @@ export class HttpClient {
         lastError = error as ApiError;
 
         // Only retry on retryable errors
-        if (!this.isRetryable(lastError) || attempt === this.config.maxRetries) {
+        if (
+          !this.isRetryable(lastError) ||
+          attempt === this.config.maxRetries
+        ) {
           throw lastError;
         }
       }
@@ -292,10 +291,7 @@ export class HttpClient {
    * @param body - Request body (will be JSON stringified)
    * @returns Promise resolving to the API response
    */
-  async post<T>(
-    endpoint: string,
-    body: unknown,
-  ): Promise<ApiResponse<T>> {
+  async post<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'POST', body });
   }
 
@@ -307,10 +303,7 @@ export class HttpClient {
    * @param body - Request body (will be JSON stringified)
    * @returns Promise resolving to the API response
    */
-  async put<T>(
-    endpoint: string,
-    body: unknown,
-  ): Promise<ApiResponse<T>> {
+  async put<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, { method: 'PUT', body });
   }
 
@@ -341,7 +334,7 @@ export class HttpClient {
   private async executeRequest<T>(
     url: string,
     config: RequestConfig,
-    timeout: number,
+    timeout: number
   ): Promise<ApiResponse<T>> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -392,9 +385,7 @@ export class HttpClient {
       // Wrap unexpected errors
       throw this.createError(0, {
         message:
-          error instanceof Error
-            ? error.message
-            : 'Network request failed',
+          error instanceof Error ? error.message : 'Network request failed',
         code: 'NETWORK_ERROR',
       });
     } finally {

@@ -22,7 +22,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ChatbotWidget } from '../../../chatbot-widget';
 import { createMockApi } from '../helpers/mock-api';
-import { createMockConfig, createMockServerConfig } from '../helpers/mock-factories';
+import {
+  createMockConfig,
+  createMockServerConfig,
+} from '../helpers/mock-factories';
 
 // ============================================================================
 // jsdom compatibility shims
@@ -145,8 +148,12 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
 
   afterEach(() => {
     // Remove any widget host/root elements that might have been left by a test
-    document.querySelectorAll('#nevent-chatbot-host').forEach((el) => el.remove());
-    document.querySelectorAll('.nevent-chatbot-root').forEach((el) => el.remove());
+    document
+      .querySelectorAll('#nevent-chatbot-host')
+      .forEach((el) => el.remove());
+    document
+      .querySelectorAll('.nevent-chatbot-root')
+      .forEach((el) => el.remove());
     document.querySelectorAll('[data-vitest-css]').forEach((el) => el.remove());
 
     mockApi.reset();
@@ -265,9 +272,7 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
     });
 
     it('should render the window header with bot name from server config', async () => {
-      const widget = new ChatbotWidget(
-        createMockConfig(),
-      );
+      const widget = new ChatbotWidget(createMockConfig());
       // Server config has name: 'Test Bot'
       await widget.init();
 
@@ -419,7 +424,7 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
 
     it('should NOT render a bubble in inline mode', async () => {
       const widget = new ChatbotWidget(
-        createMockConfig({ containerId: 'chat-container' }),
+        createMockConfig({ containerId: 'chat-container' })
       );
       await widget.init();
 
@@ -431,7 +436,7 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
 
     it('should mount host inside the provided container with shadow root', async () => {
       const widget = new ChatbotWidget(
-        createMockConfig({ containerId: 'chat-container' }),
+        createMockConfig({ containerId: 'chat-container' })
       );
       await widget.init();
 
@@ -448,7 +453,7 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
 
     it('should open the window immediately in inline mode', async () => {
       const widget = new ChatbotWidget(
-        createMockConfig({ containerId: 'chat-container' }),
+        createMockConfig({ containerId: 'chat-container' })
       );
       await widget.init();
 
@@ -461,13 +466,13 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
     it('should call onError with CONTAINER_NOT_FOUND when container does not exist (error isolated)', async () => {
       const onError = vi.fn();
       const widget = new ChatbotWidget(
-        createMockConfig({ containerId: 'non-existent-container', onError }),
+        createMockConfig({ containerId: 'non-existent-container', onError })
       );
 
       // Error boundary isolates the error — init() resolves without throwing
       await expect(widget.init()).resolves.toBeUndefined();
       expect(onError).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 'CONTAINER_NOT_FOUND' }),
+        expect.objectContaining({ code: 'CONTAINER_NOT_FOUND' })
       );
     });
   });
@@ -488,7 +493,9 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
 
       // Messages live inside the shadow root
       const messageElements = queryShadowAll('.nevent-chatbot-message');
-      const texts = Array.from(messageElements).map((el) => el.textContent ?? '');
+      const texts = Array.from(messageElements).map(
+        (el) => el.textContent ?? ''
+      );
       const hasUserMessage = texts.some((t) => t.includes('Hello from test'));
       expect(hasUserMessage).toBe(true);
 
@@ -529,7 +536,7 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
         createMockConfig({
           chatbotId,
           persistConversation: true,
-        }),
+        })
       );
       await widget.init();
       widget.open();
@@ -552,7 +559,7 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
         createMockConfig({
           chatbotId,
           persistConversation: false,
-        }),
+        })
       );
       await widget.init();
       widget.open();
@@ -579,10 +586,10 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
       const onReady2 = vi.fn();
 
       const widget1 = new ChatbotWidget(
-        createMockConfig({ chatbotId: 'bot-widget-1', onReady: onReady1 }),
+        createMockConfig({ chatbotId: 'bot-widget-1', onReady: onReady1 })
       );
       const widget2 = new ChatbotWidget(
-        createMockConfig({ chatbotId: 'bot-widget-2', onReady: onReady2 }),
+        createMockConfig({ chatbotId: 'bot-widget-2', onReady: onReady2 })
       );
 
       await Promise.all([widget1.init(), widget2.init()]);
@@ -600,10 +607,10 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
 
     it('destroying one widget does not affect the other', async () => {
       const widget1 = new ChatbotWidget(
-        createMockConfig({ chatbotId: 'bot-indep-1' }),
+        createMockConfig({ chatbotId: 'bot-indep-1' })
       );
       const widget2 = new ChatbotWidget(
-        createMockConfig({ chatbotId: 'bot-indep-2' }),
+        createMockConfig({ chatbotId: 'bot-indep-2' })
       );
 
       await Promise.all([widget1.init(), widget2.init()]);
@@ -619,10 +626,10 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
 
     it('open/close on one widget does not affect the other', async () => {
       const widget1 = new ChatbotWidget(
-        createMockConfig({ chatbotId: 'bot-state-1' }),
+        createMockConfig({ chatbotId: 'bot-state-1' })
       );
       const widget2 = new ChatbotWidget(
-        createMockConfig({ chatbotId: 'bot-state-2' }),
+        createMockConfig({ chatbotId: 'bot-state-2' })
       );
 
       await Promise.all([widget1.init(), widget2.init()]);
@@ -646,7 +653,7 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
       // Override fetch with a rejecting mock for this test
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockRejectedValue(new Error('Network error')),
+        vi.fn().mockRejectedValue(new Error('Network error'))
       );
 
       const onError = vi.fn();
@@ -655,7 +662,7 @@ describe('ChatbotWidget — Integration: Lifecycle', () => {
       // Error boundary isolates the error — init() resolves without throwing
       await expect(widget.init()).resolves.toBeUndefined();
       expect(onError).toHaveBeenCalledWith(
-        expect.objectContaining({ code: 'CONFIG_LOAD_FAILED' }),
+        expect.objectContaining({ code: 'CONFIG_LOAD_FAILED' })
       );
     });
   });

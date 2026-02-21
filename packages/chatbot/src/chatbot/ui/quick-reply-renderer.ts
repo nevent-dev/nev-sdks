@@ -151,7 +151,7 @@ export class QuickReplyRenderer {
    */
   constructor(
     private readonly styles: QuickReplyStyles | undefined,
-    private readonly i18n: I18nManager,
+    private readonly i18n: I18nManager
   ) {
     // Derive a single primary color used across button states.
     // Priority: explicit borderColor > textColor > CSS var fallback.
@@ -421,7 +421,7 @@ export class QuickReplyRenderer {
     reply: QuickReply,
     onClick: (reply: QuickReply) => void,
     mode: QuickReplyDisplayMode,
-    animated: boolean,
+    animated: boolean
   ): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
@@ -468,7 +468,10 @@ export class QuickReplyRenderer {
    * @param altText - Accessible alt text used if the icon is an image.
    * @returns The icon element (`<span>` or `<img>`).
    */
-  private createIconElement(icon: string, altText: string): HTMLElement | HTMLImageElement {
+  private createIconElement(
+    icon: string,
+    altText: string
+  ): HTMLElement | HTMLImageElement {
     const isUrl = icon.startsWith('http://') || icon.startsWith('https://');
 
     if (isUrl) {
@@ -519,7 +522,10 @@ export class QuickReplyRenderer {
    * @param container - The container div element.
    * @param mode - The chosen display mode.
    */
-  private applyContainerStyles(container: HTMLElement, mode: QuickReplyDisplayMode): void {
+  private applyContainerStyles(
+    container: HTMLElement,
+    mode: QuickReplyDisplayMode
+  ): void {
     const base: Partial<CSSStyleDeclaration> = {
       display: 'flex',
       gap: '8px',
@@ -569,7 +575,7 @@ export class QuickReplyRenderer {
   private applyButtonStyles(
     button: HTMLButtonElement,
     mode: QuickReplyDisplayMode,
-    animated: boolean,
+    animated: boolean
   ): void {
     const s = this.styles;
 
@@ -691,7 +697,7 @@ export class QuickReplyRenderer {
    */
   private attachKeyboardNavigation(
     container: HTMLElement,
-    buttons: HTMLButtonElement[],
+    buttons: HTMLButtonElement[]
   ): void {
     if (buttons.length === 0) return;
 
@@ -701,7 +707,8 @@ export class QuickReplyRenderer {
       // the inner focused element.  Use the container's root node (which is the
       // ShadowRoot when inside Shadow DOM) to get the correct active element.
       const rootNode = container.getRootNode() as Document | ShadowRoot;
-      const focused = (rootNode.activeElement ?? document.activeElement) as HTMLButtonElement | null;
+      const focused = (rootNode.activeElement ??
+        document.activeElement) as HTMLButtonElement | null;
       if (!focused) return;
 
       const idx = buttons.indexOf(focused);
@@ -761,8 +768,7 @@ export class QuickReplyRenderer {
       setTimeout(() => {
         // Use the CSS animation if keyframes are available, otherwise use
         // a simple JS-driven style transition as a progressive enhancement.
-        button.style.animation =
-          `nevent-chatbot-qr-enter ${ENTER_ANIMATION_DURATION_MS}ms ease-out forwards`;
+        button.style.animation = `nevent-chatbot-qr-enter ${ENTER_ANIMATION_DURATION_MS}ms ease-out forwards`;
         button.style.animationDelay = '0ms'; // delay already applied via setTimeout
 
         // Fallback for environments without the keyframe defined:

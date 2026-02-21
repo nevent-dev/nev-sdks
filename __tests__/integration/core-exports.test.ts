@@ -180,7 +180,7 @@ describe('Core Exports - Sanitizer', () => {
     expect(typeof Sanitizer.sanitizeHtml).toBe('function');
 
     const result = Sanitizer.sanitizeHtml(
-      '<b>Hello</b><script>alert(1)</script>',
+      '<b>Hello</b><script>alert(1)</script>'
     );
     expect(result).toBe('<b>Hello</b>');
   });
@@ -188,7 +188,7 @@ describe('Core Exports - Sanitizer', () => {
   it('should accept custom allowed tags list', () => {
     const result = Sanitizer.sanitizeHtml(
       '<b>Bold</b><i>Italic</i><u>Underline</u>',
-      ['b'],
+      ['b']
     );
     expect(result).toContain('<b>Bold</b>');
     expect(result).not.toContain('<i>');

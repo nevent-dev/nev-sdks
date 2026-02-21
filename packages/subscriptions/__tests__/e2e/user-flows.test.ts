@@ -57,12 +57,20 @@ describe('User Flows (E2E)', () => {
       expect(form).not.toBeNull();
 
       // Fill email
-      const emailInput = fillInput(shadow, 'input[name="email"]', 'john@company.com');
+      const emailInput = fillInput(
+        shadow,
+        'input[name="email"]',
+        'john@company.com'
+      );
       expect(emailInput).not.toBeNull();
       expect(emailInput!.value).toBe('john@company.com');
 
       // Accept GDPR
-      const gdprCheckbox = toggleCheckbox(shadow, '.nevent-gdpr-checkbox', true);
+      const gdprCheckbox = toggleCheckbox(
+        shadow,
+        '.nevent-gdpr-checkbox',
+        true
+      );
       expect(gdprCheckbox).not.toBeNull();
       expect(gdprCheckbox!.checked).toBe(true);
 
@@ -72,8 +80,8 @@ describe('User Flows (E2E)', () => {
       await flush();
 
       // Verify API call was made with correct data
-      const subscriptionCall = fetchMock.mock.calls.find(
-        (call: unknown[]) => String(call[0]).includes('/subscribe'),
+      const subscriptionCall = fetchMock.mock.calls.find((call: unknown[]) =>
+        String(call[0]).includes('/subscribe')
       );
       expect(subscriptionCall).toBeDefined();
 
@@ -116,7 +124,9 @@ describe('User Flows (E2E)', () => {
       const fieldError = emailField!.querySelector('.nevent-field-error');
       expect(fieldError).not.toBeNull();
       // Error should be visible (not hidden)
-      expect(fieldError!.classList.contains('nevent-field-error--hidden')).toBe(false);
+      expect(fieldError!.classList.contains('nevent-field-error--hidden')).toBe(
+        false
+      );
 
       // Step 2: Fill in a valid email and re-submit
       fillInput(shadow, 'input[name="email"]', 'fixed@example.com');
@@ -246,8 +256,8 @@ describe('User Flows (E2E)', () => {
       await flush();
 
       // Verify API was called
-      const subscriptionCall = fetchMock.mock.calls.find(
-        (call: unknown[]) => String(call[0]).includes('/subscribe'),
+      const subscriptionCall = fetchMock.mock.calls.find((call: unknown[]) =>
+        String(call[0]).includes('/subscribe')
       );
       expect(subscriptionCall).toBeDefined();
 
@@ -444,7 +454,9 @@ describe('User Flows (E2E)', () => {
 
       await flush();
 
-      const bannerAfter = shadow.querySelector('.nevent-offline-banner') as HTMLElement;
+      const bannerAfter = shadow.querySelector(
+        '.nevent-offline-banner'
+      ) as HTMLElement;
       if (bannerAfter) {
         expect(bannerAfter.style.display).toBe('none');
       }
@@ -486,7 +498,8 @@ describe('User Flows (E2E)', () => {
               return Promise.resolve({
                 ok: false,
                 status: 422,
-                json: () => Promise.resolve({ message: 'Validation error', status: 422 }),
+                json: () =>
+                  Promise.resolve({ message: 'Validation error', status: 422 }),
               });
             }
             // Second submission: success (ApiResponse envelope)
@@ -501,8 +514,12 @@ describe('User Flows (E2E)', () => {
             });
           }
 
-          return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) });
-        }),
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({}),
+          });
+        })
       );
 
       const { widget, container } = createWidget();
@@ -583,13 +600,17 @@ describe('User Flows (E2E)', () => {
                         success: true,
                       }),
                   }),
-                2000,
-              ),
+                2000
+              )
             );
           }
 
-          return Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve({}) });
-        }),
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () => Promise.resolve({}),
+          });
+        })
       );
 
       const { widget, container } = createWidget();
@@ -636,7 +657,9 @@ describe('User Flows (E2E)', () => {
       // Wait for the 3 second reset timeout
       await vi.advanceTimersByTimeAsync(3100);
 
-      const emailInput = shadow.querySelector('input[name="email"]') as HTMLInputElement;
+      const emailInput = shadow.querySelector(
+        'input[name="email"]'
+      ) as HTMLInputElement;
       if (emailInput) {
         // After form.reset(), value should be cleared
         expect(emailInput.value).toBe('');
@@ -661,7 +684,9 @@ describe('User Flows (E2E)', () => {
       // Even after waiting, values should be preserved
       await vi.advanceTimersByTimeAsync(5000);
 
-      const emailInput = shadow.querySelector('input[name="email"]') as HTMLInputElement;
+      const emailInput = shadow.querySelector(
+        'input[name="email"]'
+      ) as HTMLInputElement;
       if (emailInput) {
         expect(emailInput.value).toBe('keep@example.com');
       }

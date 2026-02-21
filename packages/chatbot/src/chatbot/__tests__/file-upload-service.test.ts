@@ -12,11 +12,7 @@ import type { FileUploadConfig } from '../../types';
 /**
  * Creates a mock File object with the specified properties.
  */
-function createMockFile(
-  name: string,
-  size: number,
-  type: string,
-): File {
+function createMockFile(name: string, size: number, type: string): File {
   const content = new ArrayBuffer(size);
   return new File([content], name, { type });
 }
@@ -29,7 +25,7 @@ function createService(
   apiUrl = 'https://api.nevent.es',
   tenantId = 'tenant-123',
   token = 'test-token',
-  debug = false,
+  debug = false
 ): FileUploadService {
   return new FileUploadService(config, apiUrl, tenantId, token, debug);
 }
@@ -72,7 +68,7 @@ class MockXMLHttpRequest {
     addEventListener: function (
       this: MockXMLHttpRequest['upload'],
       event: string,
-      handler: (e: unknown) => void,
+      handler: (e: unknown) => void
     ): void {
       if (!this.listeners[event]) {
         this.listeners[event] = [];
@@ -131,10 +127,14 @@ describe('FileUploadService', () => {
   beforeEach(() => {
     // Mock XMLHttpRequest globally
     mockXhr = new MockXMLHttpRequest();
-    globalThis.XMLHttpRequest = vi.fn(() => mockXhr) as unknown as typeof XMLHttpRequest;
+    globalThis.XMLHttpRequest = vi.fn(
+      () => mockXhr
+    ) as unknown as typeof XMLHttpRequest;
 
     // Mock URL.createObjectURL and URL.revokeObjectURL
-    globalThis.URL.createObjectURL = vi.fn(() => 'blob:http://localhost/test-blob-url');
+    globalThis.URL.createObjectURL = vi.fn(
+      () => 'blob:http://localhost/test-blob-url'
+    );
     globalThis.URL.revokeObjectURL = vi.fn();
   });
 
@@ -153,7 +153,9 @@ describe('FileUploadService', () => {
 
       expect(service.getMaxFiles()).toBe(5);
       expect(service.getMaxFileSize()).toBe(10 * 1024 * 1024);
-      expect(service.getAcceptString()).toBe('image/*,application/pdf,text/plain');
+      expect(service.getAcceptString()).toBe(
+        'image/*,application/pdf,text/plain'
+      );
     });
 
     it('should merge custom configuration with defaults', () => {
@@ -217,7 +219,11 @@ describe('FileUploadService', () => {
 
     it('should reject files with unaccepted MIME type', () => {
       const service = createService({ acceptedTypes: ['image/*'] });
-      const file = createMockFile('doc.docx', 1024, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+      const file = createMockFile(
+        'doc.docx',
+        1024,
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      );
 
       const result = service.validate(file);
 
@@ -270,7 +276,12 @@ describe('FileUploadService', () => {
 
   describe('upload()', () => {
     it('should send POST request with correct headers', () => {
-      const service = createService(undefined, 'https://api.nevent.es', 'tenant-abc', 'my-token');
+      const service = createService(
+        undefined,
+        'https://api.nevent.es',
+        'tenant-abc',
+        'my-token'
+      );
       const file = createMockFile('test.png', 1024, 'image/png');
 
       void service.upload(file, vi.fn());
@@ -314,7 +325,9 @@ describe('FileUploadService', () => {
 
       // Simulate successful completion
       mockXhr.status = 200;
-      mockXhr.responseText = JSON.stringify({ url: 'https://cdn.example.com/test.png' });
+      mockXhr.responseText = JSON.stringify({
+        url: 'https://cdn.example.com/test.png',
+      });
       mockXhr.triggerEvent('load', {});
 
       const result = await uploadPromise;
@@ -333,7 +346,9 @@ describe('FileUploadService', () => {
       const uploadPromise = service.upload(file, vi.fn());
 
       mockXhr.status = 200;
-      mockXhr.responseText = JSON.stringify({ url: 'https://cdn.example.com/test.png' });
+      mockXhr.responseText = JSON.stringify({
+        url: 'https://cdn.example.com/test.png',
+      });
       mockXhr.triggerEvent('load', {});
 
       const result = await uploadPromise;
@@ -426,7 +441,9 @@ describe('FileUploadService', () => {
 
       // Complete upload
       mockXhr.status = 200;
-      mockXhr.responseText = JSON.stringify({ url: 'https://cdn.example.com/photo.jpg' });
+      mockXhr.responseText = JSON.stringify({
+        url: 'https://cdn.example.com/photo.jpg',
+      });
       mockXhr.triggerEvent('load', {});
 
       const result = await uploadPromise;
@@ -442,7 +459,9 @@ describe('FileUploadService', () => {
       const uploadPromise = service.upload(file, vi.fn());
 
       mockXhr.status = 200;
-      mockXhr.responseText = JSON.stringify({ url: 'https://cdn.example.com/doc.pdf' });
+      mockXhr.responseText = JSON.stringify({
+        url: 'https://cdn.example.com/doc.pdf',
+      });
       mockXhr.triggerEvent('load', {});
 
       const result = await uploadPromise;
@@ -562,7 +581,7 @@ describe('FileUploadService', () => {
 
       let callCount = 0;
       (URL.createObjectURL as ReturnType<typeof vi.fn>).mockImplementation(
-        () => `blob:http://localhost/blob-${callCount++}`,
+        () => `blob:http://localhost/blob-${callCount++}`
       );
 
       service.createPreview(file1);

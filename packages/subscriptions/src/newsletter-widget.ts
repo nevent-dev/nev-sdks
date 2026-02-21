@@ -211,10 +211,7 @@ export class NewsletterWidget {
     this.logger = new Logger('[NeventWidget]', this.config.debug);
 
     // Initialize error boundary for host page isolation
-    this.errorBoundary = new ErrorBoundary(
-      this.config.debug,
-      '[NeventWidget]'
-    );
+    this.errorBoundary = new ErrorBoundary(this.config.debug, '[NeventWidget]');
     if (this.config.onError) {
       this.errorBoundary.setErrorHandler(
         this.config.onError as (error: NormalizedError) => void
@@ -1109,10 +1106,7 @@ export class NewsletterWidget {
     this.form.className = 'nevent-widget-form';
     // WCAG: form role and label
     this.form.setAttribute('role', 'form');
-    this.form.setAttribute(
-      'aria-label',
-      this.i18n.t('formAriaLabel')
-    );
+    this.form.setAttribute('aria-label', this.i18n.t('formAriaLabel'));
     this.form.setAttribute('novalidate', '');
 
     // Use dynamic form rendering if fieldConfigurations exist
@@ -1219,10 +1213,7 @@ export class NewsletterWidget {
     statusMessage.className = 'nevent-status-message';
     statusMessage.setAttribute('role', 'status');
     statusMessage.setAttribute('aria-live', 'polite');
-    statusMessage.setAttribute(
-      'aria-label',
-      this.i18n.t('statusRegionLabel')
-    );
+    statusMessage.setAttribute('aria-label', this.i18n.t('statusRegionLabel'));
     statusMessage.style.display = 'none';
     this.form.appendChild(statusMessage);
   }
@@ -1330,8 +1321,7 @@ export class NewsletterWidget {
       return '';
     }
 
-    const title =
-      this.config.title || this.i18n.t('formTitle');
+    const title = this.config.title || this.i18n.t('formTitle');
     return `<h2 class="nevent-title">${Sanitizer.escapeHtml(title)}</h2>`;
   }
 
@@ -1566,18 +1556,22 @@ export class NewsletterWidget {
    */
   private buildGDPRHtml(): string {
     // Use config message or i18n fallback
-    let gdprText =
-      this.config.messages.gdprText || this.i18n.t('gdprText');
+    let gdprText = this.config.messages.gdprText || this.i18n.t('gdprText');
 
     // Build privacy policy link
     const privacyLabel =
-      this.config.messages.privacyText ||
-      this.i18n.t('privacyPolicyLabel');
+      this.config.messages.privacyText || this.i18n.t('privacyPolicyLabel');
 
     if (this.config.companyName) {
       gdprText = gdprText
-        .replace('{{companyName}}', Sanitizer.escapeHtml(this.config.companyName))
-        .replace('[COMPANY_NAME]', Sanitizer.escapeHtml(this.config.companyName));
+        .replace(
+          '{{companyName}}',
+          Sanitizer.escapeHtml(this.config.companyName)
+        )
+        .replace(
+          '[COMPANY_NAME]',
+          Sanitizer.escapeHtml(this.config.companyName)
+        );
     }
 
     if (this.config.privacyPolicyUrl) {
@@ -2002,8 +1996,7 @@ export class NewsletterWidget {
       const emailValidation = EmailValidator.validate(email);
       if (!emailValidation.valid) {
         const message =
-          this.config.messages.invalidEmail ||
-          this.i18n.t('invalidEmail');
+          this.config.messages.invalidEmail || this.i18n.t('invalidEmail');
         this.showError(message);
         return;
       }
@@ -2104,8 +2097,7 @@ export class NewsletterWidget {
         const errorMessage =
           error instanceof Error
             ? error.message
-            : this.config.messages.error ||
-              this.i18n.t('errorMessage');
+            : this.config.messages.error || this.i18n.t('errorMessage');
 
         this.showError(errorMessage);
 
@@ -2216,10 +2208,7 @@ export class NewsletterWidget {
    * @param eventName - Name of the event to track
    * @param extra - Optional additional event parameters
    */
-  private trackEvent(
-    eventName: string,
-    extra?: Record<string, unknown>
-  ): void {
+  private trackEvent(eventName: string, extra?: Record<string, unknown>): void {
     if (!this.config.analytics || !this.widgetTracker) {
       return;
     }

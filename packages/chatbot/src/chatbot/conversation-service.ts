@@ -192,7 +192,7 @@ export class ConversationService {
       source?: string;
       userContext?: { lat: number; lng: number };
     },
-    rateLimitConfig?: Partial<RateLimiterConfig>,
+    rateLimitConfig?: Partial<RateLimiterConfig>
   ) {
     this.apiUrl = apiUrl.replace(/\/$/, '');
     // Disable HTTP-level retries: the chatbot widget should fail fast and
@@ -241,7 +241,8 @@ export class ConversationService {
   checkRateLimit(): void {
     const result = this.rateLimiter.consume();
     if (!result.allowed) {
-      const retryAfterMs = result.retryAfterMs ?? this.rateLimiter['config'].cooldownMs;
+      const retryAfterMs =
+        result.retryAfterMs ?? this.rateLimiter['config'].cooldownMs;
       const error: ChatbotError = {
         code: 'RATE_LIMITED',
         message: 'Too many messages. Please wait before sending another.',
@@ -311,7 +312,7 @@ export class ConversationService {
     body: unknown | undefined,
     errorCode: ChatbotErrorCode,
     fallbackMessage: string,
-    isRetry = false,
+    isRetry = false
   ): Promise<T> {
     try {
       // Build extra headers: tenant ID, user context, and auth headers
@@ -367,7 +368,7 @@ export class ConversationService {
             body,
             errorCode,
             fallbackMessage,
-            true,
+            true
           );
         }
         this.logger.debug('Token refresh failed — propagating 401 error');
@@ -391,7 +392,10 @@ export class ConversationService {
    */
   async fetchConfig(tenantId: string): Promise<ServerChatbotConfig> {
     const endpoint = `/public/chatbot/${this.chatbotId}/config?tenantId=${encodeURIComponent(tenantId)}`;
-    this.logger.debug('Fetching chatbot config', { chatbotId: this.chatbotId, tenantId });
+    this.logger.debug('Fetching chatbot config', {
+      chatbotId: this.chatbotId,
+      tenantId,
+    });
 
     try {
       const data = await this.authenticatedRequest<ServerChatbotConfig>(
@@ -399,13 +403,17 @@ export class ConversationService {
         endpoint,
         undefined,
         'CONFIG_LOAD_FAILED',
-        'Failed to load chatbot configuration',
+        'Failed to load chatbot configuration'
       );
       this.logger.debug('Chatbot config loaded successfully');
       return data;
     } catch (error) {
       this.logger.error('Failed to fetch chatbot config', error);
-      throw mapApiError(error, 'CONFIG_LOAD_FAILED', 'Failed to load chatbot configuration');
+      throw mapApiError(
+        error,
+        'CONFIG_LOAD_FAILED',
+        'Failed to load chatbot configuration'
+      );
     }
   }
 
@@ -426,7 +434,10 @@ export class ConversationService {
     request?: CreateConversationRequest
   ): Promise<CreateConversationResponse> {
     const endpoint = `/public/chatbot/${this.chatbotId}/conversations`;
-    this.logger.debug('Creating conversation', { chatbotId: this.chatbotId, request });
+    this.logger.debug('Creating conversation', {
+      chatbotId: this.chatbotId,
+      request,
+    });
 
     try {
       // Merge user identity from AuthManager into the request body
@@ -442,13 +453,19 @@ export class ConversationService {
         endpoint,
         body,
         'CONVERSATION_CREATE_FAILED',
-        'Failed to create conversation',
+        'Failed to create conversation'
       );
-      this.logger.debug('Conversation created', { conversationId: data.conversationId });
+      this.logger.debug('Conversation created', {
+        conversationId: data.conversationId,
+      });
       return data;
     } catch (error) {
       this.logger.error('Failed to create conversation', error);
-      throw mapApiError(error, 'CONVERSATION_CREATE_FAILED', 'Failed to create conversation');
+      throw mapApiError(
+        error,
+        'CONVERSATION_CREATE_FAILED',
+        'Failed to create conversation'
+      );
     }
   }
 
@@ -496,7 +513,10 @@ export class ConversationService {
     };
 
     // Include ticketId from request metadata if provided
-    if (request.metadata?.ticketId && typeof request.metadata.ticketId === 'string') {
+    if (
+      request.metadata?.ticketId &&
+      typeof request.metadata.ticketId === 'string'
+    ) {
       backendBody.ticketId = request.metadata.ticketId;
     }
 
@@ -506,7 +526,7 @@ export class ConversationService {
         endpoint,
         backendBody,
         'MESSAGE_SEND_FAILED',
-        'Failed to send message',
+        'Failed to send message'
       );
       this.logger.debug('Message sent and bot response received', {
         userMessageId: data.userMessage.id,
@@ -523,7 +543,11 @@ export class ConversationService {
         'status' in error &&
         (error as ApiError).status === 429
       ) {
-        throw mapApiError(error, 'RATE_LIMIT_EXCEEDED', 'You are sending messages too quickly. Please wait a moment.');
+        throw mapApiError(
+          error,
+          'RATE_LIMIT_EXCEEDED',
+          'You are sending messages too quickly. Please wait a moment.'
+        );
       }
 
       throw mapApiError(error, 'MESSAGE_SEND_FAILED', 'Failed to send message');
@@ -565,7 +589,11 @@ export class ConversationService {
     });
 
     const endpoint = `/chatbot/messages${queryParams}`;
-    this.logger.debug('Fetching message history', { chatbotId: this.chatbotId, conversationId, params });
+    this.logger.debug('Fetching message history', {
+      chatbotId: this.chatbotId,
+      conversationId,
+      params,
+    });
 
     try {
       const data = await this.authenticatedRequest<GetMessagesResponse>(
@@ -573,7 +601,7 @@ export class ConversationService {
         endpoint,
         undefined,
         'MESSAGE_LOAD_FAILED',
-        'Failed to load message history',
+        'Failed to load message history'
       );
       this.logger.debug('Messages loaded', {
         count: data.messages.length,
@@ -582,7 +610,11 @@ export class ConversationService {
       return data;
     } catch (error) {
       this.logger.error('Failed to fetch messages', error);
-      throw mapApiError(error, 'MESSAGE_LOAD_FAILED', 'Failed to load message history');
+      throw mapApiError(
+        error,
+        'MESSAGE_LOAD_FAILED',
+        'Failed to load message history'
+      );
     }
   }
 
@@ -600,7 +632,10 @@ export class ConversationService {
    */
   async closeConversation(conversationId: string): Promise<void> {
     const endpoint = `/public/chatbot/${this.chatbotId}/conversations/${conversationId}/close`;
-    this.logger.debug('Closing conversation', { chatbotId: this.chatbotId, conversationId });
+    this.logger.debug('Closing conversation', {
+      chatbotId: this.chatbotId,
+      conversationId,
+    });
 
     try {
       await this.authenticatedRequest<void>(
@@ -608,7 +643,7 @@ export class ConversationService {
         endpoint,
         {},
         'API_ERROR',
-        'Failed to close conversation',
+        'Failed to close conversation'
       );
       this.logger.debug('Conversation closed successfully', { conversationId });
     } catch (error) {
@@ -671,7 +706,10 @@ export class ConversationService {
    * await service.sendFeedback('msg-123', 'POSITIVE');
    * ```
    */
-  async sendFeedback(messageId: string, feedbackType: FeedbackType): Promise<void> {
+  async sendFeedback(
+    messageId: string,
+    feedbackType: FeedbackType
+  ): Promise<void> {
     const endpoint = `/chatbot/message/${encodeURIComponent(messageId)}/feedback?feedbackType=${encodeURIComponent(feedbackType)}`;
     this.logger.debug('Sending message feedback', { messageId, feedbackType });
 
@@ -681,12 +719,19 @@ export class ConversationService {
         endpoint,
         {},
         'FEEDBACK_FAILED',
-        'Failed to submit feedback',
+        'Failed to submit feedback'
       );
-      this.logger.debug('Feedback submitted successfully', { messageId, feedbackType });
+      this.logger.debug('Feedback submitted successfully', {
+        messageId,
+        feedbackType,
+      });
     } catch (error) {
       this.logger.error('Failed to submit feedback', error);
-      throw mapApiError(error, 'FEEDBACK_FAILED', 'Failed to submit message feedback');
+      throw mapApiError(
+        error,
+        'FEEDBACK_FAILED',
+        'Failed to submit message feedback'
+      );
     }
   }
 

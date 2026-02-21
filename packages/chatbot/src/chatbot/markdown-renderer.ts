@@ -84,10 +84,12 @@ function escapeHtml(text: string): string {
  */
 function isSafeUrl(url: string): boolean {
   const trimmed = url.trim();
+  // eslint-disable-next-line no-control-regex
   const normalized = trimmed.replace(/[\s\u0000-\u001f]/g, '').toLowerCase();
   if (/^(javascript|data|vbscript):/i.test(normalized)) return false;
   // Allow relative, fragment, and http/https/mailto URLs
-  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('/')) return true;
+  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('/'))
+    return true;
   return /^(https?:|mailto:)/i.test(trimmed);
 }
 
@@ -100,6 +102,7 @@ function isSafeUrl(url: string): boolean {
 function isSafeImageUrl(url: string): boolean {
   const trimmed = url.trim();
   if (!trimmed) return false;
+  // eslint-disable-next-line no-control-regex
   const normalized = trimmed.replace(/[\s\u0000-\u001f]/g, '').toLowerCase();
   if (/^(javascript|data|vbscript):/i.test(normalized)) return false;
   return /^https:/i.test(trimmed);
@@ -162,12 +165,17 @@ export class MarkdownRenderer {
     // This prevents markdown processing inside code blocks.
     // ------------------------------------------------------------------
     const codeBlocks: string[] = [];
-    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_match, lang: string, code: string) => {
-      const index = codeBlocks.length;
-      const langClass = lang ? ` class="language-${escapeHtml(lang)}"` : '';
-      codeBlocks.push(`<pre><code${langClass}>${escapeHtml(code.trimEnd())}</code></pre>`);
-      return `\x00CB${index}\x00`;
-    });
+    html = html.replace(
+      /```(\w*)\n([\s\S]*?)```/g,
+      (_match, lang: string, code: string) => {
+        const index = codeBlocks.length;
+        const langClass = lang ? ` class="language-${escapeHtml(lang)}"` : '';
+        codeBlocks.push(
+          `<pre><code${langClass}>${escapeHtml(code.trimEnd())}</code></pre>`
+        );
+        return `\x00CB${index}\x00`;
+      }
+    );
 
     // ------------------------------------------------------------------
     // Phase 2: Extract inline code (` ... `) into placeholders
@@ -195,9 +203,11 @@ export class MarkdownRenderer {
     // ------------------------------------------------------------------
     // Phase 5: Restore code blocks and inline code from placeholders
     // ------------------------------------------------------------------
+    // eslint-disable-next-line no-control-regex
     html = html.replace(/\x00CB(\d+)\x00/g, (_match, index: string) => {
       return codeBlocks[Number(index)] ?? '';
     });
+    // eslint-disable-next-line no-control-regex
     html = html.replace(/\x00IC(\d+)\x00/g, (_match, index: string) => {
       return inlineCodes[Number(index)] ?? '';
     });
@@ -233,7 +243,7 @@ export class MarkdownRenderer {
     // **bold**, __bold__, ~~strike~~, ```code```, `inline`,
     // [link](url), # heading, - list, * list, 1. ordered, > blockquote
     return /(\*\*|__|~~|```|`[^`]+`|\[.+?\]\(.+?\)|^#{1,3}\s|^[-*]\s|^\d+\.\s|^>\s)/m.test(
-      text,
+      text
     );
   }
 
@@ -292,6 +302,7 @@ export class MarkdownRenderer {
       }
 
       // -- Code block placeholder: pass through as-is --
+      // eslint-disable-next-line no-control-regex
       if (/^\x00CB\d+\x00$/.test(line.trim())) {
         flushParagraph();
         closeList();
@@ -397,7 +408,7 @@ export class MarkdownRenderer {
         }
         // Unsafe image URL: render only the alt text (drop the dangerous URL)
         return escapeHtml(alt || 'image');
-      },
+      }
     );
 
     // Links: [text](url)
@@ -409,13 +420,13 @@ export class MarkdownRenderer {
         }
         // Unsafe URL: render only the link text (drop the dangerous URL)
         return escapeHtml(text);
-      },
+      }
     );
 
     // Bold + Italic: ***text*** or ___text___
     result = result.replace(
       /\*\*\*(.+?)\*\*\*/g,
-      '<strong><em>$1</em></strong>',
+      '<strong><em>$1</em></strong>'
     );
 
     // Bold: **text** or __text__

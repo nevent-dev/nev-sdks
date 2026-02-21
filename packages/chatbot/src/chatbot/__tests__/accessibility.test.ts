@@ -198,7 +198,12 @@ describe('MessageRenderer — ARIA attributes', () => {
 
   beforeEach(() => {
     document.body.innerHTML = '';
-    renderer = new MessageRenderer(undefined, undefined, createI18n(), MessageSanitizer);
+    renderer = new MessageRenderer(
+      undefined,
+      undefined,
+      createI18n(),
+      MessageSanitizer
+    );
     container = renderer.render();
     document.body.appendChild(container);
   });
@@ -236,15 +241,22 @@ describe('MessageRenderer — ARIA attributes', () => {
     const msg = createMockBotMessage({ content: 'Bot reply' });
     renderer.addMessage(msg);
 
-    const messageEl = container.querySelector('.nevent-chatbot-message--assistant');
+    const messageEl = container.querySelector(
+      '.nevent-chatbot-message--assistant'
+    );
     expect(messageEl?.getAttribute('role')).toBe('article');
   });
 
   it('should have role="note" on system messages', () => {
-    const msg = createMockMessage({ role: 'system' as any, content: 'System notice' });
+    const msg = createMockMessage({
+      role: 'system' as any,
+      content: 'System notice',
+    });
     renderer.addMessage(msg);
 
-    const messageEl = container.querySelector('.nevent-chatbot-message--system');
+    const messageEl = container.querySelector(
+      '.nevent-chatbot-message--system'
+    );
     expect(messageEl?.getAttribute('role')).toBe('note');
   });
 
@@ -259,7 +271,9 @@ describe('MessageRenderer — ARIA attributes', () => {
   });
 
   it('should have a screen-reader announcer element', () => {
-    const announcer = container.querySelector('.nevent-chatbot-sr-only[role="status"]');
+    const announcer = container.querySelector(
+      '.nevent-chatbot-sr-only[role="status"]'
+    );
     expect(announcer).not.toBeNull();
     expect(announcer?.getAttribute('aria-live')).toBe('polite');
   });
@@ -285,7 +299,9 @@ describe('MessageRenderer — ARIA attributes', () => {
   it('announce() should set text on the screen-reader announcer', () => {
     renderer.announce('Message sent');
 
-    const announcer = container.querySelector('.nevent-chatbot-sr-only[role="status"]');
+    const announcer = container.querySelector(
+      '.nevent-chatbot-sr-only[role="status"]'
+    );
     expect(announcer?.textContent).toBe('Message sent');
   });
 });
@@ -429,7 +445,9 @@ describe('QuickReplyRenderer — ARIA attributes', () => {
   });
 
   it('should have aria-label on each button', () => {
-    const buttons = container.querySelectorAll('.nevent-chatbot-quick-reply-button');
+    const buttons = container.querySelectorAll(
+      '.nevent-chatbot-quick-reply-button'
+    );
     expect(buttons.length).toBe(2);
 
     buttons.forEach((btn) => {
@@ -439,7 +457,7 @@ describe('QuickReplyRenderer — ARIA attributes', () => {
 
   it('should support keyboard navigation with arrow keys', () => {
     const buttons = container.querySelectorAll<HTMLButtonElement>(
-      '.nevent-chatbot-quick-reply-button',
+      '.nevent-chatbot-quick-reply-button'
     );
 
     // Focus first button and simulate ArrowRight
@@ -610,7 +628,12 @@ describe('MessageRenderer — Streaming message accessibility', () => {
 
   beforeEach(() => {
     document.body.innerHTML = '';
-    renderer = new MessageRenderer(undefined, undefined, createI18n(), MessageSanitizer);
+    renderer = new MessageRenderer(
+      undefined,
+      undefined,
+      createI18n(),
+      MessageSanitizer
+    );
     container = renderer.render();
     document.body.appendChild(container);
   });

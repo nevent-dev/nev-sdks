@@ -29,7 +29,15 @@ import {
 // ============================================================================
 
 /** Built-in preset names that must always be present */
-const BUILT_IN_PRESETS = ['light', 'dark', 'midnight', 'ocean', 'sunset', 'forest', 'rose'];
+const BUILT_IN_PRESETS = [
+  'light',
+  'dark',
+  'midnight',
+  'ocean',
+  'sunset',
+  'forest',
+  'rose',
+];
 
 /** Minimum set of tokens every preset must define */
 const REQUIRED_TOKENS = [
@@ -61,21 +69,27 @@ describe('THEME_PRESETS', () => {
     expect(preset.name.length).toBeGreaterThan(0);
   });
 
-  it.each(BUILT_IN_PRESETS)('%s preset contains all required tokens', (presetName) => {
-    const preset = THEME_PRESETS[presetName]!;
-    for (const token of REQUIRED_TOKENS) {
-      expect(preset.tokens).toHaveProperty(token);
-      expect(typeof preset.tokens[token]).toBe('string');
-      expect((preset.tokens[token] ?? '').length).toBeGreaterThan(0);
+  it.each(BUILT_IN_PRESETS)(
+    '%s preset contains all required tokens',
+    (presetName) => {
+      const preset = THEME_PRESETS[presetName]!;
+      for (const token of REQUIRED_TOKENS) {
+        expect(preset.tokens).toHaveProperty(token);
+        expect(typeof preset.tokens[token]).toBe('string');
+        expect((preset.tokens[token] ?? '').length).toBeGreaterThan(0);
+      }
     }
-  });
+  );
 
-  it.each(BUILT_IN_PRESETS)('%s token keys all start with --nev-cb-', (presetName) => {
-    const preset = THEME_PRESETS[presetName]!;
-    for (const key of Object.keys(preset.tokens)) {
-      expect(key.startsWith('--nev-cb-')).toBe(true);
+  it.each(BUILT_IN_PRESETS)(
+    '%s token keys all start with --nev-cb-',
+    (presetName) => {
+      const preset = THEME_PRESETS[presetName]!;
+      for (const key of Object.keys(preset.tokens)) {
+        expect(key.startsWith('--nev-cb-')).toBe(true);
+      }
     }
-  });
+  );
 });
 
 // ============================================================================
@@ -353,7 +367,9 @@ describe('generateThemeFromColor', () => {
   it('generates different primary-hover color from primary', () => {
     const tokens = generateThemeFromColor('#6366F1');
     // Hover should be a darker variant — not the same as primary
-    expect(tokens['--nev-cb-color-primary-hover']).not.toBe(tokens['--nev-cb-color-primary']);
+    expect(tokens['--nev-cb-color-primary-hover']).not.toBe(
+      tokens['--nev-cb-color-primary']
+    );
   });
 
   it('generates a light background for indigo brand color', () => {
@@ -371,7 +387,7 @@ describe('generateThemeFromColor', () => {
     const textRgb = parseHexColor(tokens['--nev-cb-color-text'] ?? '');
     expect(textRgb).not.toBeNull();
     // Text should be dark (low RGB values)
-    const avg = ((textRgb!.r + textRgb!.g + textRgb!.b) / 3);
+    const avg = (textRgb!.r + textRgb!.g + textRgb!.b) / 3;
     expect(avg).toBeLessThan(80);
   });
 
@@ -390,7 +406,9 @@ describe('generateThemeFromColor', () => {
   it('produces different results for different brand colors', () => {
     const indigo = generateThemeFromColor('#6366F1');
     const orange = generateThemeFromColor('#F97316');
-    expect(indigo['--nev-cb-color-primary']).not.toBe(orange['--nev-cb-color-primary']);
+    expect(indigo['--nev-cb-color-primary']).not.toBe(
+      orange['--nev-cb-color-primary']
+    );
     expect(indigo['--nev-cb-color-bg']).not.toBe(orange['--nev-cb-color-bg']);
   });
 });

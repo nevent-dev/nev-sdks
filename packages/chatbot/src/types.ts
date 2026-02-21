@@ -1491,4 +1491,8 @@ export type { ApiError };
  * Re-export authentication types from auth-manager for convenience.
  * Consumers can import these directly from `@nevent/chatbot`.
  */
-export type { AuthConfig, AuthMode, UserIdentity } from './chatbot/auth-manager';
+export type {
+  AuthConfig,
+  AuthMode,
+  UserIdentity,
+} from './chatbot/auth-manager';

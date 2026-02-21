@@ -46,7 +46,7 @@ describe('Logger', () => {
       expect(consoleSpy.warn).toHaveBeenCalledWith(
         '[TestSDK]',
         '[WARN]',
-        'warning message',
+        'warning message'
       );
     });
 
@@ -55,7 +55,7 @@ describe('Logger', () => {
       expect(consoleSpy.error).toHaveBeenCalledWith(
         '[TestSDK]',
         '[ERROR]',
-        'error message',
+        'error message'
       );
     });
   });
@@ -75,7 +75,7 @@ describe('Logger', () => {
         '[TestSDK]',
         '[DEBUG]',
         'debug data',
-        { key: 'value' },
+        { key: 'value' }
       );
     });
 
@@ -85,7 +85,7 @@ describe('Logger', () => {
         '[TestSDK]',
         '[INFO]',
         'info message',
-        42,
+        42
       );
     });
 
@@ -94,7 +94,7 @@ describe('Logger', () => {
       expect(consoleSpy.warn).toHaveBeenCalledWith(
         '[TestSDK]',
         '[WARN]',
-        'warning',
+        'warning'
       );
     });
 
@@ -104,7 +104,7 @@ describe('Logger', () => {
         '[TestSDK]',
         '[ERROR]',
         'error',
-        expect.any(Error),
+        expect.any(Error)
       );
     });
   });
@@ -121,11 +121,7 @@ describe('Logger', () => {
 
       logger.setDebug(true);
       logger.debug('after');
-      expect(consoleSpy.log).toHaveBeenCalledWith(
-        '[SDK]',
-        '[DEBUG]',
-        'after',
-      );
+      expect(consoleSpy.log).toHaveBeenCalledWith('[SDK]', '[DEBUG]', 'after');
     });
 
     it('should disable debug mode at runtime', () => {
@@ -153,7 +149,7 @@ describe('Logger', () => {
         '[DEBUG]',
         'arg1',
         'arg2',
-        'arg3',
+        'arg3'
       );
     });
 
@@ -173,31 +169,19 @@ describe('Logger', () => {
       logger = new Logger('[MyWidget]', true);
 
       logger.debug('d');
-      expect(consoleSpy.log).toHaveBeenCalledWith(
-        '[MyWidget]',
-        '[DEBUG]',
-        'd',
-      );
+      expect(consoleSpy.log).toHaveBeenCalledWith('[MyWidget]', '[DEBUG]', 'd');
 
       logger.info('i');
-      expect(consoleSpy.log).toHaveBeenCalledWith(
-        '[MyWidget]',
-        '[INFO]',
-        'i',
-      );
+      expect(consoleSpy.log).toHaveBeenCalledWith('[MyWidget]', '[INFO]', 'i');
 
       logger.warn('w');
-      expect(consoleSpy.warn).toHaveBeenCalledWith(
-        '[MyWidget]',
-        '[WARN]',
-        'w',
-      );
+      expect(consoleSpy.warn).toHaveBeenCalledWith('[MyWidget]', '[WARN]', 'w');
 
       logger.error('e');
       expect(consoleSpy.error).toHaveBeenCalledWith(
         '[MyWidget]',
         '[ERROR]',
-        'e',
+        'e'
       );
     });
   });

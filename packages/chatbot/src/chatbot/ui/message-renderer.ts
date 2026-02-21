@@ -27,7 +27,14 @@
  * and updateMessage() with ChatMessage objects.
  */
 
-import type { ActionButton, ChatMessage, FileAttachment, MessageStyles, QuickReply, QuickReplyStyles } from '../../types';
+import type {
+  ActionButton,
+  ChatMessage,
+  FileAttachment,
+  MessageStyles,
+  QuickReply,
+  QuickReplyStyles,
+} from '../../types';
 import { I18nManager } from '../i18n-manager';
 import { MarkdownRenderer } from '../markdown-renderer';
 import { MessageSanitizer } from '../message-sanitizer';
@@ -158,7 +165,7 @@ export class MessageRenderer {
     private styles: MessageStyles | undefined,
     quickReplyStyles: QuickReplyStyles | undefined,
     private i18n: I18nManager,
-    private sanitizer: typeof MessageSanitizer,
+    private sanitizer: typeof MessageSanitizer
   ) {
     this.quickReplyRenderer = new QuickReplyRenderer(quickReplyStyles, i18n);
     this.richContentRenderer = new RichContentRenderer(sanitizer, i18n);
@@ -233,7 +240,10 @@ export class MessageRenderer {
    * @param onAction - Optional callback invoked when a rich content action
    *   button (e.g. postback) is activated
    */
-  addMessage(message: ChatMessage, onAction?: (action: ActionButton) => void): void {
+  addMessage(
+    message: ChatMessage,
+    onAction?: (action: ActionButton) => void
+  ): void {
     if (!this.container) return;
 
     const wasAtBottom = this.isScrolledToBottom();
@@ -270,7 +280,10 @@ export class MessageRenderer {
     this.messageElements.set(message.id, messageEl);
 
     // Insert before quick reply container if it exists
-    if (this.quickReplyContainer && this.container.contains(this.quickReplyContainer)) {
+    if (
+      this.quickReplyContainer &&
+      this.container.contains(this.quickReplyContainer)
+    ) {
       this.container.insertBefore(messageEl, this.quickReplyContainer);
     } else {
       this.container.appendChild(messageEl);
@@ -307,7 +320,8 @@ export class MessageRenderer {
 
     // Build the message wrapper with the same layout as a regular bot message
     const wrapper = document.createElement('div');
-    wrapper.className = 'nevent-chatbot-message nevent-chatbot-message--assistant nevent-chatbot-message--streaming';
+    wrapper.className =
+      'nevent-chatbot-message nevent-chatbot-message--assistant nevent-chatbot-message--streaming';
     wrapper.setAttribute('data-message-id', message.id);
     wrapper.setAttribute('data-role', 'assistant');
     wrapper.setAttribute('role', 'article');
@@ -355,7 +369,10 @@ export class MessageRenderer {
     this.messageElements.set(message.id, wrapper);
 
     // Insert before quick reply container if present
-    if (this.quickReplyContainer && this.container.contains(this.quickReplyContainer)) {
+    if (
+      this.quickReplyContainer &&
+      this.container.contains(this.quickReplyContainer)
+    ) {
       this.container.insertBefore(wrapper, this.quickReplyContainer);
     } else {
       this.container.appendChild(wrapper);
@@ -388,15 +405,23 @@ export class MessageRenderer {
    *   {@link MarkdownRenderer} for live markdown previewing. Set to `true` for
    *   most bot responses. Set to `false` for plain-text-only responses.
    */
-  updateMessageContent(messageId: string, content: string, isMarkdown: boolean): void {
+  updateMessageContent(
+    messageId: string,
+    content: string,
+    isMarkdown: boolean
+  ): void {
     const wrapper = this.messageElements.get(messageId);
     if (!wrapper) return;
 
-    const contentEl = wrapper.querySelector<HTMLElement>('.nevent-chatbot-message-content');
+    const contentEl = wrapper.querySelector<HTMLElement>(
+      '.nevent-chatbot-message-content'
+    );
     if (!contentEl) return;
 
     // Detach the cursor before updating innerHTML so it is not lost
-    const cursorEl = contentEl.querySelector<HTMLElement>('.nevent-chatbot-streaming-cursor');
+    const cursorEl = contentEl.querySelector<HTMLElement>(
+      '.nevent-chatbot-streaming-cursor'
+    );
     if (cursorEl) cursorEl.remove();
 
     if (content) {
@@ -444,10 +469,14 @@ export class MessageRenderer {
     // Remove streaming modifier class — returns element to standard styling
     wrapper.classList.remove('nevent-chatbot-message--streaming');
 
-    const contentEl = wrapper.querySelector<HTMLElement>('.nevent-chatbot-message-content');
+    const contentEl = wrapper.querySelector<HTMLElement>(
+      '.nevent-chatbot-message-content'
+    );
     if (contentEl) {
       // Remove cursor
-      const cursorEl = contentEl.querySelector('.nevent-chatbot-streaming-cursor');
+      const cursorEl = contentEl.querySelector(
+        '.nevent-chatbot-streaming-cursor'
+      );
       cursorEl?.remove();
 
       // Set final content with full markdown rendering
@@ -461,7 +490,9 @@ export class MessageRenderer {
     }
 
     // Fill in the timestamp that was left blank during streaming
-    const metaEl = wrapper.querySelector<HTMLElement>('.nevent-chatbot-message-meta');
+    const metaEl = wrapper.querySelector<HTMLElement>(
+      '.nevent-chatbot-message-meta'
+    );
     if (metaEl) {
       const timestampEl = document.createElement('span');
       timestampEl.className = 'nevent-chatbot-message-timestamp';
@@ -471,7 +502,10 @@ export class MessageRenderer {
 
     // Update aria-label with the actual content for screen readers
     const locale = this.i18n.getLocale();
-    wrapper.setAttribute('aria-label', `${this.getBotLabel(locale)}: ${finalContent}`);
+    wrapper.setAttribute(
+      'aria-label',
+      `${this.getBotLabel(locale)}: ${finalContent}`
+    );
 
     this.scrollToBottom(true);
   }
@@ -493,7 +527,9 @@ export class MessageRenderer {
     // Remove streaming cursor if still present (error during generation)
     const contentEl = wrapper.querySelector('.nevent-chatbot-message-content');
     if (contentEl) {
-      const cursorEl = contentEl.querySelector('.nevent-chatbot-streaming-cursor');
+      const cursorEl = contentEl.querySelector(
+        '.nevent-chatbot-streaming-cursor'
+      );
       cursorEl?.remove();
     }
 
@@ -505,7 +541,9 @@ export class MessageRenderer {
       wrapper.setAttribute('aria-live', 'assertive');
 
       // Add a visible error indicator to the bubble
-      const bubble = wrapper.querySelector<HTMLElement>('.nevent-chatbot-message-bubble');
+      const bubble = wrapper.querySelector<HTMLElement>(
+        '.nevent-chatbot-message-bubble'
+      );
       if (bubble) {
         Object.assign(bubble.style, {
           borderLeft: '3px solid #ef4444',
@@ -530,7 +568,10 @@ export class MessageRenderer {
     // In virtual mode, the element may be rendered by the VirtualScroller.
     // Fall back to a DOM query if the tracked reference is null.
     if (!existingEl && this.container) {
-      existingEl = this.container.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`) ?? undefined;
+      existingEl =
+        this.container.querySelector<HTMLElement>(
+          `[data-message-id="${messageId}"]`
+        ) ?? undefined;
     }
     if (!existingEl || !this.container) return;
 
@@ -539,7 +580,9 @@ export class MessageRenderer {
 
     // Update status indicator if status changed
     if (updates.status !== undefined && role === 'user') {
-      const statusEl = existingEl.querySelector('.nevent-chatbot-message-status');
+      const statusEl = existingEl.querySelector(
+        '.nevent-chatbot-message-status'
+      );
       if (statusEl) {
         statusEl.textContent = this.getStatusIndicator(updates.status);
       }
@@ -547,12 +590,16 @@ export class MessageRenderer {
 
     // Update content if changed
     if (updates.content !== undefined) {
-      const contentEl = existingEl.querySelector('.nevent-chatbot-message-content');
+      const contentEl = existingEl.querySelector(
+        '.nevent-chatbot-message-content'
+      );
       if (contentEl) {
         if (role === 'assistant') {
           // Use MarkdownRenderer for bot messages that contain markdown syntax;
           // fall back to plain sanitization otherwise.
-          contentEl.innerHTML = MarkdownRenderer.containsMarkdown(updates.content)
+          contentEl.innerHTML = MarkdownRenderer.containsMarkdown(
+            updates.content
+          )
             ? MarkdownRenderer.render(updates.content)
             : this.sanitizer.sanitize(updates.content);
         } else if (role === 'user') {
@@ -648,7 +695,7 @@ export class MessageRenderer {
   renderQuickReplies(
     replies: QuickReply[],
     onClick: (reply: QuickReply) => void,
-    mode: 'scroll' | 'wrap' | 'stacked' = 'scroll',
+    mode: 'scroll' | 'wrap' | 'stacked' = 'scroll'
   ): void {
     if (!this.container || replies.length === 0) return;
 
@@ -926,7 +973,7 @@ export class MessageRenderer {
    */
   private migrateToVirtual(
     triggerMessage: ChatMessage,
-    onAction?: (action: ActionButton) => void,
+    onAction?: (action: ActionButton) => void
   ): void {
     if (!this.scrollContainer) return;
 
@@ -1108,7 +1155,7 @@ export class MessageRenderer {
    */
   private createMessageElement(
     message: ChatMessage,
-    onAction?: (action: ActionButton) => void,
+    onAction?: (action: ActionButton) => void
   ): HTMLElement {
     const wrapper = document.createElement('div');
     wrapper.className = `nevent-chatbot-message nevent-chatbot-message--${message.role}`;
@@ -1129,7 +1176,9 @@ export class MessageRenderer {
     // for navigation purposes (e.g. when using heading/article shortcuts).
     const locale = this.i18n.getLocale();
     const senderLabel =
-      message.role === 'user' ? this.getUserLabel(locale) : this.getBotLabel(locale);
+      message.role === 'user'
+        ? this.getUserLabel(locale)
+        : this.getBotLabel(locale);
     wrapper.setAttribute('aria-label', `${senderLabel}: ${message.content}`);
     wrapper.setAttribute('aria-setsize', '-1'); // Unknown total; use -1 per spec
 
@@ -1174,7 +1223,10 @@ export class MessageRenderer {
 
       if (isUser) {
         content.innerHTML = this.sanitizer.escapeHtml(message.content);
-      } else if (message.type === 'text' && MarkdownRenderer.containsMarkdown(message.content)) {
+      } else if (
+        message.type === 'text' &&
+        MarkdownRenderer.containsMarkdown(message.content)
+      ) {
         // Bot text messages with markdown syntax are rendered through the
         // lightweight MarkdownRenderer which converts markdown to sanitized HTML.
         content.innerHTML = MarkdownRenderer.render(message.content);
@@ -1190,7 +1242,10 @@ export class MessageRenderer {
 
     // File attachments (rendered below the text bubble if present)
     if (message.attachments && message.attachments.length > 0) {
-      const attachmentsEl = this.createAttachmentsElement(message.attachments, isUser);
+      const attachmentsEl = this.createAttachmentsElement(
+        message.attachments,
+        isUser
+      );
       wrapper.appendChild(attachmentsEl);
     }
 
@@ -1229,7 +1284,10 @@ export class MessageRenderer {
    * @param message - The system message data
    * @returns The styled wrapper element
    */
-  private createSystemMessage(wrapper: HTMLElement, message: ChatMessage): HTMLElement {
+  private createSystemMessage(
+    wrapper: HTMLElement,
+    message: ChatMessage
+  ): HTMLElement {
     Object.assign(wrapper.style, {
       display: 'flex',
       justifyContent: 'center',
@@ -1264,7 +1322,10 @@ export class MessageRenderer {
    * @param isUser - Whether this is a user message (affects alignment and colors)
    * @returns Container element with all attachment items
    */
-  private createAttachmentsElement(attachments: FileAttachment[], isUser: boolean): HTMLElement {
+  private createAttachmentsElement(
+    attachments: FileAttachment[],
+    isUser: boolean
+  ): HTMLElement {
     const container = document.createElement('div');
     container.className = 'nevent-chatbot-message-attachments';
     container.setAttribute('role', 'list');
@@ -1297,7 +1358,10 @@ export class MessageRenderer {
    * @param isUser - Whether this is a user message
    * @returns The attachment item element
    */
-  private createAttachmentItem(attachment: FileAttachment, isUser: boolean): HTMLElement {
+  private createAttachmentItem(
+    attachment: FileAttachment,
+    isUser: boolean
+  ): HTMLElement {
     const item = document.createElement('div');
     item.className = 'nevent-chatbot-message-attachment-item';
     item.setAttribute('role', 'listitem');
@@ -1325,7 +1389,7 @@ export class MessageRenderer {
     item: HTMLElement,
     attachment: FileAttachment,
     imageUrl: string,
-    _isUser: boolean,
+    _isUser: boolean
   ): HTMLElement {
     Object.assign(item.style, {
       borderRadius: '8px',
@@ -1352,7 +1416,7 @@ export class MessageRenderer {
       link.rel = 'noopener noreferrer';
       link.setAttribute(
         'aria-label',
-        `${MessageSanitizer.escapeHtml(attachment.name)} (${this.formatAttachmentSize(attachment.size)})`,
+        `${MessageSanitizer.escapeHtml(attachment.name)} (${this.formatAttachmentSize(attachment.size)})`
       );
       link.appendChild(img);
       item.appendChild(link);
@@ -1381,7 +1445,7 @@ export class MessageRenderer {
   private createFileAttachment(
     item: HTMLElement,
     attachment: FileAttachment,
-    isUser: boolean,
+    isUser: boolean
   ): HTMLElement {
     const bgColor = isUser ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.05)';
     const textColor = isUser
@@ -1451,7 +1515,7 @@ export class MessageRenderer {
       item.setAttribute('tabindex', '0');
       item.setAttribute(
         'aria-label',
-        `${MessageSanitizer.escapeHtml(attachment.name)} (${this.formatAttachmentSize(attachment.size)})`,
+        `${MessageSanitizer.escapeHtml(attachment.name)} (${this.formatAttachmentSize(attachment.size)})`
       );
     }
 
@@ -1482,7 +1546,7 @@ export class MessageRenderer {
     overlay.setAttribute('aria-valuenow', String(attachment.progress));
     overlay.setAttribute(
       'aria-label',
-      `${this.i18n.t('uploading')} ${MessageSanitizer.escapeHtml(attachment.name)}`,
+      `${this.i18n.t('uploading')} ${MessageSanitizer.escapeHtml(attachment.name)}`
     );
 
     Object.assign(overlay.style, {
@@ -1582,7 +1646,10 @@ export class MessageRenderer {
     separator.appendChild(rightLine);
 
     // Insert before quick replies if present, else append
-    if (this.quickReplyContainer && this.container.contains(this.quickReplyContainer)) {
+    if (
+      this.quickReplyContainer &&
+      this.container.contains(this.quickReplyContainer)
+    ) {
       this.container.insertBefore(separator, this.quickReplyContainer);
     } else {
       this.container.appendChild(separator);
@@ -1751,7 +1818,10 @@ export class MessageRenderer {
    * @param wrapper - The message wrapper div
    * @param isUser - Whether this is a user message (right-aligned)
    */
-  private applyMessageWrapperStyles(wrapper: HTMLElement, isUser: boolean): void {
+  private applyMessageWrapperStyles(
+    wrapper: HTMLElement,
+    isUser: boolean
+  ): void {
     Object.assign(wrapper.style, {
       display: 'flex',
       flexDirection: 'column',
@@ -1810,7 +1880,8 @@ export class MessageRenderer {
       color: textColor,
       fontSize,
       lineHeight,
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily:
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     });
 
     if (s?.font?.family) {
@@ -1835,6 +1906,4 @@ export class MessageRenderer {
       padding: '0 2px',
     });
   }
-
 }
-

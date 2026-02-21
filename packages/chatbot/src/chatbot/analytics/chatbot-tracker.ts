@@ -260,10 +260,7 @@ export class ChatbotTracker {
    *
    * Event name: `chatbot.message.received`
    */
-  trackMessageReceived(
-    conversationId: string,
-    responseTimeMs: number
-  ): void {
+  trackMessageReceived(conversationId: string, responseTimeMs: number): void {
     this.client.track('chatbot.message.received', {
       ...this.baseParams(),
       interaction: false,
@@ -352,10 +349,7 @@ export class ChatbotTracker {
    *
    * Event name: `chatbot.conversation.resume`
    */
-  trackConversationResume(
-    conversationId: string,
-    messageCount: number
-  ): void {
+  trackConversationResume(conversationId: string, messageCount: number): void {
     this.client.track('chatbot.conversation.resume', {
       ...this.baseParams(),
       interaction: false,

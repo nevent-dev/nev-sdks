@@ -90,7 +90,7 @@ beforeEach(() => {
         status: 200,
         json: () => Promise.resolve({ data: {}, success: true }),
       });
-    }),
+    })
   );
 });
 
@@ -177,7 +177,7 @@ describe('Side-by-side: Shadow DOM isolation', () => {
 
     // Newsletter should have its own host element with data attribute
     const nlHost = newsletterContainer.querySelector(
-      '[data-nevent-widget="newsletter"]',
+      '[data-nevent-widget="newsletter"]'
     );
 
     // Chatbot should have rendered into its container
@@ -237,16 +237,14 @@ describe('Side-by-side: ErrorBoundary independence', () => {
       newsletterId: 'nl-123',
       tenantId: 'tenant-456',
       containerId: 'newsletter-container',
-      onError: (err: unknown) =>
-        newsletterErrors.push(err as NormalizedError),
+      onError: (err: unknown) => newsletterErrors.push(err as NormalizedError),
     });
 
     const chatbot = new ChatbotWidget({
       chatbotId: 'bot-123',
       tenantId: 'tenant-456',
       containerId: 'chatbot-container',
-      onError: (err: unknown) =>
-        chatbotErrors.push(err as NormalizedError),
+      onError: (err: unknown) => chatbotErrors.push(err as NormalizedError),
     });
 
     // Both widgets exist independently with separate error handlers
@@ -404,7 +402,7 @@ describe('Side-by-side: I18n independence', () => {
         en: { greeting: 'Hello' },
         es: { greeting: 'Hola' },
       },
-      'en',
+      'en'
     );
 
     const i18n2 = new I18nManager(
@@ -412,7 +410,7 @@ describe('Side-by-side: I18n independence', () => {
         en: { greeting: 'Hi' },
         fr: { greeting: 'Bonjour' },
       },
-      'en',
+      'en'
     );
 
     expect(i18n1.t('greeting')).toBe('Hello');

@@ -8,9 +8,7 @@ export default defineConfig({
       name: 'NeventChatbot',
       formats: ['es', 'umd'],
       fileName: (format) =>
-        format === 'es'
-          ? 'nevent-chatbot.js'
-          : 'nevent-chatbot.umd.cjs',
+        format === 'es' ? 'nevent-chatbot.js' : 'nevent-chatbot.umd.cjs',
     },
     sourcemap: true,
     minify: 'esbuild',

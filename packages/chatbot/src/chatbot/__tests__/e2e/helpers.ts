@@ -172,7 +172,9 @@ export function createMockSSEResponse(events: MockSSEEvent[]): Response {
     async start(controller) {
       for (const event of events) {
         if (event.delay && event.delay > 0) {
-          await new Promise<void>((resolve) => setTimeout(resolve, event.delay));
+          await new Promise<void>((resolve) =>
+            setTimeout(resolve, event.delay)
+          );
         }
 
         const ssePayload =
@@ -261,10 +263,14 @@ export function typeInInput(shadowRoot: ShadowRoot, text: string): void {
  * @throws Error if no send button is found
  */
 export function clickSend(shadowRoot: ShadowRoot): void {
-  const sendBtn = shadowRoot.querySelector('.nevent-chatbot-send-button') as HTMLButtonElement;
+  const sendBtn = shadowRoot.querySelector(
+    '.nevent-chatbot-send-button'
+  ) as HTMLButtonElement;
   if (!sendBtn) {
     // Fallback: try finding by aria-label pattern
-    const btn = shadowRoot.querySelector('button[aria-label]') as HTMLButtonElement;
+    const btn = shadowRoot.querySelector(
+      'button[aria-label]'
+    ) as HTMLButtonElement;
     if (!btn) {
       throw new Error('No send button found in shadow root');
     }
@@ -281,7 +287,9 @@ export function clickSend(shadowRoot: ShadowRoot): void {
  * @throws Error if no bubble element is found
  */
 export function toggleChat(shadowRoot: ShadowRoot): void {
-  const bubble = shadowRoot.querySelector('.nevent-chatbot-bubble') as HTMLElement;
+  const bubble = shadowRoot.querySelector(
+    '.nevent-chatbot-bubble'
+  ) as HTMLElement;
   if (!bubble) {
     throw new Error('No bubble element found in shadow root');
   }

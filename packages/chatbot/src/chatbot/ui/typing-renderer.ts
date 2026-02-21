@@ -85,7 +85,7 @@ export class TypingRenderer {
   constructor(
     private styles: MessageStyles | undefined,
     private i18n: I18nManager,
-    private shadowRoot?: ShadowRoot,
+    private shadowRoot?: ShadowRoot
   ) {}
 
   // --------------------------------------------------------------------------
@@ -339,7 +339,8 @@ export class TypingRenderer {
       fontSize: '11px',
       color: textColor,
       paddingLeft: '4px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily:
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
     });
   }
 }

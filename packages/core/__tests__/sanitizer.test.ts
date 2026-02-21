@@ -26,7 +26,7 @@ describe('Sanitizer', () => {
 
     it('should escape all special characters together', () => {
       expect(Sanitizer.escapeHtml('<script>alert("xss")</script>')).toBe(
-        '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;',
+        '&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;'
       );
     });
 
@@ -142,7 +142,8 @@ describe('Sanitizer', () => {
       });
 
       it('should block style tags with expressions', () => {
-        const input = '<style>body{background:url(javascript:alert(1))}</style>';
+        const input =
+          '<style>body{background:url(javascript:alert(1))}</style>';
         const result = Sanitizer.sanitizeHtml(input);
         expect(result).not.toContain('<style');
         expect(result).not.toContain('javascript');
@@ -175,7 +176,8 @@ describe('Sanitizer', () => {
       });
 
       it('should handle data: scheme', () => {
-        const input = '<a href="data:text/html,<script>alert(1)</script>">Click</a>';
+        const input =
+          '<a href="data:text/html,<script>alert(1)</script>">Click</a>';
         const result = Sanitizer.sanitizeHtml(input);
         expect(result).not.toContain('data:text');
       });
@@ -189,7 +191,9 @@ describe('Sanitizer', () => {
   describe('isValidUrl', () => {
     it('should accept https URLs', () => {
       expect(Sanitizer.isValidUrl('https://example.com')).toBe(true);
-      expect(Sanitizer.isValidUrl('https://sub.example.com/path?q=1')).toBe(true);
+      expect(Sanitizer.isValidUrl('https://sub.example.com/path?q=1')).toBe(
+        true
+      );
     });
 
     it('should accept http URLs', () => {

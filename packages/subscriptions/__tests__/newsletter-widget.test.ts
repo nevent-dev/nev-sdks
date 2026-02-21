@@ -26,7 +26,7 @@ function minimalConfig() {
 function stubFetch(
   overrides: Record<string, unknown> = {},
   ok = true,
-  status = 200,
+  status = 200
 ) {
   const serverConfig = {
     title: 'Test Newsletter',
@@ -41,7 +41,7 @@ function stubFetch(
       ok,
       status,
       json: () => Promise.resolve(serverConfig),
-    }),
+    })
   );
 }
 
@@ -75,7 +75,7 @@ describe('NewsletterWidget', () => {
           new NewsletterWidget({
             newsletterId: '',
             tenantId: 'tenant-456',
-          }),
+          })
       ).toThrow('newsletterId and tenantId are required');
     });
 
@@ -85,7 +85,7 @@ describe('NewsletterWidget', () => {
           new NewsletterWidget({
             newsletterId: 'nl-123',
             tenantId: '',
-          }),
+          })
       ).toThrow('newsletterId and tenantId are required');
     });
 
@@ -105,7 +105,9 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       // Widget should have created a host element with shadow root
-      const hostEl = container.querySelector('[data-nevent-widget="newsletter"]');
+      const hostEl = container.querySelector(
+        '[data-nevent-widget="newsletter"]'
+      );
       expect(hostEl).not.toBeNull();
     });
 
@@ -129,7 +131,7 @@ describe('NewsletterWidget', () => {
     it('should handle failed server config gracefully', async () => {
       vi.stubGlobal(
         'fetch',
-        vi.fn().mockRejectedValue(new Error('Network error')),
+        vi.fn().mockRejectedValue(new Error('Network error'))
       );
 
       const widget = new NewsletterWidget(minimalConfig());
@@ -148,7 +150,7 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       const hostEl = container.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       ) as HTMLElement;
       expect(hostEl).not.toBeNull();
       expect(hostEl.shadowRoot).not.toBeNull();
@@ -159,7 +161,7 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       const hostEl = container.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       ) as HTMLElement;
       const form = hostEl.shadowRoot?.querySelector('form');
       expect(form).not.toBeNull();
@@ -170,7 +172,7 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       const hostEl = container.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       ) as HTMLElement;
       const styles = hostEl.shadowRoot?.querySelectorAll('style');
       expect(styles).toBeDefined();
@@ -190,7 +192,7 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       const hostEl = container.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       ) as HTMLElement;
       expect(hostEl.style.all).toBe('initial');
     });
@@ -206,13 +208,13 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       expect(
-        container.querySelector('[data-nevent-widget="newsletter"]'),
+        container.querySelector('[data-nevent-widget="newsletter"]')
       ).not.toBeNull();
 
       widget.destroy();
 
       expect(
-        container.querySelector('[data-nevent-widget="newsletter"]'),
+        container.querySelector('[data-nevent-widget="newsletter"]')
       ).toBeNull();
     });
 
@@ -283,7 +285,7 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       const hostEl = container.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       ) as HTMLElement;
       const form = hostEl.shadowRoot?.querySelector('form');
       expect(form?.getAttribute('role')).toBe('form');
@@ -294,7 +296,7 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       const hostEl = container.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       ) as HTMLElement;
       const button = hostEl.shadowRoot?.querySelector('.nevent-submit-button');
       expect(button).not.toBeNull();
@@ -305,10 +307,10 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       const hostEl = container.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       ) as HTMLElement;
       const checkbox = hostEl.shadowRoot?.querySelector(
-        '.nevent-gdpr-checkbox',
+        '.nevent-gdpr-checkbox'
       );
       expect(checkbox).not.toBeNull();
     });
@@ -318,7 +320,7 @@ describe('NewsletterWidget', () => {
       await widget.init();
 
       const hostEl = container.querySelector(
-        '[data-nevent-widget="newsletter"]',
+        '[data-nevent-widget="newsletter"]'
       ) as HTMLElement;
       const status = hostEl.shadowRoot?.querySelector('.nevent-status-message');
       expect(status?.getAttribute('aria-live')).toBe('polite');

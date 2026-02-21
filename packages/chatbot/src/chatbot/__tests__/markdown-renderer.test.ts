@@ -100,7 +100,9 @@ describe('MarkdownRenderer', () => {
 
   describe('render() - links', () => {
     it('should convert [text](url) to <a> with target and rel', () => {
-      const result = MarkdownRenderer.render('[Click here](https://example.com)');
+      const result = MarkdownRenderer.render(
+        '[Click here](https://example.com)'
+      );
       expect(result).toContain('href="https://example.com"');
       expect(result).toContain('target="_blank"');
       expect(result).toContain('rel="noopener noreferrer"');
@@ -113,7 +115,9 @@ describe('MarkdownRenderer', () => {
     });
 
     it('should support mailto links', () => {
-      const result = MarkdownRenderer.render('[Email](mailto:test@example.com)');
+      const result = MarkdownRenderer.render(
+        '[Email](mailto:test@example.com)'
+      );
       expect(result).toContain('href="mailto:test@example.com"');
     });
 
@@ -126,7 +130,9 @@ describe('MarkdownRenderer', () => {
     });
 
     it('should reject data: URLs', () => {
-      const result = MarkdownRenderer.render('[click](data:text/html,<script>alert(1)</script>)');
+      const result = MarkdownRenderer.render(
+        '[click](data:text/html,<script>alert(1)</script>)'
+      );
       expect(result).not.toContain('data:');
       expect(result).not.toContain('<a');
       // The link text is preserved but the URL is dropped
@@ -140,14 +146,18 @@ describe('MarkdownRenderer', () => {
 
   describe('render() - images', () => {
     it('should convert ![alt](url) to <img> for HTTPS URLs', () => {
-      const result = MarkdownRenderer.render('![Photo](https://cdn.example.com/img.png)');
+      const result = MarkdownRenderer.render(
+        '![Photo](https://cdn.example.com/img.png)'
+      );
       expect(result).toContain('<img');
       expect(result).toContain('src="https://cdn.example.com/img.png"');
       expect(result).toContain('alt="Photo"');
     });
 
     it('should reject non-HTTPS image URLs', () => {
-      const result = MarkdownRenderer.render('![Photo](http://cdn.example.com/img.png)');
+      const result = MarkdownRenderer.render(
+        '![Photo](http://cdn.example.com/img.png)'
+      );
       expect(result).not.toContain('<img');
     });
 
@@ -281,7 +291,9 @@ describe('MarkdownRenderer', () => {
     });
 
     it('should handle links inside a list item', () => {
-      const result = MarkdownRenderer.render('- Visit [Google](https://google.com)');
+      const result = MarkdownRenderer.render(
+        '- Visit [Google](https://google.com)'
+      );
       expect(result).toContain('<li>');
       expect(result).toContain('<a href="https://google.com"');
     });
@@ -331,13 +343,17 @@ describe('MarkdownRenderer', () => {
     });
 
     it('should sanitize event handlers in embedded HTML', () => {
-      const result = MarkdownRenderer.render('<img onerror="alert(1)" src="x">');
+      const result = MarkdownRenderer.render(
+        '<img onerror="alert(1)" src="x">'
+      );
       expect(result).not.toContain('onerror');
     });
 
     it('should pass output through MessageSanitizer', () => {
       // Even raw HTML mixed with markdown should be sanitized
-      const result = MarkdownRenderer.render('**bold** <iframe src="evil.com"></iframe>');
+      const result = MarkdownRenderer.render(
+        '**bold** <iframe src="evil.com"></iframe>'
+      );
       expect(result).toContain('<strong>bold</strong>');
       expect(result).not.toContain('<iframe');
     });
@@ -369,7 +385,7 @@ describe('MarkdownRenderer', () => {
         '',
         '---',
         '',
-        'That\'s it!',
+        "That's it!",
       ].join('\n');
 
       const result = MarkdownRenderer.render(input);
@@ -396,7 +412,9 @@ describe('MarkdownRenderer', () => {
     });
 
     it('should detect __bold__', () => {
-      expect(MarkdownRenderer.containsMarkdown('__underline bold__')).toBe(true);
+      expect(MarkdownRenderer.containsMarkdown('__underline bold__')).toBe(
+        true
+      );
     });
 
     it('should detect ~~strikethrough~~', () => {
@@ -412,7 +430,9 @@ describe('MarkdownRenderer', () => {
     });
 
     it('should detect [links](url)', () => {
-      expect(MarkdownRenderer.containsMarkdown('[click](https://example.com)')).toBe(true);
+      expect(
+        MarkdownRenderer.containsMarkdown('[click](https://example.com)')
+      ).toBe(true);
     });
 
     it('should detect # headings', () => {
@@ -448,8 +468,12 @@ describe('MarkdownRenderer', () => {
     });
 
     it('should return false for null/undefined', () => {
-      expect(MarkdownRenderer.containsMarkdown(null as unknown as string)).toBe(false);
-      expect(MarkdownRenderer.containsMarkdown(undefined as unknown as string)).toBe(false);
+      expect(MarkdownRenderer.containsMarkdown(null as unknown as string)).toBe(
+        false
+      );
+      expect(
+        MarkdownRenderer.containsMarkdown(undefined as unknown as string)
+      ).toBe(false);
     });
   });
 });

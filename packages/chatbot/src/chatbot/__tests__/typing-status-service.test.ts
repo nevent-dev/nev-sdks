@@ -21,7 +21,8 @@ function createService(options?: {
   tenantId?: string;
   token?: string;
 }) {
-  const threadId = options && 'threadId' in options ? options.threadId : 'thread-123';
+  const threadId =
+    options && 'threadId' in options ? options.threadId : 'thread-123';
   return new TypingStatusService(
     {
       enabled: options?.enabled ?? true,
@@ -32,7 +33,7 @@ function createService(options?: {
     options?.tenantId ?? 'tenant-456',
     () => threadId,
     options?.token ?? 'test-token',
-    false,
+    false
   );
 }
 
@@ -45,7 +46,9 @@ describe('TypingStatusService', () => {
     vi.useFakeTimers();
 
     // Mock fetch globally
-    globalThis.fetch = vi.fn().mockResolvedValue(new Response('OK', { status: 200 }));
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValue(new Response('OK', { status: 200 }));
   });
 
   afterEach(() => {
@@ -71,11 +74,11 @@ describe('TypingStatusService', () => {
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
             'X-Tenant-ID': 'tenant-456',
-            'Authorization': 'Bearer test-token',
+            Authorization: 'Bearer test-token',
           }),
           body: JSON.stringify({ threadId: 'thread-123', isTyping: true }),
           keepalive: true,
-        }),
+        })
       );
     });
 
@@ -235,7 +238,7 @@ describe('TypingStatusService', () => {
       service.handleServerTypingEvent(event);
 
       expect(callback).toHaveBeenCalledWith(
-        expect.objectContaining({ isTyping: false }),
+        expect.objectContaining({ isTyping: false })
       );
     });
 
@@ -300,7 +303,7 @@ describe('TypingStatusService', () => {
       expect(sendBeaconMock).toHaveBeenCalledTimes(1);
       expect(sendBeaconMock).toHaveBeenCalledWith(
         'https://api.nevent.es/chatbot/typing',
-        expect.any(Blob),
+        expect.any(Blob)
       );
     });
 
@@ -333,7 +336,7 @@ describe('TypingStatusService', () => {
   describe('fire-and-forget behavior', () => {
     it('should not throw on network error', async () => {
       (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-        new Error('Network error'),
+        new Error('Network error')
       );
 
       const service = createService();
@@ -349,7 +352,7 @@ describe('TypingStatusService', () => {
 
     it('should not throw on HTTP error response', async () => {
       (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValue(
-        new Response('Server Error', { status: 500 }),
+        new Response('Server Error', { status: 500 })
       );
 
       const service = createService();
@@ -373,7 +376,7 @@ describe('TypingStatusService', () => {
         'https://api.nevent.es',
         'tenant-456',
         () => 'thread-123',
-        'test-token',
+        'test-token'
       );
 
       // Should work with defaults (enabled=true, debounceMs=2000, timeoutMs=5000)
@@ -394,7 +397,7 @@ describe('TypingStatusService', () => {
 
       expect(fetch).toHaveBeenCalledWith(
         'https://api.nevent.es/chatbot/typing',
-        expect.anything(),
+        expect.anything()
       );
 
       service.destroy();

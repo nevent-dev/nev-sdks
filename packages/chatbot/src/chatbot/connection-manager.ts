@@ -48,7 +48,11 @@ import { Logger } from '@nevent/core';
  * - `'disconnected'` — Max retry attempts exhausted; user intervention required.
  * - `'offline'`      — Browser reports no network (`navigator.onLine === false`).
  */
-export type ConnectionStatus = 'connected' | 'disconnected' | 'reconnecting' | 'offline';
+export type ConnectionStatus =
+  | 'connected'
+  | 'disconnected'
+  | 'reconnecting'
+  | 'offline';
 
 /**
  * Configuration options for the ConnectionManager.
@@ -200,7 +204,7 @@ export class ConnectionManager {
    */
   constructor(
     private readonly apiUrl: string,
-    config: ConnectionManagerConfig = {},
+    config: ConnectionManagerConfig = {}
   ) {
     this.maxRetries = config.maxRetries ?? 5;
     this.baseRetryDelay = config.baseRetryDelay ?? 1000;
@@ -209,7 +213,10 @@ export class ConnectionManager {
     this.heartbeatTimeout = config.heartbeatTimeout ?? 5_000;
     this.autoReconnect = config.autoReconnect ?? true;
 
-    this.logger = new Logger('[NeventChatbot:ConnectionManager]', config.debug ?? false);
+    this.logger = new Logger(
+      '[NeventChatbot:ConnectionManager]',
+      config.debug ?? false
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -437,7 +444,10 @@ export class ConnectionManager {
   async ping(): Promise<boolean> {
     const url = this.apiUrl.replace(/\/$/, '');
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.heartbeatTimeout);
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      this.heartbeatTimeout
+    );
 
     this.logger.debug('Pinging API', { url });
 
@@ -453,7 +463,9 @@ export class ConnectionManager {
       return true;
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') {
-        this.logger.debug('Ping timed out', { timeoutMs: this.heartbeatTimeout });
+        this.logger.debug('Ping timed out', {
+          timeoutMs: this.heartbeatTimeout,
+        });
       } else {
         this.logger.debug('Ping failed', { error });
       }
@@ -617,12 +629,16 @@ export class ConnectionManager {
       return;
     }
 
-    this.logger.debug('Executing retry attempt', { retryCount: this.retryCount });
+    this.logger.debug('Executing retry attempt', {
+      retryCount: this.retryCount,
+    });
 
     const ok = await this.ping();
 
     if (ok) {
-      this.logger.debug('Reconnection succeeded', { attempts: this.retryCount + 1 });
+      this.logger.debug('Reconnection succeeded', {
+        attempts: this.retryCount + 1,
+      });
       this.retryCount = 0;
       this.setStatus('connected');
     } else {

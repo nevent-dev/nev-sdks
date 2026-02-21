@@ -118,20 +118,34 @@ export class ErrorBoundary extends CoreErrorBoundary {
    * ```
    */
   override guardTimer(fn: () => void, context?: string): () => void;
-  override guardTimer(fn: () => void, interval: number, context?: string): number;
-  override guardTimer(fn: () => void, intervalOrContext?: number | string, context?: string): number | (() => void) {
+  override guardTimer(
+    fn: () => void,
+    interval: number,
+    context?: string
+  ): number;
+  override guardTimer(
+    fn: () => void,
+    intervalOrContext?: number | string,
+    context?: string
+  ): number | (() => void) {
     // When called with chatbot signature: guardTimer(fn, context?)
     // The second argument is either a string (context) or undefined.
-    if (typeof intervalOrContext === 'string' || intervalOrContext === undefined) {
+    if (
+      typeof intervalOrContext === 'string' ||
+      intervalOrContext === undefined
+    ) {
       const ctx = intervalOrContext;
       return () => {
         try {
           fn();
         } catch (error) {
           // Delegate to core's guard which catches errors and calls handleError.
-          this.guard(() => {
-            throw error;
-          }, `timer:${ctx ?? 'unknown'}`);
+          this.guard(
+            () => {
+              throw error;
+            },
+            `timer:${ctx ?? 'unknown'}`
+          );
         }
       };
     }
@@ -168,7 +182,10 @@ export class ErrorBoundary extends CoreErrorBoundary {
    * ```
    */
   static override normalize(error: unknown, context?: string): ChatbotError {
-    const normalized: NormalizedError = CoreErrorBoundary.normalize(error, context);
+    const normalized: NormalizedError = CoreErrorBoundary.normalize(
+      error,
+      context
+    );
     return normalized as ChatbotError;
   }
 }

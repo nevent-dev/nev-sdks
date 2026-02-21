@@ -74,7 +74,7 @@ describe('HttpClient', () => {
       expect(result.data).toBe('hello');
       expect(fetchSpy).toHaveBeenCalledWith(
         'https://api.example.com/test',
-        expect.objectContaining({ method: 'GET' }),
+        expect.objectContaining({ method: 'GET' })
       );
     });
 
@@ -95,7 +95,7 @@ describe('HttpClient', () => {
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({ name: 'test' }),
-        }),
+        })
       );
     });
 
@@ -113,7 +113,7 @@ describe('HttpClient', () => {
         expect.objectContaining({
           method: 'PUT',
           body: JSON.stringify({ name: 'updated' }),
-        }),
+        })
       );
     });
 
@@ -128,14 +128,12 @@ describe('HttpClient', () => {
 
       expect(fetchSpy).toHaveBeenCalledWith(
         'https://api.example.com/items/1',
-        expect.objectContaining({ method: 'DELETE' }),
+        expect.objectContaining({ method: 'DELETE' })
       );
     });
 
     it('should send default headers including API key', async () => {
-      fetchSpy.mockResolvedValue(
-        mockResponse({ data: null, success: true }),
-      );
+      fetchSpy.mockResolvedValue(mockResponse({ data: null, success: true }));
 
       await client.get('/test');
 
@@ -151,17 +149,15 @@ describe('HttpClient', () => {
       const clientWithSlash = new HttpClient(
         'https://api.example.com/',
         'key',
-        { maxRetries: 0 },
+        { maxRetries: 0 }
       );
-      fetchSpy.mockResolvedValue(
-        mockResponse({ data: null, success: true }),
-      );
+      fetchSpy.mockResolvedValue(mockResponse({ data: null, success: true }));
 
       clientWithSlash.get('/test');
 
       expect(fetchSpy).toHaveBeenCalledWith(
         'https://api.example.com/test',
-        expect.anything(),
+        expect.anything()
       );
     });
   });
@@ -172,9 +168,7 @@ describe('HttpClient', () => {
 
   describe('error handling', () => {
     it('should throw ApiError on non-ok response', async () => {
-      fetchSpy.mockResolvedValue(
-        mockResponse({ message: 'Not found' }, 404),
-      );
+      fetchSpy.mockResolvedValue(mockResponse({ message: 'Not found' }, 404));
 
       await expect(client.get('/missing')).rejects.toMatchObject({
         message: 'Not found',
@@ -209,17 +203,13 @@ describe('HttpClient', () => {
               reject(abortError);
             };
             options.signal?.addEventListener('abort', onAbort);
-          }),
+          })
       );
 
-      const timeoutClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        {
-          timeout: 1000,
-          maxRetries: 0,
-        },
-      );
+      const timeoutClient = new HttpClient('https://api.example.com', 'key', {
+        timeout: 1000,
+        maxRetries: 0,
+      });
 
       const promise = timeoutClient.get('/slow');
 
@@ -247,7 +237,7 @@ describe('HttpClient', () => {
               reject(abortError);
             };
             options.signal?.addEventListener('abort', onAbort);
-          }),
+          })
       );
 
       // Client has 5s default timeout, but request uses 500ms
@@ -273,24 +263,16 @@ describe('HttpClient', () => {
 
   describe('retry logic', () => {
     it('should retry on 500 errors', async () => {
-      const retryClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        {
-          maxRetries: 2,
-          retryDelay: 10, // Short delay for tests
-        },
-      );
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 2,
+        retryDelay: 10, // Short delay for tests
+      });
 
       fetchSpy
+        .mockResolvedValueOnce(mockResponse({ message: 'Server error' }, 500))
+        .mockResolvedValueOnce(mockResponse({ message: 'Server error' }, 500))
         .mockResolvedValueOnce(
-          mockResponse({ message: 'Server error' }, 500),
-        )
-        .mockResolvedValueOnce(
-          mockResponse({ message: 'Server error' }, 500),
-        )
-        .mockResolvedValueOnce(
-          mockResponse({ data: 'success', success: true }, 200),
+          mockResponse({ data: 'success', success: true }, 200)
         );
 
       const result = await retryClient.get<string>('/test');
@@ -300,18 +282,12 @@ describe('HttpClient', () => {
     });
 
     it('should NOT retry on 400 errors', async () => {
-      const retryClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        {
-          maxRetries: 2,
-          retryDelay: 10,
-        },
-      );
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 2,
+        retryDelay: 10,
+      });
 
-      fetchSpy.mockResolvedValue(
-        mockResponse({ message: 'Bad request' }, 400),
-      );
+      fetchSpy.mockResolvedValue(mockResponse({ message: 'Bad request' }, 400));
 
       await expect(retryClient.get('/test')).rejects.toMatchObject({
         status: 400,
@@ -321,17 +297,13 @@ describe('HttpClient', () => {
     });
 
     it('should NOT retry on 401 errors', async () => {
-      const retryClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        {
-          maxRetries: 2,
-          retryDelay: 10,
-        },
-      );
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 2,
+        retryDelay: 10,
+      });
 
       fetchSpy.mockResolvedValue(
-        mockResponse({ message: 'Unauthorized' }, 401),
+        mockResponse({ message: 'Unauthorized' }, 401)
       );
 
       await expect(retryClient.get('/test')).rejects.toMatchObject({
@@ -342,21 +314,15 @@ describe('HttpClient', () => {
     });
 
     it('should retry on 429 (rate limit) errors', async () => {
-      const retryClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        {
-          maxRetries: 1,
-          retryDelay: 10,
-        },
-      );
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 1,
+        retryDelay: 10,
+      });
 
       fetchSpy
+        .mockResolvedValueOnce(mockResponse({ message: 'Rate limited' }, 429))
         .mockResolvedValueOnce(
-          mockResponse({ message: 'Rate limited' }, 429),
-        )
-        .mockResolvedValueOnce(
-          mockResponse({ data: 'ok', success: true }, 200),
+          mockResponse({ data: 'ok', success: true }, 200)
         );
 
       const result = await retryClient.get<string>('/test');
@@ -365,17 +331,13 @@ describe('HttpClient', () => {
     });
 
     it('should throw after exhausting all retries', async () => {
-      const retryClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        {
-          maxRetries: 2,
-          retryDelay: 10,
-        },
-      );
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 2,
+        retryDelay: 10,
+      });
 
       fetchSpy.mockResolvedValue(
-        mockResponse({ message: 'Server error' }, 503),
+        mockResponse({ message: 'Server error' }, 503)
       );
 
       await expect(retryClient.get('/test')).rejects.toMatchObject({
@@ -387,19 +349,15 @@ describe('HttpClient', () => {
     });
 
     it('should retry on network errors', async () => {
-      const retryClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        {
-          maxRetries: 1,
-          retryDelay: 10,
-        },
-      );
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 1,
+        retryDelay: 10,
+      });
 
       fetchSpy
         .mockRejectedValueOnce(new TypeError('Failed to fetch'))
         .mockResolvedValueOnce(
-          mockResponse({ data: 'recovered', success: true }, 200),
+          mockResponse({ data: 'recovered', success: true }, 200)
         );
 
       const result = await retryClient.get<string>('/test');
@@ -436,9 +394,7 @@ describe('HttpClient', () => {
         writable: true,
       });
 
-      fetchSpy.mockResolvedValue(
-        mockResponse({ data: null, success: true }),
-      );
+      fetchSpy.mockResolvedValue(mockResponse({ data: null, success: true }));
 
       await expect(client.get('/test')).resolves.toBeDefined();
     });
@@ -450,18 +406,12 @@ describe('HttpClient', () => {
         writable: true,
       });
 
-      const noOfflineClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        {
-          offlineDetection: false,
-          maxRetries: 0,
-        },
-      );
+      const noOfflineClient = new HttpClient('https://api.example.com', 'key', {
+        offlineDetection: false,
+        maxRetries: 0,
+      });
 
-      fetchSpy.mockResolvedValue(
-        mockResponse({ data: null, success: true }),
-      );
+      fetchSpy.mockResolvedValue(mockResponse({ data: null, success: true }));
 
       // Should NOT throw offline error
       await expect(noOfflineClient.get('/test')).resolves.toBeDefined();
@@ -476,9 +426,7 @@ describe('HttpClient', () => {
   describe('interceptors', () => {
     describe('request interceptors', () => {
       it('should call request interceptors before fetch', async () => {
-        fetchSpy.mockResolvedValue(
-          mockResponse({ data: null, success: true }),
-        );
+        fetchSpy.mockResolvedValue(mockResponse({ data: null, success: true }));
 
         const interceptor = vi.fn((url: string, options: RequestInit) => {
           return {
@@ -497,7 +445,7 @@ describe('HttpClient', () => {
         expect(interceptor).toHaveBeenCalledOnce();
         expect(interceptor).toHaveBeenCalledWith(
           'https://api.example.com/test',
-          expect.objectContaining({ method: 'GET' }),
+          expect.objectContaining({ method: 'GET' })
         );
 
         const fetchHeaders = fetchSpy.mock.calls[0]?.[1]?.headers;
@@ -505,9 +453,7 @@ describe('HttpClient', () => {
       });
 
       it('should chain multiple request interceptors', async () => {
-        fetchSpy.mockResolvedValue(
-          mockResponse({ data: null, success: true }),
-        );
+        fetchSpy.mockResolvedValue(mockResponse({ data: null, success: true }));
 
         const order: number[] = [];
 
@@ -545,9 +491,7 @@ describe('HttpClient', () => {
       });
 
       it('should chain multiple response interceptors', async () => {
-        fetchSpy.mockResolvedValue(
-          mockResponse({ data: null, success: true }),
-        );
+        fetchSpy.mockResolvedValue(mockResponse({ data: null, success: true }));
 
         const order: number[] = [];
 
@@ -574,30 +518,21 @@ describe('HttpClient', () => {
 
   describe('default configuration', () => {
     it('should use 30s timeout by default', () => {
-      const defaultClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-      );
+      const defaultClient = new HttpClient('https://api.example.com', 'key');
 
       // We can verify the default by checking the AbortController timeout
       // Indirectly test by checking it does not immediately fail
-      fetchSpy.mockResolvedValue(
-        mockResponse({ data: null, success: true }),
-      );
+      fetchSpy.mockResolvedValue(mockResponse({ data: null, success: true }));
 
       expect(defaultClient.get('/test')).resolves.toBeDefined();
     });
 
     it('should use 3 retries by default', async () => {
-      const defaultClient = new HttpClient(
-        'https://api.example.com',
-        'key',
-        { retryDelay: 10 },
-      );
+      const defaultClient = new HttpClient('https://api.example.com', 'key', {
+        retryDelay: 10,
+      });
 
-      fetchSpy.mockResolvedValue(
-        mockResponse({ message: 'Error' }, 500),
-      );
+      fetchSpy.mockResolvedValue(mockResponse({ message: 'Error' }, 500));
 
       await expect(defaultClient.get('/test')).rejects.toBeDefined();
 

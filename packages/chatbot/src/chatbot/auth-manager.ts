@@ -296,7 +296,9 @@ export class AuthManager {
 
     // Deduplicate concurrent refresh calls
     if (this.refreshPromise !== null) {
-      this.logger.debug('Token refresh already in progress — awaiting existing promise');
+      this.logger.debug(
+        'Token refresh already in progress — awaiting existing promise'
+      );
       try {
         const newToken = await this.refreshPromise;
         return newToken.length > 0;

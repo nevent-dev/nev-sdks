@@ -16,11 +16,7 @@ import { describe, it, expect, afterEach, vi } from 'vitest';
 import { ChatbotWidget } from '../../../chatbot-widget';
 import { createMockApi } from '../helpers/mock-api';
 import { createMockConfig } from '../helpers/mock-factories';
-import {
-  createInitializedWidget,
-  flushPromises,
-  queryAll,
-} from './helpers';
+import { createInitializedWidget, flushPromises, queryAll } from './helpers';
 
 // ============================================================================
 // jsdom compatibility shims
@@ -41,7 +37,9 @@ describe('E2E: Error Recovery Flow', () => {
     cleanup?.();
     cleanup = null;
     // Clean up any remaining DOM elements
-    document.querySelectorAll('#nevent-chatbot-host').forEach((el) => el.remove());
+    document
+      .querySelectorAll('#nevent-chatbot-host')
+      .forEach((el) => el.remove());
     localStorage.clear();
   });
 
@@ -133,9 +131,7 @@ describe('E2E: Error Recovery Flow', () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const onError = vi.fn();
-      const widget = new ChatbotWidget(
-        createMockConfig({ onError })
-      );
+      const widget = new ChatbotWidget(createMockConfig({ onError }));
 
       // init() should not throw (error boundary catches it)
       await expect(widget.init()).resolves.toBeUndefined();
@@ -162,7 +158,11 @@ describe('E2E: Error Recovery Flow', () => {
         vi.fn().mockResolvedValue({
           ok: false,
           status: 500,
-          json: () => Promise.resolve({ success: false, message: 'Internal Server Error' }),
+          json: () =>
+            Promise.resolve({
+              success: false,
+              message: 'Internal Server Error',
+            }),
         })
       );
       vi.spyOn(console, 'debug').mockImplementation(() => {});
@@ -171,9 +171,7 @@ describe('E2E: Error Recovery Flow', () => {
       vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const onError = vi.fn();
-      const widget = new ChatbotWidget(
-        createMockConfig({ onError })
-      );
+      const widget = new ChatbotWidget(createMockConfig({ onError }));
 
       await widget.init();
 
@@ -217,28 +215,19 @@ describe('E2E: Error Recovery Flow', () => {
 
     it('should throw for invalid apiUrl', () => {
       expect(
-        () =>
-          new ChatbotWidget(
-            createMockConfig({ apiUrl: 'not-a-valid-url' })
-          )
+        () => new ChatbotWidget(createMockConfig({ apiUrl: 'not-a-valid-url' }))
       ).toThrow('apiUrl must be a valid');
     });
 
     it('should throw for unsupported locale', () => {
       expect(
-        () =>
-          new ChatbotWidget(
-            createMockConfig({ locale: 'xyz' as never })
-          )
+        () => new ChatbotWidget(createMockConfig({ locale: 'xyz' as never }))
       ).toThrow('locale must be one of');
     });
 
     it('should throw for unsupported theme', () => {
       expect(
-        () =>
-          new ChatbotWidget(
-            createMockConfig({ theme: 'neon' as never })
-          )
+        () => new ChatbotWidget(createMockConfig({ theme: 'neon' as never }))
       ).toThrow('theme must be one of');
     });
   });
@@ -327,7 +316,9 @@ describe('E2E: Error Recovery Flow', () => {
 
       widget.destroy();
 
-      await expect(widget.sendMessage('After destroy')).resolves.toBeUndefined();
+      await expect(
+        widget.sendMessage('After destroy')
+      ).resolves.toBeUndefined();
     });
 
     it('should not throw when destroy is called twice', async () => {
@@ -360,7 +351,11 @@ describe('E2E: Error Recovery Flow', () => {
 
     it('should continue working after a non-fatal error', async () => {
       const onError = vi.fn();
-      const { widget, shadowRoot, cleanup: c } = await createInitializedWidget({
+      const {
+        widget,
+        shadowRoot,
+        cleanup: c,
+      } = await createInitializedWidget({
         onError,
       });
       cleanup = c;

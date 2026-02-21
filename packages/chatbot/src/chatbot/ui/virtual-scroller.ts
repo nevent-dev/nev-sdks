@@ -199,7 +199,9 @@ export class VirtualScroller {
 
     // Set up the scroll listener (rAF-debounced)
     this.scrollHandler = () => this.onScroll();
-    this.config.container.addEventListener('scroll', this.scrollHandler, { passive: true });
+    this.config.container.addEventListener('scroll', this.scrollHandler, {
+      passive: true,
+    });
 
     // Set up ResizeObserver for dynamic height measurement.
     // Guard against environments that lack ResizeObserver (SSR, legacy browsers,
@@ -524,7 +526,13 @@ export class VirtualScroller {
    * unmounted. This avoids full re-renders on every scroll event.
    */
   private updateVirtualRender(): void {
-    if (!this.isVirtualized || !this.contentElement || !this.spacerTop || !this.spacerBottom) return;
+    if (
+      !this.isVirtualized ||
+      !this.contentElement ||
+      !this.spacerTop ||
+      !this.spacerBottom
+    )
+      return;
 
     const scrollTop = this.config.container.scrollTop;
     const viewportHeight = this.config.container.clientHeight;
@@ -612,7 +620,7 @@ export class VirtualScroller {
    */
   private calculateVisibleRange(
     scrollTop: number,
-    viewportHeight: number,
+    viewportHeight: number
   ): { start: number; end: number } {
     if (this.items.length === 0) {
       return { start: 0, end: 0 };
@@ -759,7 +767,9 @@ export class VirtualScroller {
       const id = el.getAttribute('data-virtual-id');
       if (!id) continue;
 
-      const newHeight = entry.borderBoxSize?.[0]?.blockSize ?? el.getBoundingClientRect().height;
+      const newHeight =
+        entry.borderBoxSize?.[0]?.blockSize ??
+        el.getBoundingClientRect().height;
       const oldHeight = this.heights.get(id);
 
       if (oldHeight === undefined || Math.abs(newHeight - oldHeight) > 0.5) {
@@ -784,7 +794,8 @@ export class VirtualScroller {
     if (!this.spacerTop || !this.spacerBottom) return;
 
     const topHeight = this.getItemTop(this.visibleRange.start);
-    const bottomHeight = this.getTotalHeight() - this.getItemTop(this.visibleRange.end);
+    const bottomHeight =
+      this.getTotalHeight() - this.getItemTop(this.visibleRange.end);
 
     this.spacerTop.style.height = `${Math.max(0, topHeight)}px`;
     this.spacerBottom.style.height = `${Math.max(0, bottomHeight)}px`;

@@ -80,7 +80,7 @@ export class I18nManager<T extends Record<string, string>> {
     if (!locales[defaultLocale]) {
       throw new Error(
         `I18nManager: default locale "${defaultLocale}" not found in provided locales. ` +
-          `Available locales: ${Object.keys(locales).join(', ')}`,
+          `Available locales: ${Object.keys(locales).join(', ')}`
       );
     }
 
@@ -169,7 +169,7 @@ export class I18nManager<T extends Record<string, string>> {
     if (!this.locales[locale]) {
       console.warn(
         `I18nManager: locale "${locale}" not available. ` +
-          `Available locales: ${Object.keys(this.locales).join(', ')}`,
+          `Available locales: ${Object.keys(this.locales).join(', ')}`
       );
       return;
     }
@@ -230,10 +230,7 @@ export class I18nManager<T extends Record<string, string>> {
    * ```
    */
   static detectLocale(): string {
-    if (
-      typeof navigator !== 'undefined' &&
-      navigator.language
-    ) {
+    if (typeof navigator !== 'undefined' && navigator.language) {
       // Extract two-letter language code from BCP 47 tag (e.g., 'en-US' -> 'en')
       return navigator.language.split('-')[0]?.toLowerCase() ?? 'en';
     }
@@ -255,13 +252,10 @@ export class I18nManager<T extends Record<string, string>> {
    */
   private static interpolate(
     template: string,
-    params: Record<string, string>,
+    params: Record<string, string>
   ): string {
-    return template.replace(
-      /\{\{(\w+)\}\}/g,
-      (_match, paramKey: string) => {
-        return params[paramKey] ?? `{{${paramKey}}}`;
-      },
-    );
+    return template.replace(/\{\{(\w+)\}\}/g, (_match, paramKey: string) => {
+      return params[paramKey] ?? `{{${paramKey}}}`;
+    });
   }
 }

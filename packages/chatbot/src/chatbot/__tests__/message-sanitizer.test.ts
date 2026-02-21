@@ -8,7 +8,8 @@ describe('MessageSanitizer', () => {
 
   describe('sanitize() - allowed tags', () => {
     it('should allow <b>, <i>, <em>, <strong> tags', () => {
-      const input = '<b>bold</b> <i>italic</i> <em>emphasis</em> <strong>strong</strong>';
+      const input =
+        '<b>bold</b> <i>italic</i> <em>emphasis</em> <strong>strong</strong>';
       const result = MessageSanitizer.sanitize(input);
 
       expect(result).toContain('<b>bold</b>');
@@ -93,7 +94,8 @@ describe('MessageSanitizer', () => {
     });
 
     it('should remove onerror event handler from img', () => {
-      const input = '<img src="https://cdn.example.com/img.png" onerror="alert(1)">';
+      const input =
+        '<img src="https://cdn.example.com/img.png" onerror="alert(1)">';
       const result = MessageSanitizer.sanitize(input);
 
       expect(result).not.toContain('onerror');
@@ -136,7 +138,8 @@ describe('MessageSanitizer', () => {
     });
 
     it('should reject href with data: URL', () => {
-      const input = '<a href="data:text/html,<script>alert(1)</script>">Click</a>';
+      const input =
+        '<a href="data:text/html,<script>alert(1)</script>">Click</a>';
       const result = MessageSanitizer.sanitize(input);
 
       expect(result).not.toContain('data:');
@@ -202,7 +205,9 @@ describe('MessageSanitizer', () => {
   describe('sanitize() - edge cases', () => {
     it('should return empty string for null/undefined input', () => {
       expect(MessageSanitizer.sanitize(null as unknown as string)).toBe('');
-      expect(MessageSanitizer.sanitize(undefined as unknown as string)).toBe('');
+      expect(MessageSanitizer.sanitize(undefined as unknown as string)).toBe(
+        ''
+      );
       expect(MessageSanitizer.sanitize('')).toBe('');
     });
 
@@ -262,7 +267,9 @@ describe('MessageSanitizer', () => {
     });
 
     it('should escape double quote (")', () => {
-      expect(MessageSanitizer.escapeHtml('say "hi"')).toBe('say &quot;hi&quot;');
+      expect(MessageSanitizer.escapeHtml('say "hi"')).toBe(
+        'say &quot;hi&quot;'
+      );
     });
 
     it("should escape single quote (')", () => {
@@ -281,7 +288,9 @@ describe('MessageSanitizer', () => {
 
   describe('isDangerous()', () => {
     it('should detect script tags', () => {
-      expect(MessageSanitizer.isDangerous('<script>alert(1)</script>')).toBe(true);
+      expect(MessageSanitizer.isDangerous('<script>alert(1)</script>')).toBe(
+        true
+      );
     });
 
     it('should detect self-closing script tags', () => {
@@ -289,15 +298,21 @@ describe('MessageSanitizer', () => {
     });
 
     it('should detect event handlers (onclick)', () => {
-      expect(MessageSanitizer.isDangerous('<img onclick="alert(1)">')).toBe(true);
+      expect(MessageSanitizer.isDangerous('<img onclick="alert(1)">')).toBe(
+        true
+      );
     });
 
     it('should detect event handlers (onerror)', () => {
-      expect(MessageSanitizer.isDangerous('<img src=x onerror=alert(1)>')).toBe(true);
+      expect(MessageSanitizer.isDangerous('<img src=x onerror=alert(1)>')).toBe(
+        true
+      );
     });
 
     it('should detect event handlers (onload)', () => {
-      expect(MessageSanitizer.isDangerous('<body onload="alert(1)">')).toBe(true);
+      expect(MessageSanitizer.isDangerous('<body onload="alert(1)">')).toBe(
+        true
+      );
     });
 
     it('should detect javascript: URIs in href', () => {
@@ -325,9 +340,7 @@ describe('MessageSanitizer', () => {
     });
 
     it('should detect embed tags', () => {
-      expect(
-        MessageSanitizer.isDangerous('<embed src="evil.swf">')
-      ).toBe(true);
+      expect(MessageSanitizer.isDangerous('<embed src="evil.swf">')).toBe(true);
     });
 
     it('should return false for safe HTML', () => {
@@ -340,7 +353,9 @@ describe('MessageSanitizer', () => {
 
     it('should return false for empty/null input', () => {
       expect(MessageSanitizer.isDangerous('')).toBe(false);
-      expect(MessageSanitizer.isDangerous(null as unknown as string)).toBe(false);
+      expect(MessageSanitizer.isDangerous(null as unknown as string)).toBe(
+        false
+      );
     });
 
     it('should detect data: URIs in href', () => {

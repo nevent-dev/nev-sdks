@@ -61,7 +61,9 @@ export function resetFactorySequences(): void {
  * @param overrides - Partial properties to override the defaults
  * @returns A fully-typed ChatMessage object
  */
-export function createMockMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+export function createMockMessage(
+  overrides: Partial<ChatMessage> = {}
+): ChatMessage {
   const id = `msg-${++messageSeq}`;
   return {
     id,
@@ -81,7 +83,9 @@ export function createMockMessage(overrides: Partial<ChatMessage> = {}): ChatMes
  * @param overrides - Partial properties to override the defaults
  * @returns A ChatMessage with `role: 'assistant'`
  */
-export function createMockBotMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
+export function createMockBotMessage(
+  overrides: Partial<ChatMessage> = {}
+): ChatMessage {
   return createMockMessage({
     role: 'assistant',
     content: 'Hello! How can I help you today?',
@@ -106,7 +110,9 @@ export function createMockBotMessage(overrides: Partial<ChatMessage> = {}): Chat
  * @param overrides - Partial properties to override the defaults
  * @returns A fully-typed Conversation object
  */
-export function createMockConversation(overrides: Partial<Conversation> = {}): Conversation {
+export function createMockConversation(
+  overrides: Partial<Conversation> = {}
+): Conversation {
   const id = `conv-${++conversationSeq}`;
   return {
     id,
@@ -134,7 +140,9 @@ export function createMockConversation(overrides: Partial<Conversation> = {}): C
  * @param overrides - Partial properties to override the defaults
  * @returns A minimal, valid ChatbotConfig
  */
-export function createMockConfig(overrides: Partial<ChatbotConfig> = {}): ChatbotConfig {
+export function createMockConfig(
+  overrides: Partial<ChatbotConfig> = {}
+): ChatbotConfig {
   return {
     chatbotId: 'bot-test-123',
     tenantId: 'tenant-test-456',
@@ -167,7 +175,7 @@ export function createMockConfig(overrides: Partial<ChatbotConfig> = {}): Chatbo
  * @returns A fully-typed ServerChatbotConfig
  */
 export function createMockServerConfig(
-  overrides: Partial<ServerChatbotConfig> = {},
+  overrides: Partial<ServerChatbotConfig> = {}
 ): ServerChatbotConfig {
   return {
     chatbotId: 'bot-test-123',
@@ -220,11 +228,22 @@ export function createMockRichContent(type: RichContentType): RichContent {
       return {
         type: 'card',
         title: 'Festival Pass 2025',
-        description: 'Get your all-access festival pass. Includes all stages and events.',
+        description:
+          'Get your all-access festival pass. Includes all stages and events.',
         imageUrl: 'https://example.com/festival-pass.jpg',
         buttons: [
-          { id: 'btn-1', label: 'Buy Now', type: 'url', value: 'https://tickets.nevent.es' },
-          { id: 'btn-2', label: 'More Info', type: 'postback', value: 'more_info' },
+          {
+            id: 'btn-1',
+            label: 'Buy Now',
+            type: 'url',
+            value: 'https://tickets.nevent.es',
+          },
+          {
+            id: 'btn-2',
+            label: 'More Info',
+            type: 'postback',
+            value: 'more_info',
+          },
         ],
       };
 
@@ -237,21 +256,42 @@ export function createMockRichContent(type: RichContentType): RichContent {
             title: 'Day 1 Pass',
             description: 'Friday, 23 May 2025',
             imageUrl: 'https://example.com/day1.jpg',
-            buttons: [{ id: 'btn-day1', label: 'Buy', type: 'url', value: 'https://tickets.nevent.es/day1' }],
+            buttons: [
+              {
+                id: 'btn-day1',
+                label: 'Buy',
+                type: 'url',
+                value: 'https://tickets.nevent.es/day1',
+              },
+            ],
           },
           {
             type: 'card',
             title: 'Day 2 Pass',
             description: 'Saturday, 24 May 2025',
             imageUrl: 'https://example.com/day2.jpg',
-            buttons: [{ id: 'btn-day2', label: 'Buy', type: 'url', value: 'https://tickets.nevent.es/day2' }],
+            buttons: [
+              {
+                id: 'btn-day2',
+                label: 'Buy',
+                type: 'url',
+                value: 'https://tickets.nevent.es/day2',
+              },
+            ],
           },
           {
             type: 'card',
             title: 'Weekend Pass',
             description: 'Both days for the price of 1.5',
             imageUrl: 'https://example.com/weekend.jpg',
-            buttons: [{ id: 'btn-wkd', label: 'Buy', type: 'url', value: 'https://tickets.nevent.es/weekend' }],
+            buttons: [
+              {
+                id: 'btn-wkd',
+                label: 'Buy',
+                type: 'url',
+                value: 'https://tickets.nevent.es/weekend',
+              },
+            ],
           },
         ],
       };
@@ -268,9 +308,24 @@ export function createMockRichContent(type: RichContentType): RichContent {
       return {
         type: 'button_group',
         buttons: [
-          { id: 'bg-1', label: 'General Admission', type: 'postback', value: 'ticket_ga' },
-          { id: 'bg-2', label: 'VIP Access', type: 'postback', value: 'ticket_vip' },
-          { id: 'bg-3', label: 'Family Pack', type: 'postback', value: 'ticket_family' },
+          {
+            id: 'bg-1',
+            label: 'General Admission',
+            type: 'postback',
+            value: 'ticket_ga',
+          },
+          {
+            id: 'bg-2',
+            label: 'VIP Access',
+            type: 'postback',
+            value: 'ticket_vip',
+          },
+          {
+            id: 'bg-3',
+            label: 'Family Pack',
+            type: 'postback',
+            value: 'ticket_family',
+          },
         ],
       };
 
@@ -289,7 +344,9 @@ export function createMockRichContent(type: RichContentType): RichContent {
  * @param serverConfig - The server config to embed in the response
  * @returns A mock Response object compatible with `fetch`
  */
-export function createMockConfigResponse(serverConfig: ServerChatbotConfig): Response {
+export function createMockConfigResponse(
+  serverConfig: ServerChatbotConfig
+): Response {
   return {
     ok: true,
     status: 200,
@@ -303,7 +360,9 @@ export function createMockConfigResponse(serverConfig: ServerChatbotConfig): Res
  * @param conversationId - The conversation ID to return
  * @returns A mock Response object
  */
-export function createMockConversationResponse(conversationId: string): Response {
+export function createMockConversationResponse(
+  conversationId: string
+): Response {
   return {
     ok: true,
     status: 201,

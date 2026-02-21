@@ -38,10 +38,7 @@
  */
 
 import type { ChatbotStyles, ThemeMode } from '../types';
-import {
-  getThemePreset,
-  generateThemeFromColor,
-} from './theme-presets';
+import { getThemePreset, generateThemeFromColor } from './theme-presets';
 
 // ============================================================================
 // Constants
@@ -121,7 +118,7 @@ export class CSSGenerator {
   constructor(
     private theme: ThemeMode,
     private styles: ChatbotStyles | undefined,
-    private zIndex: number,
+    private zIndex: number
   ) {}
 
   // --------------------------------------------------------------------------
@@ -161,9 +158,9 @@ export class CSSGenerator {
 
     // Remove any previously injected element so we always start fresh.
     // ShadowRoot does not have getElementById, so fall back to querySelector.
-    const existing = (target
+    const existing = target
       ? target.querySelector(`#${STYLE_ELEMENT_ID}`)
-      : document.getElementById(STYLE_ELEMENT_ID));
+      : document.getElementById(STYLE_ELEMENT_ID);
     if (existing) {
       existing.remove();
     }
@@ -509,15 +506,17 @@ export class CSSGenerator {
    * @returns Sanitised CSS string safe for injection
    */
   private sanitiseCustomCSS(css: string): string {
-    return css
-      // Strip @import rules (single-line and multi-line)
-      .replace(/@import\s[^;]+;/gi, '')
-      // Strip IE expression() — could execute arbitrary JS
-      .replace(/expression\s*\([^)]*\)/gi, '')
-      // Strip url(javascript:...) — prevent JS via CSS
-      .replace(/url\s*\(\s*(['"]?)javascript:/gi, 'url($1about:')
-      // Strip IE behaviour binding
-      .replace(/behavior\s*:/gi, '_behavior_disabled_:');
+    return (
+      css
+        // Strip @import rules (single-line and multi-line)
+        .replace(/@import\s[^;]+;/gi, '')
+        // Strip IE expression() — could execute arbitrary JS
+        .replace(/expression\s*\([^)]*\)/gi, '')
+        // Strip url(javascript:...) — prevent JS via CSS
+        .replace(/url\s*\(\s*(['"]?)javascript:/gi, 'url($1about:')
+        // Strip IE behaviour binding
+        .replace(/behavior\s*:/gi, '_behavior_disabled_:')
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -767,7 +766,9 @@ export class CSSGenerator {
       props.push(`--nev-cb-typing-dot-color:${s.messages.systemMessageColor};`);
     }
     if (s.messages?.font?.family) {
-      props.push(`--nev-cb-font-family:'${s.messages.font.family}',sans-serif;`);
+      props.push(
+        `--nev-cb-font-family:'${s.messages.font.family}',sans-serif;`
+      );
     }
     if (s.messages?.fontSize) {
       props.push(`--nev-cb-font-size-base:${s.messages.fontSize};`);
@@ -813,7 +814,9 @@ export class CSSGenerator {
       props.push(`--nev-cb-qr-border:${s.quickReplies.borderColor};`);
     }
     if (s.quickReplies?.hoverBackgroundColor) {
-      props.push(`--nev-cb-qr-hover-bg:${s.quickReplies.hoverBackgroundColor};`);
+      props.push(
+        `--nev-cb-qr-hover-bg:${s.quickReplies.hoverBackgroundColor};`
+      );
     }
     if (s.quickReplies?.hoverTextColor) {
       props.push(`--nev-cb-qr-hover-color:${s.quickReplies.hoverTextColor};`);
@@ -1248,20 +1251,17 @@ export class CSSGenerator {
       `}` +
       // Hide WebKit scrollbar in scroll mode
       `.nevent-chatbot-quick-replies::-webkit-scrollbar{display:none;}` +
-
       // ---------- Wrap mode modifier ----------
       `.nevent-chatbot-quick-replies--wrap{` +
       `flex-wrap:wrap;` +
       `overflow-x:visible;` +
       `}` +
-
       // ---------- Stacked mode modifier ----------
       `.nevent-chatbot-quick-replies--stacked{` +
       `flex-direction:column;` +
       `flex-wrap:nowrap;` +
       `overflow-x:visible;` +
       `}` +
-
       // ---------- Individual button ----------
       `.nevent-chatbot-quick-reply-button{` +
       `border:1.5px solid var(--nev-cb-qr-border);` +
@@ -1278,19 +1278,16 @@ export class CSSGenerator {
       `flex-shrink:0;` +
       `transition:background-color var(--nev-cb-transition-fast),color var(--nev-cb-transition-fast),border-color var(--nev-cb-transition-fast),opacity var(--nev-cb-transition-fast),transform var(--nev-cb-transition-fast);` +
       `}` +
-
       // Hover state
       `.nevent-chatbot-quick-reply-button:hover{` +
       `background-color:var(--nev-cb-qr-hover-bg);` +
       `color:var(--nev-cb-qr-hover-color);` +
       `border-color:var(--nev-cb-qr-hover-bg);` +
       `}` +
-
       // Active / pressed state (slightly darker via opacity)
       `.nevent-chatbot-quick-reply-button:active{` +
       `opacity:0.85;` +
       `}` +
-
       // Disabled state
       `.nevent-chatbot-quick-reply-button:disabled,` +
       `.nevent-chatbot-quick-reply-button[aria-disabled="true"]{` +
@@ -1298,7 +1295,6 @@ export class CSSGenerator {
       `pointer-events:none;` +
       `cursor:not-allowed;` +
       `}` +
-
       // Highlighted state (after user activates a reply)
       `.nevent-chatbot-quick-reply-button--highlighted{` +
       `background-color:var(--nev-cb-qr-hover-bg);` +
@@ -1306,14 +1302,12 @@ export class CSSGenerator {
       `border-color:var(--nev-cb-qr-hover-bg);` +
       `transform:scale(1.02);` +
       `}` +
-
       // Stacked mode: full-width buttons with centered text
       `.nevent-chatbot-quick-replies--stacked .nevent-chatbot-quick-reply-button{` +
       `width:100%;` +
       `justify-content:center;` +
       `white-space:normal;` +
       `}` +
-
       // ---------- Icon element ----------
       // Shared icon styles for both emoji (<span>) and URL (<img>) icons
       `.nevent-chatbot-quick-reply-icon{` +
@@ -1414,7 +1408,6 @@ export class CSSGenerator {
       `gap:var(--nev-cb-spacing-sm);` +
       `padding:var(--nev-cb-spacing-md);` +
       `}` +
-
       // Attachment (paperclip) button
       `.nevent-chatbot-attach-button{` +
       `width:36px;` +
@@ -1441,7 +1434,6 @@ export class CSSGenerator {
       `opacity:0.4;` +
       `cursor:default;` +
       `}` +
-
       // File preview strip (horizontal scroll above textarea)
       `.nevent-chatbot-file-preview-strip{` +
       `display:flex;` +
@@ -1461,7 +1453,6 @@ export class CSSGenerator {
       `background:var(--nev-cb-color-border);` +
       `border-radius:2px;` +
       `}` +
-
       // File preview item
       `.nevent-chatbot-file-preview-item{` +
       `display:flex;` +
@@ -1476,7 +1467,6 @@ export class CSSGenerator {
       `max-width:200px;` +
       `flex-shrink:0;` +
       `}` +
-
       // File preview thumbnail
       `.nevent-chatbot-file-preview-thumb{` +
       `width:36px;` +
@@ -1494,7 +1484,6 @@ export class CSSGenerator {
       `height:100%;` +
       `object-fit:cover;` +
       `}` +
-
       // File preview info
       `.nevent-chatbot-file-preview-info{` +
       `flex:1;` +
@@ -1516,7 +1505,6 @@ export class CSSGenerator {
       `font-size:10px;` +
       `color:var(--nev-cb-color-text-muted);` +
       `}` +
-
       // File preview progress bar
       `.nevent-chatbot-file-preview-progress{` +
       `position:absolute;` +
@@ -1534,7 +1522,6 @@ export class CSSGenerator {
       `border-radius:0 0 var(--nev-cb-radius-sm) var(--nev-cb-radius-sm);` +
       `transition:width 0.2s ease;` +
       `}` +
-
       // File preview error state
       `.nevent-chatbot-file-preview-error{` +
       `position:absolute;` +
@@ -1544,7 +1531,6 @@ export class CSSGenerator {
       `border:1px solid rgba(239,68,68,0.3);` +
       `pointer-events:none;` +
       `}` +
-
       // File preview remove button
       `.nevent-chatbot-file-preview-remove{` +
       `width:20px;` +
@@ -1570,14 +1556,12 @@ export class CSSGenerator {
       `background-color:rgba(239,68,68,0.2);` +
       `color:#ef4444;` +
       `}` +
-
       // Drag-and-drop overlay on input area
       `.nevent-chatbot-input--dragover{` +
       `outline:2px dashed var(--nev-cb-color-primary);` +
       `outline-offset:-2px;` +
       `background-color:color-mix(in srgb,var(--nev-cb-color-primary) 5%,transparent);` +
       `}` +
-
       // Message attachment rendering
       `.nevent-chatbot-message-attachments{` +
       `display:flex;` +
@@ -1596,7 +1580,6 @@ export class CSSGenerator {
       `border-radius:var(--nev-cb-radius-sm);` +
       `object-fit:cover;` +
       `}` +
-
       // Upload overlay on attachments
       `.nevent-chatbot-attachment-upload-overlay{` +
       `position:absolute;` +
@@ -1706,7 +1689,6 @@ export class CSSGenerator {
       `display:flex;` +
       `flex-direction:column;` +
       `}` +
-
       // Card image wrapper
       `.nevent-chatbot-card-image-wrapper{` +
       `width:100%;` +
@@ -1715,7 +1697,6 @@ export class CSSGenerator {
       `flex-shrink:0;` +
       `background-color:var(--nev-cb-color-surface);` +
       `}` +
-
       // Card header image
       `.nevent-chatbot-card-image{` +
       `width:100%;` +
@@ -1723,7 +1704,6 @@ export class CSSGenerator {
       `object-fit:cover;` +
       `display:block;` +
       `}` +
-
       // Card body
       `.nevent-chatbot-card-body{` +
       `padding:var(--nev-cb-spacing-md);` +
@@ -1732,7 +1712,6 @@ export class CSSGenerator {
       `gap:var(--nev-cb-spacing-xs);` +
       `flex:1;` +
       `}` +
-
       // Card title
       `.nevent-chatbot-card-title{` +
       `font-weight:600;` +
@@ -1740,7 +1719,6 @@ export class CSSGenerator {
       `color:var(--nev-cb-color-text);` +
       `line-height:1.3;` +
       `}` +
-
       // Card description — clamp to 3 lines
       `.nevent-chatbot-card-description{` +
       `font-size:var(--nev-cb-font-size-sm);` +
@@ -1751,20 +1729,17 @@ export class CSSGenerator {
       `-webkit-box-orient:vertical;` +
       `overflow:hidden;` +
       `}` +
-
       // Card actions container
       `.nevent-chatbot-card-actions{` +
       `border-top:1px solid var(--nev-cb-color-border);` +
       `display:flex;` +
       `flex-direction:column;` +
       `}` +
-
       // Separator between action buttons inside a card
       `.nevent-chatbot-card-action-separator{` +
       `height:1px;` +
       `background-color:var(--nev-cb-color-border);` +
       `}` +
-
       // Individual card action button / anchor
       `.nevent-chatbot-card-action{` +
       `display:flex;` +
@@ -1783,13 +1758,10 @@ export class CSSGenerator {
       `width:100%;` +
       `transition:background-color var(--nev-cb-transition-fast);` +
       `}` +
-
       `.nevent-chatbot-card-action:hover{` +
       `background-color:color-mix(in srgb,var(--nev-cb-color-primary) 8%,transparent);` +
       `}` +
-
       `.nevent-chatbot-card-action:active{opacity:0.8;}` +
-
       // -----------------------------------------------------------------------
       // Carousel
       // -----------------------------------------------------------------------
@@ -1801,7 +1773,6 @@ export class CSSGenerator {
       `align-items:center;` +
       `max-width:100%;` +
       `}` +
-
       // Scroll track
       `.nevent-chatbot-carousel{` +
       `display:flex;` +
@@ -1814,15 +1785,12 @@ export class CSSGenerator {
       `padding:var(--nev-cb-spacing-sm);` +
       `flex:1;` +
       `}` +
-
       `.nevent-chatbot-carousel::-webkit-scrollbar{display:none;}` +
-
       // Snap each card
       `.nevent-chatbot-carousel .nevent-chatbot-card{` +
       `scroll-snap-align:start;` +
       `flex-shrink:0;` +
       `}` +
-
       // Nav arrow buttons
       `.nevent-chatbot-carousel-nav{` +
       `position:absolute;` +
@@ -1843,14 +1811,11 @@ export class CSSGenerator {
       `line-height:0;` +
       `transition:background-color var(--nev-cb-transition-fast);` +
       `}` +
-
       `.nevent-chatbot-carousel-nav:hover{` +
       `background-color:var(--nev-cb-color-surface);` +
       `}` +
-
       `.nevent-chatbot-carousel-nav--prev{left:-14px;}` +
       `.nevent-chatbot-carousel-nav--next{right:-14px;}` +
-
       // -----------------------------------------------------------------------
       // Standalone image
       // -----------------------------------------------------------------------
@@ -1860,7 +1825,6 @@ export class CSSGenerator {
       `border-radius:var(--nev-cb-radius-md);` +
       `background-color:var(--nev-cb-color-surface);` +
       `}` +
-
       `.nevent-chatbot-rich-image{` +
       `max-width:100%;` +
       `max-height:300px;` +
@@ -1869,7 +1833,6 @@ export class CSSGenerator {
       `border-radius:var(--nev-cb-radius-md);` +
       `transition:opacity var(--nev-cb-transition-fast);` +
       `}` +
-
       // Broken-image placeholder
       `.nevent-chatbot-image-broken{` +
       `display:flex;` +
@@ -1881,7 +1844,6 @@ export class CSSGenerator {
       `border-radius:var(--nev-cb-radius-md);` +
       `color:var(--nev-cb-color-text-muted);` +
       `}` +
-
       // -----------------------------------------------------------------------
       // Button group
       // -----------------------------------------------------------------------
@@ -1892,7 +1854,6 @@ export class CSSGenerator {
       `width:100%;` +
       `padding:var(--nev-cb-spacing-xs) 0;` +
       `}` +
-
       // Action button inside a button group
       `.nevent-chatbot-action-button{` +
       `display:flex;` +
@@ -1912,14 +1873,11 @@ export class CSSGenerator {
       `text-align:left;` +
       `transition:background-color var(--nev-cb-transition-fast),border-color var(--nev-cb-transition-fast);` +
       `}` +
-
       `.nevent-chatbot-action-button:hover{` +
       `background-color:color-mix(in srgb,var(--nev-cb-color-primary) 6%,transparent);` +
       `border-color:var(--nev-cb-color-primary);` +
       `}` +
-
       `.nevent-chatbot-action-button:active{opacity:0.8;}` +
-
       // Icon span
       `.nevent-chatbot-action-button-icon{` +
       `display:flex;` +
@@ -1928,7 +1886,6 @@ export class CSSGenerator {
       `line-height:0;` +
       `color:var(--nev-cb-color-primary);` +
       `}` +
-
       // Label span
       `.nevent-chatbot-action-button-label{` +
       `flex:1;` +
@@ -2242,60 +2199,50 @@ export class CSSGenerator {
       `.nevent-chatbot-carousel-nav:focus:not(:focus-visible),` +
       `.nevent-chatbot-rich-image:focus:not(:focus-visible),` +
       `.nevent-chatbot-input-field:focus:not(:focus-visible){outline:none;}` +
-
       // Show a clear ring only when focus arrived via keyboard (:focus-visible)
       `.nevent-chatbot-bubble:focus-visible{` +
       `outline:3px solid var(--nev-cb-color-primary);` +
       `outline-offset:3px;` +
       `}` +
-
       `.nevent-chatbot-header-button:focus-visible{` +
       `outline:2px solid rgba(255,255,255,0.9);` +
       `outline-offset:2px;` +
       `}` +
-
       `.nevent-chatbot-send-button:focus-visible{` +
       `outline:3px solid var(--nev-cb-color-primary);` +
       `outline-offset:2px;` +
       `}` +
-
       `.nevent-chatbot-quick-reply-button:focus-visible{` +
       `outline:2px solid var(--nev-cb-color-primary);` +
       `outline-offset:2px;` +
       `box-shadow:0 0 0 4px color-mix(in srgb,var(--nev-cb-color-primary) 20%,transparent);` +
       `}` +
-
       `.nevent-chatbot-scroll-button:focus-visible{` +
       `outline:2px solid var(--nev-cb-color-primary);` +
       `outline-offset:2px;` +
       `}` +
-
       // Card action buttons/links — focus ring for keyboard users
       `.nevent-chatbot-card-action:focus-visible{` +
       `outline:2px solid var(--nev-cb-color-primary);` +
       `outline-offset:-2px;` +
       `background-color:color-mix(in srgb,var(--nev-cb-color-primary) 8%,transparent);` +
       `}` +
-
       // Standalone action buttons (button group) — focus ring
       `.nevent-chatbot-action-button:focus-visible{` +
       `outline:2px solid var(--nev-cb-color-primary);` +
       `outline-offset:2px;` +
       `border-color:var(--nev-cb-color-primary);` +
       `}` +
-
       // Carousel navigation arrows — focus ring
       `.nevent-chatbot-carousel-nav:focus-visible{` +
       `outline:2px solid var(--nev-cb-color-primary);` +
       `outline-offset:2px;` +
       `}` +
-
       // Standalone rich image (acts as a link) — focus ring
       `.nevent-chatbot-rich-image:focus-visible{` +
       `outline:2px solid var(--nev-cb-color-primary);` +
       `outline-offset:2px;` +
       `}` +
-
       // Input textarea uses border+shadow focus (already defined in generateInputStyles),
       // suppress the browser default outline for a cleaner appearance
       `.nevent-chatbot-input-field:focus-visible{` +
@@ -2303,7 +2250,6 @@ export class CSSGenerator {
       `box-shadow:0 0 0 3px color-mix(in srgb,var(--nev-cb-input-focus-border) 25%,transparent);` +
       `outline:none;` +
       `}` +
-
       // -----------------------------------------------------------------------
       // Reduced motion (WCAG SC 2.3.3 / prefers-reduced-motion)
       // Disables all CSS transitions, animations, and transforms for users who
@@ -2346,7 +2292,6 @@ export class CSSGenerator {
       `.nevent-chatbot-messages{scroll-behavior:auto!important;}` +
       `.nevent-chatbot-carousel{scroll-behavior:auto!important;}` +
       `}` +
-
       // -----------------------------------------------------------------------
       // Visually-hidden utility (SC 1.3.1)
       // Use this class for screen-reader-only text (e.g. keyboard hints,

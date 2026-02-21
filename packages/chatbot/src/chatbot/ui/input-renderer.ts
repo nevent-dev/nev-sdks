@@ -171,7 +171,7 @@ export class InputRenderer {
    */
   constructor(
     private styles: InputStyles | undefined,
-    private i18n: I18nManager,
+    private i18n: I18nManager
   ) {}
 
   // --------------------------------------------------------------------------
@@ -271,7 +271,10 @@ export class InputRenderer {
       this.attachButton.setAttribute('aria-label', this.i18n.t('attachFile'));
       this.attachButton.innerHTML = ATTACH_ICON_SVG;
       this.applyAttachButtonStyles();
-      this.attachButton.addEventListener('click', this.handleAttachClick.bind(this));
+      this.attachButton.addEventListener(
+        'click',
+        this.handleAttachClick.bind(this)
+      );
       this.inputRow.appendChild(this.attachButton);
 
       // Hidden file input
@@ -290,14 +293,18 @@ export class InputRenderer {
         opacity: '0',
         pointerEvents: 'none',
       });
-      this.fileInput.addEventListener('change', this.handleFileInputChange.bind(this));
+      this.fileInput.addEventListener(
+        'change',
+        this.handleFileInputChange.bind(this)
+      );
       this.inputRow.appendChild(this.fileInput);
     }
 
     // Textarea
     this.textarea = document.createElement('textarea');
     this.textarea.className = 'nevent-chatbot-input-field';
-    this.textarea.placeholder = options.placeholder ?? this.i18n.t('inputPlaceholder');
+    this.textarea.placeholder =
+      options.placeholder ?? this.i18n.t('inputPlaceholder');
     this.textarea.setAttribute('aria-label', this.i18n.t('inputPlaceholder'));
     // aria-describedby connects the keyboard shortcut instructions to the textarea
     this.textarea.setAttribute('aria-describedby', hintId);
@@ -426,7 +433,10 @@ export class InputRenderer {
    * @param attachmentId - The ID of the attachment to update
    * @param updates - Partial FileAttachment fields to merge
    */
-  updateAttachment(attachmentId: string, updates: Partial<FileAttachment>): void {
+  updateAttachment(
+    attachmentId: string,
+    updates: Partial<FileAttachment>
+  ): void {
     const index = this.attachments.findIndex((a) => a.id === attachmentId);
     if (index === -1) return;
 
@@ -472,10 +482,16 @@ export class InputRenderer {
   destroy(): void {
     // Remove drag-and-drop event listeners
     if (this.container && this.boundHandlers.dragover) {
-      this.container.removeEventListener('dragover', this.boundHandlers.dragover);
+      this.container.removeEventListener(
+        'dragover',
+        this.boundHandlers.dragover
+      );
     }
     if (this.container && this.boundHandlers.dragleave) {
-      this.container.removeEventListener('dragleave', this.boundHandlers.dragleave);
+      this.container.removeEventListener(
+        'dragleave',
+        this.boundHandlers.dragleave
+      );
     }
     if (this.container && this.boundHandlers.drop) {
       this.container.removeEventListener('drop', this.boundHandlers.drop);
@@ -794,10 +810,13 @@ export class InputRenderer {
     progressContainer.setAttribute('role', 'progressbar');
     progressContainer.setAttribute('aria-valuemin', '0');
     progressContainer.setAttribute('aria-valuemax', '100');
-    progressContainer.setAttribute('aria-valuenow', String(attachment.progress));
+    progressContainer.setAttribute(
+      'aria-valuenow',
+      String(attachment.progress)
+    );
     progressContainer.setAttribute(
       'aria-label',
-      `${this.i18n.t('uploading')} ${MessageSanitizer.escapeHtml(attachment.name)}`,
+      `${this.i18n.t('uploading')} ${MessageSanitizer.escapeHtml(attachment.name)}`
     );
     Object.assign(progressContainer.style, {
       position: 'absolute',
@@ -844,7 +863,7 @@ export class InputRenderer {
     removeBtn.className = 'nevent-chatbot-file-preview-remove';
     removeBtn.setAttribute(
       'aria-label',
-      `${this.i18n.t('removeFile')} ${MessageSanitizer.escapeHtml(attachment.name)}`,
+      `${this.i18n.t('removeFile')} ${MessageSanitizer.escapeHtml(attachment.name)}`
     );
     removeBtn.innerHTML = REMOVE_ICON_SVG;
     this.applyRemoveButtonStyles(removeBtn);
@@ -870,20 +889,24 @@ export class InputRenderer {
     if (!attachment) return;
 
     const existingItem = this.previewStrip.querySelector(
-      `[data-attachment-id="${attachmentId}"]`,
+      `[data-attachment-id="${attachmentId}"]`
     );
     if (!existingItem) return;
 
     // Update progress bar
     const progressContainer = existingItem.querySelector(
-      '.nevent-chatbot-file-preview-progress',
+      '.nevent-chatbot-file-preview-progress'
     ) as HTMLElement | null;
     if (progressContainer) {
-      progressContainer.setAttribute('aria-valuenow', String(attachment.progress));
-      progressContainer.style.display = attachment.status === 'uploading' ? 'block' : 'none';
+      progressContainer.setAttribute(
+        'aria-valuenow',
+        String(attachment.progress)
+      );
+      progressContainer.style.display =
+        attachment.status === 'uploading' ? 'block' : 'none';
 
       const progressBar = progressContainer.querySelector(
-        '.nevent-chatbot-file-preview-progress-bar',
+        '.nevent-chatbot-file-preview-progress-bar'
       ) as HTMLElement | null;
       if (progressBar) {
         progressBar.style.width = `${attachment.progress}%`;
@@ -891,7 +914,9 @@ export class InputRenderer {
     }
 
     // Update error state
-    const existingError = existingItem.querySelector('.nevent-chatbot-file-preview-error');
+    const existingError = existingItem.querySelector(
+      '.nevent-chatbot-file-preview-error'
+    );
     if (attachment.status === 'error' && !existingError) {
       const errorOverlay = document.createElement('div');
       errorOverlay.className = 'nevent-chatbot-file-preview-error';
@@ -932,7 +957,8 @@ export class InputRenderer {
     this.textarea.style.height = `${newHeight}px`;
 
     // Enable/disable scrolling based on content height
-    this.textarea.style.overflowY = this.textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
+    this.textarea.style.overflowY =
+      this.textarea.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }
 
   /**
@@ -1085,7 +1111,8 @@ export class InputRenderer {
       padding: s?.padding ?? '10px 16px',
       fontSize: s?.fontSize ?? '14px',
       lineHeight: '20px',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily:
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       color: s?.textColor ?? '#333333',
       backgroundColor: s?.backgroundColor ?? '#ffffff',
       // Do NOT set outline:none — let CSS :focus-visible rules handle focus indication (WCAG 2.4.7)

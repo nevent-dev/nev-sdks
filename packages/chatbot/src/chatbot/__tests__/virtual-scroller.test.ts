@@ -3,7 +3,10 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { VirtualScroller } from '../ui/virtual-scroller';
-import type { VirtualItem, VirtualScrollerConfig } from '../ui/virtual-scroller';
+import type {
+  VirtualItem,
+  VirtualScrollerConfig,
+} from '../ui/virtual-scroller';
 
 // ============================================================================
 // Test Helpers
@@ -63,10 +66,10 @@ function createItem(id: string, itemHeight = 80, text?: string): VirtualItem {
  */
 function createItems(
   count: number,
-  heightFn?: (index: number) => number,
+  heightFn?: (index: number) => number
 ): VirtualItem[] {
   return Array.from({ length: count }, (_, i) =>
-    createItem(`item-${i}`, heightFn ? heightFn(i) : 80),
+    createItem(`item-${i}`, heightFn ? heightFn(i) : 80)
   );
 }
 
@@ -83,23 +86,27 @@ function stubResizeObserver(): {
     callback: ResizeObserverCallback;
   }>;
 } {
-  const tracker = { instances: [] as Array<{
-    observe: ReturnType<typeof vi.fn>;
-    unobserve: ReturnType<typeof vi.fn>;
-    disconnect: ReturnType<typeof vi.fn>;
-    callback: ResizeObserverCallback;
-  }> };
+  const tracker = {
+    instances: [] as Array<{
+      observe: ReturnType<typeof vi.fn>;
+      unobserve: ReturnType<typeof vi.fn>;
+      disconnect: ReturnType<typeof vi.fn>;
+      callback: ResizeObserverCallback;
+    }>,
+  };
 
-  const MockResizeObserver = vi.fn().mockImplementation((callback: ResizeObserverCallback) => {
-    const instance = {
-      observe: vi.fn(),
-      unobserve: vi.fn(),
-      disconnect: vi.fn(),
-      callback,
-    };
-    tracker.instances.push(instance);
-    return instance;
-  });
+  const MockResizeObserver = vi
+    .fn()
+    .mockImplementation((callback: ResizeObserverCallback) => {
+      const instance = {
+        observe: vi.fn(),
+        unobserve: vi.fn(),
+        disconnect: vi.fn(),
+        callback,
+      };
+      tracker.instances.push(instance);
+      return instance;
+    });
 
   vi.stubGlobal('ResizeObserver', MockResizeObserver);
   return tracker;
@@ -134,11 +141,17 @@ describe('VirtualScroller', () => {
       scroller = new VirtualScroller({ container });
       scroller.init();
 
-      const content = container.querySelector('.nevent-chatbot-virtual-content');
+      const content = container.querySelector(
+        '.nevent-chatbot-virtual-content'
+      );
       expect(content).not.toBeNull();
 
-      const spacerTop = content?.querySelector('.nevent-chatbot-virtual-spacer-top');
-      const spacerBottom = content?.querySelector('.nevent-chatbot-virtual-spacer-bottom');
+      const spacerTop = content?.querySelector(
+        '.nevent-chatbot-virtual-spacer-top'
+      );
+      const spacerBottom = content?.querySelector(
+        '.nevent-chatbot-virtual-spacer-bottom'
+      );
       expect(spacerTop).not.toBeNull();
       expect(spacerBottom).not.toBeNull();
     });
@@ -148,7 +161,9 @@ describe('VirtualScroller', () => {
       scroller.init();
       scroller.init();
 
-      const contents = container.querySelectorAll('.nevent-chatbot-virtual-content');
+      const contents = container.querySelectorAll(
+        '.nevent-chatbot-virtual-content'
+      );
       expect(contents.length).toBe(1);
     });
 
@@ -279,8 +294,12 @@ describe('VirtualScroller', () => {
 
       scroller.appendItem(createItem('msg-1'));
 
-      const spacerTop = container.querySelector('.nevent-chatbot-virtual-spacer-top') as HTMLElement;
-      const spacerBottom = container.querySelector('.nevent-chatbot-virtual-spacer-bottom') as HTMLElement;
+      const spacerTop = container.querySelector(
+        '.nevent-chatbot-virtual-spacer-top'
+      ) as HTMLElement;
+      const spacerBottom = container.querySelector(
+        '.nevent-chatbot-virtual-spacer-bottom'
+      ) as HTMLElement;
       expect(spacerTop.style.height).toBe('0px');
       expect(spacerBottom.style.height).toBe('0px');
     });
@@ -405,7 +424,9 @@ describe('VirtualScroller', () => {
       // scrollToBottom uses requestAnimationFrame internally.
       // In JSDOM, rAF is implemented as a 0ms setTimeout.
       // Wait for it to resolve.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve())
+      );
 
       expect(scrollToSpy).toHaveBeenCalled();
     });
@@ -420,10 +441,12 @@ describe('VirtualScroller', () => {
       scroller.scrollToBottom(true);
 
       // Wait for rAF to fire
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) =>
+        requestAnimationFrame(() => resolve())
+      );
 
       expect(scrollToSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ behavior: 'smooth' }),
+        expect.objectContaining({ behavior: 'smooth' })
       );
     });
   });
@@ -434,8 +457,14 @@ describe('VirtualScroller', () => {
       scroller.init();
 
       // Simulate being at bottom: scrollHeight - scrollTop - clientHeight < 50
-      Object.defineProperty(container, 'scrollTop', { value: 0, configurable: true });
-      Object.defineProperty(container, 'scrollHeight', { value: 400, configurable: true });
+      Object.defineProperty(container, 'scrollTop', {
+        value: 0,
+        configurable: true,
+      });
+      Object.defineProperty(container, 'scrollHeight', {
+        value: 400,
+        configurable: true,
+      });
       // clientHeight is already 400
 
       expect(scroller.isAtBottom()).toBe(true);
@@ -446,8 +475,14 @@ describe('VirtualScroller', () => {
       scroller.init();
 
       // Simulate being scrolled up: scrollHeight - scrollTop - clientHeight > 50
-      Object.defineProperty(container, 'scrollTop', { value: 0, configurable: true });
-      Object.defineProperty(container, 'scrollHeight', { value: 1000, configurable: true });
+      Object.defineProperty(container, 'scrollTop', {
+        value: 0,
+        configurable: true,
+      });
+      Object.defineProperty(container, 'scrollHeight', {
+        value: 1000,
+        configurable: true,
+      });
 
       expect(scroller.isAtBottom()).toBe(false);
     });
@@ -456,8 +491,14 @@ describe('VirtualScroller', () => {
       scroller = new VirtualScroller({ container, activationThreshold: 100 });
       scroller.init();
 
-      Object.defineProperty(container, 'scrollTop', { value: 560, configurable: true });
-      Object.defineProperty(container, 'scrollHeight', { value: 1000, configurable: true });
+      Object.defineProperty(container, 'scrollTop', {
+        value: 560,
+        configurable: true,
+      });
+      Object.defineProperty(container, 'scrollHeight', {
+        value: 1000,
+        configurable: true,
+      });
       // 1000 - 560 - 400 = 40, which is < 50
 
       expect(scroller.isAtBottom()).toBe(true);
@@ -477,7 +518,9 @@ describe('VirtualScroller', () => {
       scroller.init();
 
       scroller.appendItem(createItem('msg-1'));
-      const el = container.querySelector('[data-virtual-id="msg-1"]') as HTMLElement;
+      const el = container.querySelector(
+        '[data-virtual-id="msg-1"]'
+      ) as HTMLElement;
 
       // JSDOM doesn't implement scrollIntoView natively -- stub it
       el.scrollIntoView = vi.fn();
@@ -509,7 +552,9 @@ describe('VirtualScroller', () => {
       expect(scroller.getItemCount()).toBe(0);
 
       // After clear, spacers should be reset
-      const spacerTop = container.querySelector('.nevent-chatbot-virtual-spacer-top') as HTMLElement;
+      const spacerTop = container.querySelector(
+        '.nevent-chatbot-virtual-spacer-top'
+      ) as HTMLElement;
       expect(spacerTop?.style.height).toBe('0px');
     });
 
@@ -535,7 +580,9 @@ describe('VirtualScroller', () => {
       scroller.appendItem(createItem('msg-1'));
       scroller.destroy();
 
-      const content = container.querySelector('.nevent-chatbot-virtual-content');
+      const content = container.querySelector(
+        '.nevent-chatbot-virtual-content'
+      );
       expect(content).toBeNull();
     });
 
@@ -556,10 +603,7 @@ describe('VirtualScroller', () => {
       scroller.init();
       scroller.destroy();
 
-      expect(removeSpy).toHaveBeenCalledWith(
-        'scroll',
-        expect.any(Function),
-      );
+      expect(removeSpy).toHaveBeenCalledWith('scroll', expect.any(Function));
     });
 
     it('should reset item count to zero', () => {
@@ -632,16 +676,21 @@ describe('VirtualScroller', () => {
       scroller.setItems(items);
 
       // Total height should be 20 * 120 = 2400 (reflected in spacers)
-      const spacerTop = container.querySelector('.nevent-chatbot-virtual-spacer-top') as HTMLElement;
-      const spacerBottom = container.querySelector('.nevent-chatbot-virtual-spacer-bottom') as HTMLElement;
+      const spacerTop = container.querySelector(
+        '.nevent-chatbot-virtual-spacer-top'
+      ) as HTMLElement;
+      const spacerBottom = container.querySelector(
+        '.nevent-chatbot-virtual-spacer-bottom'
+      ) as HTMLElement;
 
       const topH = parseInt(spacerTop?.style.height ?? '0', 10);
       const bottomH = parseInt(spacerBottom?.style.height ?? '0', 10);
-      const renderedCount = container.querySelectorAll('[data-virtual-id]').length;
+      const renderedCount =
+        container.querySelectorAll('[data-virtual-id]').length;
 
       // Top spacer + rendered items (estimated) + bottom spacer ~= total estimated height
       // The rendered items are in the DOM with their own height
-      expect(topH + (renderedCount * 120) + bottomH).toBe(2400);
+      expect(topH + renderedCount * 120 + bottomH).toBe(2400);
     });
 
     it('should observe rendered elements for height changes', () => {
@@ -712,7 +761,9 @@ describe('VirtualScroller', () => {
       // Indirectly verify by adding items to virtual mode and checking spacer height
       scroller.setItems(createItems(100));
 
-      const spacerBottom = container.querySelector('.nevent-chatbot-virtual-spacer-bottom') as HTMLElement;
+      const spacerBottom = container.querySelector(
+        '.nevent-chatbot-virtual-spacer-bottom'
+      ) as HTMLElement;
       const bottomH = parseInt(spacerBottom?.style.height ?? '0', 10);
       // With default 80px height and some items rendered, bottom spacer should be > 0
       expect(bottomH).toBeGreaterThan(0);
@@ -727,7 +778,8 @@ describe('VirtualScroller', () => {
         scroller.appendItem(createItem(`msg-${i}`));
       }
 
-      const renderedBefore = container.querySelectorAll('[data-virtual-id]').length;
+      const renderedBefore =
+        container.querySelectorAll('[data-virtual-id]').length;
       expect(renderedBefore).toBe(49);
     });
   });

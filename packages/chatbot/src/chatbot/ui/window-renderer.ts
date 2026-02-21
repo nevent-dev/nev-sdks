@@ -101,7 +101,7 @@ export class WindowRenderer {
     private styles: WindowStyles | undefined,
     private headerStyles: HeaderStyles | undefined,
     private i18n: I18nManager,
-    private shadowRoot?: ShadowRoot,
+    private shadowRoot?: ShadowRoot
   ) {}
 
   // --------------------------------------------------------------------------
@@ -171,7 +171,9 @@ export class WindowRenderer {
    */
   getBody(): HTMLElement {
     if (!this.body) {
-      throw new Error('WindowRenderer: render() must be called before getBody()');
+      throw new Error(
+        'WindowRenderer: render() must be called before getBody()'
+      );
     }
     return this.body;
   }
@@ -184,7 +186,9 @@ export class WindowRenderer {
    */
   getFooter(): HTMLElement {
     if (!this.footer) {
-      throw new Error('WindowRenderer: render() must be called before getFooter()');
+      throw new Error(
+        'WindowRenderer: render() must be called before getFooter()'
+      );
     }
     return this.footer;
   }
@@ -265,8 +269,12 @@ export class WindowRenderer {
       '[tabindex]:not([tabindex="-1"])',
     ].join(',');
 
-    return Array.from(this.window.querySelectorAll<HTMLElement>(selector)).filter(
-      (el) => !el.closest('[style*="display: none"]') && !el.closest('[style*="display:none"]'),
+    return Array.from(
+      this.window.querySelectorAll<HTMLElement>(selector)
+    ).filter(
+      (el) =>
+        !el.closest('[style*="display: none"]') &&
+        !el.closest('[style*="display:none"]')
     );
   }
 
@@ -389,7 +397,7 @@ export class WindowRenderer {
     const newConvButton = this.createHeaderButton(
       NEW_CONVERSATION_SVG,
       this.i18n.t('newConversation'),
-      options.onNewConversation,
+      options.onNewConversation
     );
     headerRight.appendChild(newConvButton);
 
@@ -399,7 +407,7 @@ export class WindowRenderer {
       const closeButton = this.createHeaderButton(
         CLOSE_ICON_SVG,
         this.i18n.t('closeChat'),
-        options.onClose,
+        options.onClose
       );
       headerRight.appendChild(closeButton);
     }
@@ -420,7 +428,7 @@ export class WindowRenderer {
   private createHeaderButton(
     iconSvg: string,
     ariaLabel: string,
-    onClick: () => void,
+    onClick: () => void
   ): HTMLButtonElement {
     const button = document.createElement('button');
     button.type = 'button';
@@ -553,7 +561,8 @@ export class WindowRenderer {
       flexDirection: 'column',
       overflow: 'hidden',
       zIndex: '9998',
-      fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+      fontFamily:
+        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
       // Initial state for open animation
       opacity: '0',
       transform: 'translateY(20px)',

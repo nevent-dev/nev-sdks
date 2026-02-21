@@ -138,7 +138,7 @@ export class TypingStatusService {
     tenantId: string,
     getThreadId: () => string | null,
     token: string,
-    debug = false,
+    debug = false
   ) {
     this.config = {
       enabled: config?.enabled ?? true,
@@ -361,7 +361,7 @@ export class TypingStatusService {
       headers: {
         'Content-Type': 'application/json',
         'X-Tenant-ID': this.tenantId,
-        'Authorization': `Bearer ${this.token}`,
+        Authorization: `Bearer ${this.token}`,
       },
       body,
       // Use 'keepalive' so the request survives page navigation
@@ -393,7 +393,10 @@ export class TypingStatusService {
     });
 
     try {
-      if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      if (
+        typeof navigator !== 'undefined' &&
+        typeof navigator.sendBeacon === 'function'
+      ) {
         const blob = new Blob([body], { type: 'application/json' });
         navigator.sendBeacon(url, blob);
         this.logger.debug('Typing stop sent via sendBeacon');
