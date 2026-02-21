@@ -485,11 +485,23 @@ export class CSSGenerator {
 
     const searchRoot: ParentNode = this.styleTarget ?? document;
     const root = searchRoot.querySelector(ROOT_CLASS) as HTMLElement | null;
-    if (!root) return;
 
-    // Apply every accumulated token as an inline style
-    for (const [prop, value] of Object.entries(this.runtimeTokens)) {
-      root.style.setProperty(prop, value);
+    // Apply tokens to ROOT_CLASS element (window, messages, input, etc.)
+    if (root) {
+      for (const [prop, value] of Object.entries(this.runtimeTokens)) {
+        root.style.setProperty(prop, value);
+      }
+    }
+
+    // Also apply tokens to the shadow host element so that elements rendered
+    // as siblings of ROOT_CLASS (e.g., the bubble container) inherit the tokens.
+    // The bubble is appended directly to the shadow root, not inside ROOT_CLASS,
+    // so it cannot inherit from ROOT_CLASS — it needs the host to carry the tokens.
+    if (this.styleTarget instanceof ShadowRoot) {
+      const hostEl = this.styleTarget.host as HTMLElement;
+      for (const [prop, value] of Object.entries(this.runtimeTokens)) {
+        hostEl.style.setProperty(prop, value);
+      }
     }
   }
 
@@ -531,8 +543,13 @@ export class CSSGenerator {
    */
   private generateLightTokens(): string {
     const z = this.zIndex;
+    // Declare tokens on both `:host` and `ROOT_CLASS` so that all elements
+    // inside the shadow boundary inherit them — including the bubble container
+    // which is a sibling of ROOT_CLASS rather than a descendant of it.
+    // `:host` covers the entire shadow tree; ROOT_CLASS provides the data-theme
+    // attribute target for dark/auto mode overrides.
     return (
-      `${ROOT_CLASS}{` +
+      `:host,${ROOT_CLASS}{` +
       // Colors
       `--nev-cb-color-primary:#6366F1;` +
       `--nev-cb-color-primary-hover:#4F46E5;` +

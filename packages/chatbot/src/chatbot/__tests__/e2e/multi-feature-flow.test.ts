@@ -390,7 +390,7 @@ describe('E2E: Multi-Feature Flow', () => {
         'a.nevent-chatbot-branding-link'
       ) as HTMLAnchorElement;
       expect(link).not.toBeNull();
-      expect(link.href).toContain('https://nevent.es');
+      expect(link.href).toContain('https://nevent.ai');
       expect(link.href).toContain('utm_source=chatbot_widget');
       expect(link.href).toContain('utm_medium=powered_by');
       expect(link.href).toContain('utm_campaign=plg');

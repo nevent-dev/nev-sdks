@@ -466,14 +466,14 @@ export class ChatbotWidget {
         this.cssGenerator.inject(this.shadow ?? undefined);
 
         // Step 4: Fetch server configuration
-        // Initialize with sensible defaults for graceful degradation when server is unavailable
+        // Initialize with sensible defaults for graceful degradation when server is unavailable.
+        // Use i18n-aware text so locale is respected even when the server is unreachable.
         let serverConfig: ServerChatbotConfig = {
           chatbotId: config.chatbotId,
           tenantId: config.tenantId,
-          name: 'Asistente',
-          welcomeMessage:
-            config.welcomeMessage || '¡Hola! ¿En qué puedo ayudarte?',
-          placeholder: config.placeholder || 'Escribe tu mensaje...',
+          name: this.i18n.t('defaultTitle'),
+          welcomeMessage: config.welcomeMessage || '',
+          placeholder: config.placeholder || '',
           token: '',
           theme: { primaryColor: config.brandColor || '#6366f1' },
           features: {
@@ -510,6 +510,23 @@ export class ChatbotWidget {
             'Failed to fetch server config, using local config only',
             fetchError
           );
+          // Notify the host page via onError so it can react (e.g. show a
+          // banner, log to monitoring). The widget continues with graceful
+          // degradation — this is a non-fatal error.
+          const configError: ChatbotError = {
+            code: 'CONFIG_LOAD_FAILED',
+            message:
+              fetchError instanceof Error
+                ? fetchError.message
+                : 'Failed to load chatbot configuration from server',
+            details:
+              fetchError instanceof Error
+                ? { message: fetchError.message, name: fetchError.name }
+                : { raw: String(fetchError) },
+          };
+          if (config.onError) {
+            config.onError(configError);
+          }
         }
 
         // Step 5: Merge server config into resolved config (if available)
@@ -1192,7 +1209,9 @@ export class ChatbotWidget {
         );
       }
 
-      // Create optimistic user message
+      // Create optimistic user message — rendered immediately for instant feedback,
+      // regardless of whether the API call succeeds. This is true optimistic UI:
+      // the message is visible at once; it is updated to 'error' if sending fails.
       const userMessage: ChatMessage = {
         id: generateMessageId(),
         conversationId: state.conversation?.id ?? '',
@@ -1206,25 +1225,8 @@ export class ChatbotWidget {
           : {}),
       };
 
-      // Ensure a conversation exists (create lazily on first message)
-      if (!state.conversation) {
-        try {
-          await this.createConversation();
-          // Update the conversation ID on the user message
-          const updatedState = this.stateManager.getState();
-          userMessage.conversationId = updatedState.conversation?.id ?? '';
-        } catch (createError) {
-          this.logger.error('Failed to create conversation', createError);
-          const error: ChatbotError = {
-            code: 'CONVERSATION_CREATE_FAILED',
-            message: 'Failed to start a new conversation',
-          };
-          config.onError(error);
-          return;
-        }
-      }
-
-      // Add optimistic message to state and render
+      // Show user message immediately and clear input before any async work.
+      // This gives instant visual feedback and prevents double-submit on slow networks.
       this.stateManager.addMessage(userMessage);
       this.messageRenderer?.addMessage(userMessage);
 
@@ -1235,6 +1237,30 @@ export class ChatbotWidget {
       this.inputRenderer?.clear();
       this.inputRenderer?.setDisabled(true);
       this.stateManager.setLoading(true);
+
+      // Ensure a conversation exists (create lazily on first message).
+      // We do this AFTER showing the user message so the UI is never blocked.
+      if (!state.conversation) {
+        try {
+          await this.createConversation();
+          // Update the conversation ID on the already-rendered user message
+          const updatedState = this.stateManager.getState();
+          userMessage.conversationId = updatedState.conversation?.id ?? '';
+        } catch (createError) {
+          this.logger.error('Failed to create conversation', createError);
+          // Mark the optimistic message as error so the user sees feedback
+          this.stateManager.updateMessageStatus(userMessage.id, 'error');
+          this.messageRenderer?.updateMessage(userMessage.id, {
+            status: 'error',
+          });
+          const error: ChatbotError = {
+            code: 'CONVERSATION_CREATE_FAILED',
+            message: 'Failed to start a new conversation',
+          };
+          config.onError(error);
+          return;
+        }
+      }
 
       // Track analytics
       if (this.tracker) {
