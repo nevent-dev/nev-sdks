@@ -62,6 +62,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     poweredBy: 'Powered by Nevent',
     newConversation: 'Nueva conversación',
     closeChat: 'Cerrar chat',
+    minimizeChat: 'Minimizar chat',
     openChat: 'Abrir chat',
     retry: 'Reintentar',
     justNow: 'Ahora mismo',
@@ -81,6 +82,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     agentTyping: '{name} está escribiendo...',
     someoneTyping: 'Alguien está escribiendo...',
     brandingAriaLabel: 'Desarrollado por Nevent - Chatbot IA para eventos',
+    defaultWelcomeMessage: '¡Hola! ¿En qué puedo ayudarte?',
   },
 
   /**
@@ -101,6 +103,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     poweredBy: 'Powered by Nevent',
     newConversation: 'New conversation',
     closeChat: 'Close chat',
+    minimizeChat: 'Minimize chat',
     openChat: 'Open chat',
     retry: 'Retry',
     justNow: 'Just now',
@@ -120,6 +123,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     agentTyping: '{name} is typing...',
     someoneTyping: 'Someone is typing...',
     brandingAriaLabel: 'Powered by Nevent - AI chatbot for events',
+    defaultWelcomeMessage: 'Hello! How can I help you?',
   },
 
   /**
@@ -140,6 +144,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     poweredBy: 'Powered by Nevent',
     newConversation: 'Nova conversació',
     closeChat: 'Tancar el xat',
+    minimizeChat: 'Minimitzar el xat',
     openChat: 'Obrir el xat',
     retry: 'Reintentar',
     justNow: 'Ara mateix',
@@ -160,6 +165,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     someoneTyping: 'Algú està escrivint...',
     brandingAriaLabel:
       'Desenvolupat per Nevent - Chatbot IA per a esdeveniments',
+    defaultWelcomeMessage: 'Hola! Com puc ajudar-te?',
   },
 
   /**
@@ -180,6 +186,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     poweredBy: 'Powered by Nevent',
     newConversation: 'Nova conversa',
     closeChat: 'Fechar chat',
+    minimizeChat: 'Minimizar chat',
     openChat: 'Abrir chat',
     retry: 'Tentar novamente',
     justNow: 'Agora mesmo',
@@ -199,6 +206,7 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     agentTyping: '{name} está a escrever...',
     someoneTyping: 'Alguém está a escrever...',
     brandingAriaLabel: 'Desenvolvido por Nevent - Chatbot IA para eventos',
+    defaultWelcomeMessage: 'Olá! Como posso ajudar?',
   },
 };
 

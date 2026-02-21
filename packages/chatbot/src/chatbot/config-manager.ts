@@ -43,6 +43,7 @@ const DEFAULTS: Omit<Required<ChatbotConfig>, 'chatbotId' | 'tenantId'> = {
   position: 'bottom-right' as BubblePosition,
   theme: 'light' as ThemeMode,
   locale: 'es' as SupportedLocale,
+  avatar: '',
   styles: {} as ChatbotStyles,
   analytics: true,
   analyticsUrl: 'https://events.neventapis.com',

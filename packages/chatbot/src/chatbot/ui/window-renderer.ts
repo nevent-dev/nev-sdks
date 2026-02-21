@@ -406,7 +406,9 @@ export class WindowRenderer {
         dot.className = 'nevent-chatbot-status-dot';
         this.subtitleElement.appendChild(dot);
       }
-      this.subtitleElement.appendChild(document.createTextNode(options.subtitle));
+      this.subtitleElement.appendChild(
+        document.createTextNode(options.subtitle)
+      );
     }
     textContainer.appendChild(this.subtitleElement);
 
@@ -430,12 +432,15 @@ export class WindowRenderer {
     );
     headerRight.appendChild(newConvButton);
 
-    // Close button
+    // Close button — uses 'minimizeChat' aria-label to distinguish it from the
+    // FAB bubble button (which uses 'closeChat' when the window is open).
+    // This prevents duplicate aria-labels when both elements are visible, which
+    // would create ambiguity for screen reader users (WCAG 2.4.6).
     const showClose = this.headerStyles?.showCloseButton !== false;
     if (showClose) {
       const closeButton = this.createHeaderButton(
         CLOSE_ICON_SVG,
-        this.i18n.t('closeChat'),
+        this.i18n.t('minimizeChat'),
         options.onClose
       );
       headerRight.appendChild(closeButton);
@@ -604,7 +609,10 @@ export class WindowRenderer {
       width: '32px',
       height: '32px',
       border: '3px solid #e0e0e0',
-      borderTopColor: this.headerStyles?.backgroundColor ?? '#007bff',
+      // Use explicit backgroundColor if set, otherwise fall back to CSS custom property value
+      borderTopColor:
+        this.headerStyles?.backgroundColor ??
+        'var(--nev-cb-header-bg, #007bff)',
       borderRadius: '50%',
       animation: 'nevent-chatbot-spin 0.8s linear infinite',
     });
@@ -675,7 +683,6 @@ export class WindowRenderer {
    */
   private applyHeaderStyles(header: HTMLElement): void {
     const h = this.headerStyles;
-    const bgColor = h?.backgroundColor ?? '#007bff';
     const height = h?.height ?? 64;
 
     Object.assign(header.style, {
@@ -685,7 +692,10 @@ export class WindowRenderer {
       padding: '0 12px',
       height: `${height}px`,
       minHeight: `${height}px`,
-      backgroundColor: bgColor,
+      // Only apply backgroundColor as inline style when explicitly configured.
+      // When not set, the CSS class rule uses var(--nev-cb-header-bg) which
+      // derives from var(--nev-cb-color-primary), respecting brandColor theming.
+      ...(h?.backgroundColor ? { backgroundColor: h.backgroundColor } : {}),
       borderRadius: `${this.styles?.borderRadius ?? 16}px ${this.styles?.borderRadius ?? 16}px 0 0`,
       flexShrink: '0',
     });

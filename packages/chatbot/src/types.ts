@@ -1386,6 +1386,17 @@ export interface ChatbotTranslations extends Record<string, string> {
   someoneTyping: string;
   /** Accessible label for the "Powered by Nevent" branding link */
   brandingAriaLabel: string;
+  /**
+   * Accessible label for the header close/minimize button inside the chat window.
+   * Distinct from `closeChat` (used on the FAB bubble) to avoid aria-label duplication
+   * when both the bubble and the header button are visible simultaneously.
+   */
+  minimizeChat: string;
+  /**
+   * Default welcome message shown in the chat window when the server config
+   * is unavailable and no welcome message has been explicitly configured.
+   */
+  defaultWelcomeMessage: string;
 }
 
 // ============================================================================

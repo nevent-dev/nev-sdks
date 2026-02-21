@@ -285,7 +285,6 @@ export class BubbleRenderer {
 
     const s = this.styles;
     const size = s?.size ?? 56;
-    const bgColor = s?.backgroundColor ?? '#007bff';
     const iconColor = s?.iconColor ?? '#ffffff';
     const shadow = s?.shadow ?? '0 4px 12px rgba(0,0,0,0.15)';
     const borderRadius = s?.borderRadius ?? size / 2;
@@ -294,7 +293,10 @@ export class BubbleRenderer {
       width: `${size}px`,
       height: `${size}px`,
       borderRadius: `${borderRadius}px`,
-      backgroundColor: bgColor,
+      // Only apply backgroundColor as inline style when explicitly configured.
+      // When not set, the CSS class rule uses var(--nev-cb-bubble-bg) which
+      // derives from var(--nev-cb-color-primary), respecting brandColor theming.
+      ...(s?.backgroundColor ? { backgroundColor: s.backgroundColor } : {}),
       color: iconColor,
       border: 'none',
       cursor: 'pointer',

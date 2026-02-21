@@ -743,9 +743,7 @@ export class SentryReporter {
    * @param error - The Error with a `.stack` property
    * @returns Stacktrace object with frames, or `undefined` if parsing fails
    */
-  static parseStackTrace(
-    error: Error
-  ):
+  static parseStackTrace(error: Error):
     | {
         frames: Array<{
           filename?: string;
