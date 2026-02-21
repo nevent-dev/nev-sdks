@@ -168,7 +168,22 @@ export function createMockApi(options: MockApiOptions = {}): MockApiHandle {
       return withLatency(() => createMockConfigResponse(resolvedServerConfig));
     }
 
-    // Route: POST /public/chatbot/{id}/conversations/{id}/messages
+    // Route: POST /chatbot/send-message (new backend endpoint)
+    if (url.includes('/send-message')) {
+      return withLatency(() => createMockSendMessageResponse(botResponse));
+    }
+
+    // Route: POST /chatbot/typing (typing status notifications)
+    if (url.includes('/chatbot/typing')) {
+      return withLatency(() => ({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ success: true }),
+      } as unknown as Response));
+    }
+
+    // Route: GET /chatbot/messages (message history)
+    // Route: POST /public/chatbot/{id}/conversations/{id}/messages (legacy)
     // This pattern must come BEFORE the conversations route to avoid
     // false-matching on /conversations/{id}/messages.
     if (url.includes('/messages')) {
