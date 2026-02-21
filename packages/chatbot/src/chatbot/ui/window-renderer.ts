@@ -397,10 +397,16 @@ export class WindowRenderer {
     // Subtitle
     this.subtitleElement = document.createElement('span');
     this.subtitleElement.className = 'nevent-chatbot-header-subtitle';
-    this.subtitleElement.textContent = options.subtitle ?? '';
     this.applySubtitleStyles(this.subtitleElement);
     if (!options.subtitle) {
       this.subtitleElement.style.display = 'none';
+    } else {
+      if (options.subtitle === this.i18n.t('statusOnline')) {
+        const dot = document.createElement('span');
+        dot.className = 'nevent-chatbot-status-dot';
+        this.subtitleElement.appendChild(dot);
+      }
+      this.subtitleElement.appendChild(document.createTextNode(options.subtitle));
     }
     textContainer.appendChild(this.subtitleElement);
 
@@ -526,7 +532,7 @@ export class WindowRenderer {
     });
 
     const link = document.createElement('a');
-    link.href = `https://nevent.es?${utmParams.toString()}`;
+    link.href = `https://nevent.ai?${utmParams.toString()}`;
     link.target = '_blank';
     link.rel = 'noopener noreferrer';
     link.className = 'nevent-chatbot-branding-link';
