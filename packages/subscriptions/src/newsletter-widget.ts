@@ -1215,13 +1215,6 @@ export class NewsletterWidget {
 
     root.appendChild(this.form);
 
-    // Render "Powered by Nevent" branding footer below the form.
-    // Visible by default; white-label clients can disable via showBranding: false.
-    if (this.config.showBranding !== false) {
-      const branding = this.createBrandingFooter();
-      root.appendChild(branding);
-    }
-
     if (this.config.animations) {
       requestAnimationFrame(() => {
         if (this.form) {
@@ -1712,58 +1705,6 @@ export class NewsletterWidget {
   }
 
   // --------------------------------------------------------------------------
-  // Branding Footer
-  // --------------------------------------------------------------------------
-
-  /**
-   * Creates the "Powered by Nevent" branding footer element.
-   *
-   * Links to nevent.es with UTM parameters for PLG attribution:
-   * - `utm_source=newsletter_widget`
-   * - `utm_medium=powered_by`
-   * - `utm_campaign=plg`
-   * - `utm_content={tenantId}`
-   *
-   * @returns The branding footer DOM element
-   */
-  private createBrandingFooter(): HTMLElement {
-    const container = document.createElement('div');
-    container.className = 'nevent-newsletter-branding';
-
-    const utmParams = new URLSearchParams({
-      utm_source: 'newsletter_widget',
-      utm_medium: 'powered_by',
-      utm_campaign: 'plg',
-      utm_content: this.config.tenantId,
-    });
-
-    const link = document.createElement('a');
-    link.href = `https://nevent.ai?${utmParams.toString()}`;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
-    link.className = 'nevent-newsletter-branding-link';
-
-    // Lightning bolt emoji + "Powered by " text
-    const textNode = document.createTextNode('\u26A1 Powered by ');
-    link.appendChild(textNode);
-
-    // "Nevent" in bold
-    const strong = document.createElement('strong');
-    strong.textContent = 'Nevent';
-    link.appendChild(strong);
-
-    // Track branding clicks via analytics
-    link.addEventListener('click', () => {
-      if (this.widgetTracker) {
-        this.trackEvent('branding_click');
-      }
-    });
-
-    container.appendChild(link);
-    return container;
-  }
-
-  // --------------------------------------------------------------------------
   // Style injection (Shadow DOM)
   // --------------------------------------------------------------------------
 
@@ -2113,33 +2054,6 @@ export class NewsletterWidget {
         }
       }
 
-      /* Powered by Nevent branding footer */
-      .nevent-newsletter-branding {
-        text-align: center;
-        padding: 8px 0 4px;
-        font-size: 11px;
-        color: #999;
-        opacity: 0.7;
-        transition: opacity 0.2s ease;
-      }
-      .nevent-newsletter-branding:hover {
-        opacity: 1;
-      }
-      .nevent-newsletter-branding-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        color: inherit;
-        text-decoration: none;
-        cursor: pointer;
-      }
-      .nevent-newsletter-branding-link:hover {
-        text-decoration: underline;
-      }
-      .nevent-newsletter-branding-link strong {
-        font-weight: 600;
-        color: var(--nev-primary-color, ${primaryColor});
-      }
     `;
   }
 
@@ -2512,9 +2426,6 @@ export class NewsletterWidget {
         this.widgetTracker.trackSubscriptionError(
           extra?.error_message as string
         );
-        break;
-      case 'branding_click':
-        this.widgetTracker.trackBrandingClick();
         break;
       default:
         break;
