@@ -723,7 +723,7 @@ export class ChatbotWidget {
               tunnel:
                 sentryConfig?.tunnel ?? `${mergedConfig.apiUrl}/diagnostics`,
               environment: sentryConfig?.environment ?? detectedEnv,
-              release: `@nevent/chatbot@0.1.0`,
+              release: `@nevent/chatbot@0.2.0`,
               sampleRate: sentryConfig?.sampleRate ?? 1.0,
               tags: {
                 sdk: 'chatbot',
