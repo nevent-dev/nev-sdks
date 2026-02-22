@@ -472,7 +472,8 @@ export class ChatbotWidget {
           chatbotId: config.chatbotId,
           tenantId: config.tenantId,
           name: this.i18n.t('defaultTitle'),
-          welcomeMessage: config.welcomeMessage || this.i18n.t('defaultWelcomeMessage'),
+          welcomeMessage:
+            config.welcomeMessage || this.i18n.t('defaultWelcomeMessage'),
           placeholder: config.placeholder || this.i18n.t('inputPlaceholder'),
           token: '',
           theme: { primaryColor: config.brandColor || '#6366f1' },
