@@ -920,7 +920,7 @@ export class NewsletterWidget {
         enabled: true,
         tunnel: sentryConfig?.tunnel ?? `${apiUrl}/diagnostics`,
         environment: sentryConfig?.environment ?? detectedEnv,
-        release: `@nevent/subscriptions@2.2.0`,
+        release: `@nevent/subscriptions@2.2.1`,
         sampleRate: sentryConfig?.sampleRate ?? 1.0,
         tags: {
           sdk: 'subscriptions',
