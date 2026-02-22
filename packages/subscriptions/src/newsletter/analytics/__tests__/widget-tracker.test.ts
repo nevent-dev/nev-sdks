@@ -161,6 +161,28 @@ describe('WidgetTracker', () => {
     });
   });
 
+  describe('trackBrandingClick()', () => {
+    it('should call analyticsClient.track with correct event name and parameters', () => {
+      const tracker = new WidgetTracker(
+        mockAnalyticsClient,
+        'newsletter-123',
+        'tenant-456'
+      );
+
+      tracker.trackBrandingClick();
+
+      expect(mockAnalyticsClient.track).toHaveBeenCalledWith(
+        'newsletter.branding_click',
+        expect.objectContaining({
+          event_category: 'newsletter',
+          event_label: 'newsletter-123',
+          tenant_id: 'tenant-456',
+          interaction: true,
+        })
+      );
+    });
+  });
+
   describe('setupImpressionTracking()', () => {
     it('should create IntersectionObserver with threshold 0.5', () => {
       const tracker = new WidgetTracker(

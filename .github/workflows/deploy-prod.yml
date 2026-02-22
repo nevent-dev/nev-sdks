@@ -53,44 +53,57 @@ jobs:
       - name: Build packages
         run: npm run build
 
-      - name: Extract version
+      - name: Generate SRI hashes
+        run: npm run sri
+
+      - name: Extract versions
         id: version
         run: |
-          VERSION=$(node -p "require('./packages/subscriptions/package.json').version")
-          echo "version=$VERSION" >> ${GITHUB_OUTPUT}
-          echo "Extracted version: $VERSION"
+          SUBS_VERSION=$(node -p "require('./packages/subscriptions/package.json').version")
+          CHATBOT_VERSION=$(node -p "require('./packages/chatbot/package.json').version")
+          echo "subs_version=$SUBS_VERSION" >> ${GITHUB_OUTPUT}
+          echo "chatbot_version=$CHATBOT_VERSION" >> ${GITHUB_OUTPUT}
+          echo "Extracted subscriptions version: $SUBS_VERSION"
+          echo "Extracted chatbot version: $CHATBOT_VERSION"
 
-      - name: Check if version already exists in production
+      - name: Check if versions already exist in production
         id: check-version
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-          echo "Checking if version $VERSION exists in production..."
+          SUBS_VERSION=${{ steps.version.outputs.subs_version }}
+          CHATBOT_VERSION=${{ steps.version.outputs.chatbot_version }}
+          DEPLOY_BLOCKED=false
 
-          # Check if versioned path exists in S3
-          if aws s3 ls s3://prd-nevent-sdks/subs/v${VERSION}/ > /dev/null 2>&1; then
-            echo "exists=true" >> ${GITHUB_OUTPUT}
-            echo "ERROR: Version $VERSION already exists in production!"
-            echo "Production deployments are immutable. To redeploy:"
-            echo "1. Update version in packages/subscriptions/package.json"
-            echo "2. Run 'npm run changeset' to create a changeset"
-            echo "3. Commit and push to main"
-            exit 1
+          echo "Checking if subscriptions v${SUBS_VERSION} exists in production..."
+          if aws s3 ls s3://prd-nevent-sdks/subs/v${SUBS_VERSION}/ > /dev/null 2>&1; then
+            echo "subs_exists=true" >> ${GITHUB_OUTPUT}
+            echo "WARNING: Subscriptions v${SUBS_VERSION} already exists in production. Skipping."
           else
-            echo "exists=false" >> ${GITHUB_OUTPUT}
-            echo "Version $VERSION is new. Proceeding with deployment..."
+            echo "subs_exists=false" >> ${GITHUB_OUTPUT}
+            echo "Subscriptions v${SUBS_VERSION} is new. Will deploy."
           fi
 
-      - name: Upload to S3 (versioned path)
-        if: steps.check-version.outputs.exists == 'false'
+          echo "Checking if chatbot v${CHATBOT_VERSION} exists in production..."
+          if aws s3 ls s3://prd-nevent-sdks/chatbot/v${CHATBOT_VERSION}/ > /dev/null 2>&1; then
+            echo "chatbot_exists=true" >> ${GITHUB_OUTPUT}
+            echo "WARNING: Chatbot v${CHATBOT_VERSION} already exists in production. Skipping."
+          else
+            echo "chatbot_exists=false" >> ${GITHUB_OUTPUT}
+            echo "Chatbot v${CHATBOT_VERSION} is new. Will deploy."
+          fi
+
+      # ── Subscriptions SDK ────────────────────────────────────────────────────
+
+      - name: Upload subscriptions to S3 (versioned path)
+        if: steps.check-version.outputs.subs_exists == 'false'
         run: |
           aws s3 sync packages/subscriptions/dist/ \
-            s3://prd-nevent-sdks/subs/v${{ steps.version.outputs.version }}/ \
+            s3://prd-nevent-sdks/subs/v${{ steps.version.outputs.subs_version }}/ \
             --region eu-west-1 \
             --delete \
             --cache-control "public, max-age=31536000, immutable"
 
-      - name: Upload to S3 (latest alias)
-        if: steps.check-version.outputs.exists == 'false'
+      - name: Upload subscriptions to S3 (latest alias)
+        if: steps.check-version.outputs.subs_exists == 'false'
         run: |
           aws s3 sync packages/subscriptions/dist/ \
             s3://prd-nevent-sdks/subs/latest/ \
@@ -98,21 +111,52 @@ jobs:
             --delete \
             --cache-control "public, max-age=300"
 
-      - name: Invalidate CloudFront cache
-        if: steps.check-version.outputs.exists == 'false'
+      # ── Chatbot SDK ──────────────────────────────────────────────────────────
+
+      - name: Upload chatbot to S3 (versioned path)
+        if: steps.check-version.outputs.chatbot_exists == 'false'
         run: |
+          aws s3 sync packages/chatbot/dist/ \
+            s3://prd-nevent-sdks/chatbot/v${{ steps.version.outputs.chatbot_version }}/ \
+            --region eu-west-1 \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Upload chatbot to S3 (latest alias)
+        if: steps.check-version.outputs.chatbot_exists == 'false'
+        run: |
+          aws s3 sync packages/chatbot/dist/ \
+            s3://prd-nevent-sdks/chatbot/latest/ \
+            --region eu-west-1 \
+            --delete \
+            --cache-control "public, max-age=300"
+
+      # ── CloudFront Invalidation ──────────────────────────────────────────────
+
+      - name: Invalidate CloudFront cache
+        if: steps.check-version.outputs.subs_exists == 'false' || steps.check-version.outputs.chatbot_exists == 'false'
+        run: |
+          PATHS=""
+          if [[ "${{ steps.check-version.outputs.subs_exists }}" == "false" ]]; then
+            PATHS="$PATHS /subs/latest/*"
+          fi
+          if [[ "${{ steps.check-version.outputs.chatbot_exists }}" == "false" ]]; then
+            PATHS="$PATHS /chatbot/latest/*"
+          fi
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_PROD_DISTRIBUTION_ID }} \
-            --paths "/subs/latest/*"
+            --paths $PATHS
 
-      - name: Create GitHub Release
-        if: steps.check-version.outputs.exists == 'false'
+      # ── GitHub Releases ──────────────────────────────────────────────────────
+
+      - name: Create GitHub Release for subscriptions
+        if: steps.check-version.outputs.subs_exists == 'false'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          VERSION=${{ steps.version.outputs.version }}
-          gh release create "v${VERSION}" \
-            --title "Release v${VERSION}" \
+          VERSION=${{ steps.version.outputs.subs_version }}
+          gh release create "subscriptions-v${VERSION}" \
+            --title "Release @nevent/subscriptions v${VERSION}" \
             --notes "## Nevent Subscriptions SDK v${VERSION}
 
           ### CDN URLs (Production)
@@ -133,38 +177,101 @@ jobs:
           - **ES Module:** \`nevent-subscriptions.js\`
           - **TypeScript:** \`index.d.ts\`"
 
+      - name: Create GitHub Release for chatbot
+        if: steps.check-version.outputs.chatbot_exists == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${{ steps.version.outputs.chatbot_version }}
+          gh release create "chatbot-v${VERSION}" \
+            --title "Release @nevent/chatbot v${VERSION}" \
+            --notes "## Nevent Chatbot SDK v${VERSION}
+
+          ### CDN URLs (Production)
+
+          **Versioned (recommended for production - immutable):**
+          \`\`\`html
+          <script src=\"https://neventapps.com/chatbot/v${VERSION}/nevent-chatbot.umd.cjs\"></script>
+          \`\`\`
+
+          **Latest (auto-updates to newest version):**
+          \`\`\`html
+          <script src=\"https://neventapps.com/chatbot/latest/nevent-chatbot.umd.cjs\"></script>
+          \`\`\`
+
+          ### Module Formats
+
+          - **UMD (Browser):** \`nevent-chatbot.umd.cjs\`
+          - **ES Module:** \`nevent-chatbot.js\`
+          - **TypeScript:** \`index.d.ts\`
+
+          ### Quick Start
+
+          \`\`\`html
+          <script src=\"https://neventapps.com/chatbot/v${VERSION}/nevent-chatbot.umd.cjs\"></script>
+          <script>
+            const chatbot = new NeventChatbot.ChatbotWidget({
+              chatbotId: 'your-chatbot-id',
+              tenantId: 'your-tenant-id'
+            });
+            chatbot.init();
+          </script>
+          \`\`\`"
+
+      # ── Deployment Summary ───────────────────────────────────────────────────
+
       - name: Deployment summary
-        if: steps.check-version.outputs.exists == 'false'
         run: |
           echo "## Production Deployment Complete! :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**GitHub Release:** https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### CDN URLs" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Versioned (immutable - recommended):**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://neventapps.com/subs/v${{ steps.version.outputs.version }}/nevent-subscriptions.umd.cjs" >> $GITHUB_STEP_SUMMARY
-          echo "https://neventapps.com/subs/v${{ steps.version.outputs.version }}/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "### @nevent/subscriptions v${{ steps.version.outputs.subs_version }}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ steps.check-version.outputs.subs_exists }}" == "true" ]]; then
+            echo "> Already deployed — skipped." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Versioned (immutable - recommended):**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "https://neventapps.com/subs/v${{ steps.version.outputs.subs_version }}/nevent-subscriptions.umd.cjs" >> $GITHUB_STEP_SUMMARY
+            echo "https://neventapps.com/subs/v${{ steps.version.outputs.subs_version }}/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Latest (auto-updates):**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "https://neventapps.com/subs/latest/nevent-subscriptions.umd.cjs" >> $GITHUB_STEP_SUMMARY
+            echo "https://neventapps.com/subs/latest/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Latest (auto-updates):**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://neventapps.com/subs/latest/nevent-subscriptions.umd.cjs" >> $GITHUB_STEP_SUMMARY
-          echo "https://neventapps.com/subs/latest/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Copy-Paste Integration" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`html" >> $GITHUB_STEP_SUMMARY
-          echo "<script src=\"https://neventapps.com/subs/v${{ steps.version.outputs.version }}/nevent-subscriptions.umd.cjs\"></script>" >> $GITHUB_STEP_SUMMARY
-          echo "<script>" >> $GITHUB_STEP_SUMMARY
-          echo "  const widget = new NeventSubscriptions.NewsletterWidget({" >> $GITHUB_STEP_SUMMARY
-          echo "    newsletterId: 'your-newsletter-id'," >> $GITHUB_STEP_SUMMARY
-          echo "    tenantId: 'your-tenant-id'," >> $GITHUB_STEP_SUMMARY
-          echo "    containerId: 'newsletter-widget'" >> $GITHUB_STEP_SUMMARY
-          echo "  });" >> $GITHUB_STEP_SUMMARY
-          echo "  widget.init();" >> $GITHUB_STEP_SUMMARY
-          echo "</script>" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "### @nevent/chatbot v${{ steps.version.outputs.chatbot_version }}" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ steps.check-version.outputs.chatbot_exists }}" == "true" ]]; then
+            echo "> Already deployed — skipped." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Versioned (immutable - recommended):**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "https://neventapps.com/chatbot/v${{ steps.version.outputs.chatbot_version }}/nevent-chatbot.umd.cjs" >> $GITHUB_STEP_SUMMARY
+            echo "https://neventapps.com/chatbot/v${{ steps.version.outputs.chatbot_version }}/nevent-chatbot.js" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Latest (auto-updates):**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "https://neventapps.com/chatbot/latest/nevent-chatbot.umd.cjs" >> $GITHUB_STEP_SUMMARY
+            echo "https://neventapps.com/chatbot/latest/nevent-chatbot.js" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Quick Start:**" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`html" >> $GITHUB_STEP_SUMMARY
+            echo "<script src=\"https://neventapps.com/chatbot/v${{ steps.version.outputs.chatbot_version }}/nevent-chatbot.umd.cjs\"></script>" >> $GITHUB_STEP_SUMMARY
+            echo "<script>" >> $GITHUB_STEP_SUMMARY
+            echo "  const chatbot = new NeventChatbot.ChatbotWidget({" >> $GITHUB_STEP_SUMMARY
+            echo "    chatbotId: 'your-chatbot-id'," >> $GITHUB_STEP_SUMMARY
+            echo "    tenantId: 'your-tenant-id'" >> $GITHUB_STEP_SUMMARY
+            echo "  });" >> $GITHUB_STEP_SUMMARY
+            echo "  chatbot.init();" >> $GITHUB_STEP_SUMMARY
+            echo "</script>" >> $GITHUB_STEP_SUMMARY
+            echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          fi

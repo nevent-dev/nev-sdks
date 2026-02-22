@@ -1,6 +1,12 @@
+import { resolve } from 'path';
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@nevent/core': resolve(__dirname, 'packages/core/src/index.ts'),
+    },
+  },
   test: {
     globals: true,
     environment: 'jsdom',

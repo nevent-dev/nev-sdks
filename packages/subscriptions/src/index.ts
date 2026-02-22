@@ -1,16 +1,22 @@
 /**
  * @nevent/subscriptions - Newsletter subscription widget
  *
- * A production-ready newsletter subscription widget for the Nevent platform.
+ * An enterprise-grade newsletter subscription widget for the Nevent platform.
  *
  * Features:
+ * - Shadow DOM encapsulation (CSS isolation)
+ * - Error isolation via ErrorBoundary (widget errors never crash host page)
+ * - i18n support (es, en, ca, pt with auto-detection)
+ * - HTML sanitization for XSS prevention
+ * - WCAG 2.1 AA accessibility compliance
  * - GDPR-compliant subscription forms
  * - Customizable layouts (column/row)
  * - Google Fonts and custom fonts support
  * - Responsive design
  * - Form validation
- * - Error handling and retry logic
+ * - Connection management with retry logic and offline detection
  * - Analytics tracking
+ * - Proper destroy() lifecycle method
  * - TypeScript support
  *
  * @example
@@ -21,9 +27,14 @@
  *   newsletterId: 'newsletter-123',
  *   tenantId: 'tenant-456',
  *   containerId: 'newsletter-container',
+ *   locale: 'en',
+ *   onError: (err) => console.error('Widget error:', err),
  * });
  *
  * await widget.init();
+ *
+ * // Cleanup when done
+ * widget.destroy();
  * ```
  *
  * @packageDocumentation

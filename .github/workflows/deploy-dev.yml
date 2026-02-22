@@ -48,22 +48,30 @@ jobs:
       - name: Build packages
         run: npm run build
 
-      - name: Extract version
+      - name: Generate SRI hashes
+        run: npm run sri
+
+      - name: Extract versions
         id: version
         run: |
-          VERSION=$(node -p "require('./packages/subscriptions/package.json').version")
-          echo "version=$VERSION" >> ${GITHUB_OUTPUT}
-          echo "Extracted version: $VERSION"
+          SUBS_VERSION=$(node -p "require('./packages/subscriptions/package.json').version")
+          CHATBOT_VERSION=$(node -p "require('./packages/chatbot/package.json').version")
+          echo "subs_version=$SUBS_VERSION" >> ${GITHUB_OUTPUT}
+          echo "chatbot_version=$CHATBOT_VERSION" >> ${GITHUB_OUTPUT}
+          echo "Extracted subscriptions version: $SUBS_VERSION"
+          echo "Extracted chatbot version: $CHATBOT_VERSION"
 
-      - name: Upload to S3 (versioned path)
+      # ── Subscriptions SDK ────────────────────────────────────────────────────
+
+      - name: Upload subscriptions to S3 (versioned path)
         run: |
           aws s3 sync packages/subscriptions/dist/ \
-            s3://dev-nevent-sdks/subs/v${{ steps.version.outputs.version }}/ \
+            s3://dev-nevent-sdks/subs/v${{ steps.version.outputs.subs_version }}/ \
             --region eu-west-1 \
             --delete \
             --cache-control "public, max-age=31536000, immutable"
 
-      - name: Upload to S3 (latest alias)
+      - name: Upload subscriptions to S3 (latest alias)
         run: |
           aws s3 sync packages/subscriptions/dist/ \
             s3://dev-nevent-sdks/subs/latest/ \
@@ -71,25 +79,46 @@ jobs:
             --delete \
             --cache-control "public, max-age=300"
 
+      # ── Chatbot SDK ──────────────────────────────────────────────────────────
+
+      - name: Upload chatbot to S3 (versioned path)
+        run: |
+          aws s3 sync packages/chatbot/dist/ \
+            s3://dev-nevent-sdks/chatbot/v${{ steps.version.outputs.chatbot_version }}/ \
+            --region eu-west-1 \
+            --delete \
+            --cache-control "public, max-age=31536000, immutable"
+
+      - name: Upload chatbot to S3 (latest alias)
+        run: |
+          aws s3 sync packages/chatbot/dist/ \
+            s3://dev-nevent-sdks/chatbot/latest/ \
+            --region eu-west-1 \
+            --delete \
+            --cache-control "public, max-age=300"
+
+      # ── CloudFront Invalidation ──────────────────────────────────────────────
+
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DEV_DISTRIBUTION_ID }} \
-            --paths "/subs/latest/*"
+            --paths "/subs/latest/*" "/chatbot/latest/*"
 
       - name: Deployment summary
         run: |
           echo "## Deployment Complete! :rocket:" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** Development" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### CDN URLs" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### @nevent/subscriptions v${{ steps.version.outputs.subs_version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Versioned (immutable):**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://dev.neventapps.com/subs/v${{ steps.version.outputs.version }}/nevent-subscriptions.umd.cjs" >> $GITHUB_STEP_SUMMARY
-          echo "https://dev.neventapps.com/subs/v${{ steps.version.outputs.version }}/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
+          echo "https://dev.neventapps.com/subs/v${{ steps.version.outputs.subs_version }}/nevent-subscriptions.umd.cjs" >> $GITHUB_STEP_SUMMARY
+          echo "https://dev.neventapps.com/subs/v${{ steps.version.outputs.subs_version }}/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Latest (updates automatically):**" >> $GITHUB_STEP_SUMMARY
@@ -98,7 +127,30 @@ jobs:
           echo "https://dev.neventapps.com/subs/latest/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Integration Example" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### @nevent/chatbot v${{ steps.version.outputs.chatbot_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Versioned (immutable):**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "https://dev.neventapps.com/chatbot/v${{ steps.version.outputs.chatbot_version }}/nevent-chatbot.umd.cjs" >> $GITHUB_STEP_SUMMARY
+          echo "https://dev.neventapps.com/chatbot/v${{ steps.version.outputs.chatbot_version }}/nevent-chatbot.js" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Latest (updates automatically):**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "https://dev.neventapps.com/chatbot/latest/nevent-chatbot.umd.cjs" >> $GITHUB_STEP_SUMMARY
+          echo "https://dev.neventapps.com/chatbot/latest/nevent-chatbot.js" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Integration Example:**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`html" >> $GITHUB_STEP_SUMMARY
-          echo "<script src=\"https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs\"></script>" >> $GITHUB_STEP_SUMMARY
+          echo "<script src=\"https://dev.neventapps.com/chatbot/latest/nevent-chatbot.umd.cjs\"></script>" >> $GITHUB_STEP_SUMMARY
+          echo "<script>" >> $GITHUB_STEP_SUMMARY
+          echo "  const chatbot = new NeventChatbot.ChatbotWidget({" >> $GITHUB_STEP_SUMMARY
+          echo "    chatbotId: 'your-chatbot-id'," >> $GITHUB_STEP_SUMMARY
+          echo "    tenantId: 'your-tenant-id'" >> $GITHUB_STEP_SUMMARY
+          echo "  });" >> $GITHUB_STEP_SUMMARY
+          echo "  chatbot.init();" >> $GITHUB_STEP_SUMMARY
+          echo "</script>" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
