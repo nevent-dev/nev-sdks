@@ -112,6 +112,9 @@ export class NewsletterWidget {
   /** Whether a form submission is in progress */
   private isSubmitting = false;
 
+  /** Original submit button text, stored before spinner is shown so it can be restored */
+  private submitButtonOriginalText: string | null = null;
+
   /** Signature of loaded Google Fonts to prevent duplicate loading */
   private loadedFontSignature: string | null = null;
 
@@ -365,6 +368,7 @@ export class NewsletterWidget {
       this.loadedFontSignature = null;
       this.loadedCustomFonts.clear();
       this.isSubmitting = false;
+      this.submitButtonOriginalText = null;
 
       this.logger.info('Widget destroyed');
     }, 'destroy');
@@ -2011,6 +2015,22 @@ export class NewsletterWidget {
         cursor: not-allowed;
       }
 
+      /* Submit button loading spinner */
+      @keyframes nevent-spin {
+        to { transform: rotate(360deg); }
+      }
+
+      .nevent-newsletter-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid currentColor;
+        border-top-color: transparent;
+        border-radius: 50%;
+        animation: nevent-spin 0.7s linear infinite;
+        vertical-align: middle;
+      }
+
       .nevent-field-hint {
         display: block;
         margin-top: 4px;
@@ -2051,7 +2071,8 @@ export class NewsletterWidget {
       @media (prefers-reduced-motion: reduce) {
         .nevent-widget-form,
         .nevent-input,
-        .nevent-submit-button {
+        .nevent-submit-button,
+        .nevent-newsletter-spinner {
           transition: none !important;
           animation: none !important;
         }
@@ -2295,6 +2316,11 @@ export class NewsletterWidget {
 
   /**
    * Shows loading state on the form.
+   *
+   * Replaces the submit button text with an inline CSS spinner animation
+   * and disables the button to prevent double-submission. The original
+   * button text is stored in {@link submitButtonOriginalText} so it can
+   * be restored once the request completes (success or error).
    */
   private showLoading(): void {
     const root = this.getRenderRoot();
@@ -2303,18 +2329,59 @@ export class NewsletterWidget {
       '.nevent-submit-button'
     ) as HTMLButtonElement;
 
-    const loadingText =
-      this.config.messages.loading || this.i18n.t('loadingButton');
-
     if (statusElement) {
-      statusElement.textContent = loadingText;
-      (statusElement as HTMLElement).style.display = 'block';
+      (statusElement as HTMLElement).style.display = 'none';
       statusElement.className = 'nevent-status-message';
     }
 
     if (submitButton) {
+      // Persist the current label so it can be restored after submission
+      this.submitButtonOriginalText = submitButton.textContent ?? '';
+
+      // Replace text content with an accessible spinner element.
+      // The spinner <span> is purely visual; the aria-label on the button
+      // keeps the loading intent announced to screen readers.
+      submitButton.textContent = '';
+      const spinner = document.createElement('span');
+      spinner.className = 'nevent-newsletter-spinner';
+      spinner.setAttribute('aria-hidden', 'true');
+      submitButton.appendChild(spinner);
+      submitButton.setAttribute(
+        'aria-label',
+        this.config.messages.loading || this.i18n.t('loadingButton')
+      );
       submitButton.disabled = true;
     }
+  }
+
+  /**
+   * Restores the submit button to its pre-submission state.
+   *
+   * Removes the spinner element, restores the original button text, clears
+   * the stored aria-label override, and re-enables the button so the user
+   * can attempt another submission.
+   */
+  private restoreSubmitButton(): void {
+    const root = this.getRenderRoot();
+    const submitButton = root.querySelector(
+      '.nevent-submit-button'
+    ) as HTMLButtonElement | null;
+
+    if (!submitButton) {
+      return;
+    }
+
+    // Remove spinner if present
+    const spinner = submitButton.querySelector('.nevent-newsletter-spinner');
+    if (spinner) {
+      submitButton.removeChild(spinner);
+    }
+
+    // Restore original text and remove the loading aria-label override
+    submitButton.textContent = this.submitButtonOriginalText ?? '';
+    submitButton.removeAttribute('aria-label');
+    submitButton.disabled = false;
+    this.submitButtonOriginalText = null;
   }
 
   /**
@@ -2325,9 +2392,6 @@ export class NewsletterWidget {
   private showSuccess(message: string): void {
     const root = this.getRenderRoot();
     const statusElement = root.querySelector('.nevent-status-message');
-    const submitButton = root.querySelector(
-      '.nevent-submit-button'
-    ) as HTMLButtonElement;
 
     if (statusElement) {
       statusElement.textContent = Sanitizer.escapeHtml(message);
@@ -2335,9 +2399,7 @@ export class NewsletterWidget {
       statusElement.className = 'nevent-status-message success';
     }
 
-    if (submitButton) {
-      submitButton.disabled = false;
-    }
+    this.restoreSubmitButton();
   }
 
   /**
@@ -2348,9 +2410,6 @@ export class NewsletterWidget {
   private showError(message: string): void {
     const root = this.getRenderRoot();
     const statusElement = root.querySelector('.nevent-status-message');
-    const submitButton = root.querySelector(
-      '.nevent-submit-button'
-    ) as HTMLButtonElement;
 
     if (statusElement) {
       statusElement.textContent = Sanitizer.escapeHtml(message);
@@ -2364,9 +2423,7 @@ export class NewsletterWidget {
       this.timers.push(timer);
     }
 
-    if (submitButton) {
-      submitButton.disabled = false;
-    }
+    this.restoreSubmitButton();
   }
 
   // --------------------------------------------------------------------------
