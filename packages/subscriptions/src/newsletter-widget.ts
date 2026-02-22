@@ -2067,12 +2067,32 @@ export class NewsletterWidget {
         color: #721c24;
       }
 
+      /* Success state: full-container overlay that replaces the form */
+      @keyframes nevent-fade-in {
+        from { opacity: 0; }
+        to   { opacity: 1; }
+      }
+
+      .nevent-newsletter-success-message {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px 20px;
+        font-size: 18px;
+        font-weight: 500;
+        color: #155724;
+        font-family: ${globalFontFamily};
+        animation: nevent-fade-in 0.4s ease forwards;
+      }
+
       /* WCAG: Prefers-reduced-motion */
       @media (prefers-reduced-motion: reduce) {
         .nevent-widget-form,
         .nevent-input,
         .nevent-submit-button,
-        .nevent-newsletter-spinner {
+        .nevent-newsletter-spinner,
+        .nevent-newsletter-success-message {
           transition: none !important;
           animation: none !important;
         }
@@ -2385,20 +2405,57 @@ export class NewsletterWidget {
   }
 
   /**
-   * Shows a success message on the form.
+   * Shows a success message by replacing the entire form with a centered
+   * success panel that fills the container at its current height.
    *
-   * @param message - The success message to display (escaped before rendering)
+   * Implementation notes:
+   * - The container height is captured and locked via `minHeight` BEFORE
+   *   the form is hidden, preventing any layout shift on the host page.
+   * - The form element is hidden (not removed) so the DOM stays intact for
+   *   potential `resetOnSuccess` resets.
+   * - A dedicated success element is created and positioned absolutely so
+   *   it overlays the form area without affecting document flow.
+   * - A `nevent-fade-in` animation fades the message in smoothly.
+   * - Respects `prefers-reduced-motion` via CSS (animation is suppressed).
+   *
+   * @param message - The success message to display (HTML-escaped before rendering)
    */
   private showSuccess(message: string): void {
     const root = this.getRenderRoot();
-    const statusElement = root.querySelector('.nevent-status-message');
 
-    if (statusElement) {
-      statusElement.textContent = Sanitizer.escapeHtml(message);
-      (statusElement as HTMLElement).style.display = 'block';
-      statusElement.className = 'nevent-status-message success';
+    // --- 1. Lock the container height before touching the form ---
+    // Capture the form's rendered height and pin it on the host element so
+    // the surrounding page layout does not jump when we hide the form.
+    if (this.hostElement && this.form) {
+      const currentHeight = this.form.getBoundingClientRect().height;
+      if (currentHeight > 0) {
+        this.hostElement.style.minHeight = `${currentHeight}px`;
+      }
     }
 
+    // --- 2. Hide the form (all inputs, GDPR, button) ---
+    if (this.form) {
+      this.form.style.display = 'none';
+    }
+
+    // --- 3. Create and show the success message element ---
+    // Remove any pre-existing success element from a previous call (edge case).
+    const existing = root.querySelector(
+      '.nevent-newsletter-success-message'
+    ) as HTMLElement | null;
+    if (existing) {
+      existing.parentNode?.removeChild(existing);
+    }
+
+    const successEl = document.createElement('div');
+    successEl.className = 'nevent-newsletter-success-message';
+    successEl.setAttribute('role', 'status');
+    successEl.setAttribute('aria-live', 'polite');
+    successEl.textContent = message;
+    root.appendChild(successEl);
+
+    // Submit button state is no longer relevant (form is hidden), but we still
+    // reset the internal flag so destroy() and potential future resets are clean.
     this.restoreSubmitButton();
   }
 
