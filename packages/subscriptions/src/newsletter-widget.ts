@@ -2451,7 +2451,7 @@ export class NewsletterWidget {
     successEl.className = 'nevent-newsletter-success-message';
     successEl.setAttribute('role', 'status');
     successEl.setAttribute('aria-live', 'polite');
-    successEl.textContent = Sanitizer.escapeHtml(message);
+    successEl.textContent = message;
     root.appendChild(successEl);
 
     // Submit button state is no longer relevant (form is hidden), but we still
