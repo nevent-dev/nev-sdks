@@ -1341,16 +1341,16 @@ export class NewsletterWidget {
         // was standardised (e.g. layoutElement key "firstName" vs semanticKey "name").
         const canonicalKey =
           NewsletterWidget.LAYOUT_KEY_ALIASES[key] ?? key;
-        const fieldConfig = this.fieldConfigurations.find(
-          (f) => f.fieldName === key || f.fieldName === canonicalKey
-        );
+        const fieldConfig =
+          this.fieldConfigurations.find((f) => f.fieldName === key) ??
+          this.fieldConfigurations.find((f) => f.fieldName === canonicalKey);
         if (fieldConfig) {
           const configWithWidth = { ...fieldConfig, width };
           const fieldElement = this.formRenderer!.renderField(configWithWidth);
           container.appendChild(fieldElement);
         } else {
-          console.warn(
-            `[NewsletterWidget] No fieldConfiguration found for layoutElement key "${key}" ` +
+          this.logger.warn(
+            `No fieldConfiguration found for layoutElement key "${key}" ` +
               `(canonical: "${canonicalKey}"). Field will not be rendered.`
           );
         }
