@@ -1307,6 +1307,22 @@ export class NewsletterWidget {
   }
 
   /**
+   * Known aliases for layout element keys to fieldName semantic keys.
+   *
+   * Some newsletters were created before the property definition naming was
+   * standardized. The layout element stored the legacy `firstName` key while
+   * the backend now returns `name` as the semanticKey.  This map allows the
+   * renderer to resolve the match without requiring a data migration.
+   *
+   * Keys: legacy layoutElement key
+   * Values: canonical semanticKey used in fieldConfigurations
+   */
+  private static readonly LAYOUT_KEY_ALIASES: Record<string, string> = {
+    firstName: 'name',
+    surname: 'surname1',
+  };
+
+  /**
    * Renders form using layoutElements for order and width.
    *
    * @param container - The container element for form fields
@@ -1320,13 +1336,23 @@ export class NewsletterWidget {
       const { type, key, width } = layoutElement;
 
       if (type === 'field') {
+        // Try exact match first, then fall back to known legacy key aliases.
+        // This handles newsletters created before the propertyDefinition naming
+        // was standardised (e.g. layoutElement key "firstName" vs semanticKey "name").
+        const canonicalKey =
+          NewsletterWidget.LAYOUT_KEY_ALIASES[key] ?? key;
         const fieldConfig = this.fieldConfigurations.find(
-          (f) => f.fieldName === key
+          (f) => f.fieldName === key || f.fieldName === canonicalKey
         );
         if (fieldConfig) {
           const configWithWidth = { ...fieldConfig, width };
           const fieldElement = this.formRenderer!.renderField(configWithWidth);
           container.appendChild(fieldElement);
+        } else {
+          console.warn(
+            `[NewsletterWidget] No fieldConfiguration found for layoutElement key "${key}" ` +
+              `(canonical: "${canonicalKey}"). Field will not be rendered.`
+          );
         }
       } else if (type === 'legalTerms') {
         const gdprElement = this.buildGDPRElement(width);
