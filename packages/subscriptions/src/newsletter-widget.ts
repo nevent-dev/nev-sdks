@@ -646,11 +646,12 @@ export class NewsletterWidget {
         };
 
         // Normalize button text key: API may return buttonText or submitButton,
-        // but the SDK template reads messages.submit. Promote whichever is present.
-        if (mergedConfig.messages?.buttonText && !mergedConfig.messages?.submit) {
+        // but the SDK template reads messages.submit.
+        // Server-provided buttonText/submitButton always take precedence over a
+        // locally pre-set submit value so the widget reflects what the server configures.
+        if (mergedConfig.messages?.buttonText) {
           mergedConfig.messages.submit = mergedConfig.messages.buttonText;
-        }
-        if (mergedConfig.messages?.submitButton && !mergedConfig.messages?.submit) {
+        } else if (mergedConfig.messages?.submitButton) {
           mergedConfig.messages.submit = mergedConfig.messages.submitButton;
         }
 
