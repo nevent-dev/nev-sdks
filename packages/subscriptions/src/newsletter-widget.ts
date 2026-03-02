@@ -261,8 +261,8 @@ export class NewsletterWidget {
       await this.loadWidgetConfig();
       injectSchemaOrg({
         newsletterId: this.config.newsletterId,
-        title: this.config.title,
-        description: this.config.subtitle,
+        title: this.config.messages?.title || this.config.title,
+        description: this.config.messages?.description || this.config.subtitle,
         companyName: this.config.companyName,
         privacyPolicyUrl: this.config.privacyPolicyUrl,
       });
