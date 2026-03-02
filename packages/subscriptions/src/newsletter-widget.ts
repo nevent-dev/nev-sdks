@@ -645,6 +645,15 @@ export class NewsletterWidget {
             : this.config.styles,
         };
 
+        // Normalize button text key: API may return buttonText or submitButton,
+        // but the SDK template reads messages.submit. Promote whichever is present.
+        if (mergedConfig.messages?.buttonText && !mergedConfig.messages?.submit) {
+          mergedConfig.messages.submit = mergedConfig.messages.buttonText;
+        }
+        if (mergedConfig.messages?.submitButton && !mergedConfig.messages?.submit) {
+          mergedConfig.messages.submit = mergedConfig.messages.submitButton;
+        }
+
         this.config = mergedConfig as Required<NewsletterConfig>;
         this.logger.debug('Widget configuration loaded from server');
 
@@ -1435,7 +1444,7 @@ export class NewsletterWidget {
       return '';
     }
 
-    const title = this.config.title || this.i18n.t('formTitle');
+    const title = this.config.messages?.title || this.config.title || this.i18n.t('formTitle');
     return `<h2 class="nevent-title">${Sanitizer.escapeHtml(title)}</h2>`;
   }
 
@@ -1445,11 +1454,12 @@ export class NewsletterWidget {
    * @returns HTML string for the subtitle, or empty string if hidden
    */
   private buildSubtitle(): string {
-    if (this.config.styles?.subtitle?.hidden || !this.config.subtitle) {
+    const subtitle = this.config.messages?.description || this.config.subtitle;
+    if (this.config.styles?.subtitle?.hidden || !subtitle) {
       return '';
     }
 
-    return `<p class="nevent-subtitle">${Sanitizer.escapeHtml(this.config.subtitle)}</p>`;
+    return `<p class="nevent-subtitle">${Sanitizer.escapeHtml(subtitle)}</p>`;
   }
 
   /**
