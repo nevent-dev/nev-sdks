@@ -224,7 +224,16 @@ export interface NewsletterConfig {
 
   // Messages
   messages?: I18nDictionary & {
+    /** Widget title (preferred over top-level title field) */
+    title?: string;
+    /** Widget subtitle / description (preferred over top-level subtitle field) */
+    description?: string;
+    /** Submit button text (canonical key used by widget template) */
     submit?: string;
+    /** Alternative key returned by some API versions — normalized to submit at load time */
+    buttonText?: string;
+    /** Alternative key returned by some API versions — normalized to submit at load time */
+    submitButton?: string;
     loading?: string;
     success?: string;
     error?: string;
