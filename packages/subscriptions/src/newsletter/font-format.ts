@@ -87,11 +87,36 @@ function rank(format: string | null): number {
 
 /**
  * Escapes a string for safe inclusion inside a CSS single-quoted string
- * literal. Only `\` and `'` need escaping per CSS Syntax Level 3
- * §4.3.5 (string token). HTML escaping (`&amp;`, `&#39;`, …) is wrong here
- * because CSS does not interpret HTML entities — the literal `&amp;` would
- * end up in the rendered font-family.
+ * literal. Per CSS Syntax Level 3 §4.3.5 (string token):
+ *   - `\` and `'` must be backslash-escaped to keep them literal.
+ *   - Newline characters (U+000A LF, U+000C FF, U+000D CR) are explicitly
+ *     invalid inside a string literal and produce a bad-string token,
+ *     which causes the browser to discard the entire CSS rule. They are
+ *     emitted here as `\A `, `\C `, `\D ` (CSS hex escape with trailing
+ *     space terminator), the canonical encoding.
+ *
+ * HTML escaping (`&amp;`, `&#39;`, …) is wrong here because CSS does not
+ * interpret HTML entities — the literal `&amp;` would end up in the
+ * rendered font-family.
  */
 export function cssEscapeStringLiteral(value: string): string {
-  return value.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, '\\A ')
+    .replace(/\r/g, '\\D ')
+    .replace(/\f/g, '\\C ');
+}
+
+/**
+ * Wraps a font-family name in single quotes with the value properly escaped
+ * for CSS, so it can be safely interpolated both in `@font-face { font-family: … }`
+ * and in `font-family: …` declarations. Use this everywhere a tenant-supplied
+ * family name reaches generated CSS — keeps registration and consumption in
+ * lockstep so a name like `O'Hara` does not register fine in `@font-face`
+ * but break the consumer rule (which would silently fall back to the system
+ * stack — same symptom as B3 by another route).
+ */
+export function cssFontFamilyLiteral(family: string): string {
+  return `'${cssEscapeStringLiteral(family)}'`;
 }
