@@ -258,37 +258,74 @@ export class NewsletterWidget {
       }
 
       this.findContainer();
-      await this.loadWidgetConfig();
-      injectSchemaOrg({
-        newsletterId: this.config.newsletterId,
-        title: this.config.messages?.title || this.config.title,
-        description: this.config.messages?.description || this.config.subtitle,
-        companyName: this.config.companyName,
-        privacyPolicyUrl: this.config.privacyPolicyUrl,
-      });
-      injectSeoTags();
-      this.initHttpClient();
-      this.initAnalytics();
-      this.initSentry();
-      this.loadGoogleFonts();
-      this.loadCustomFonts();
-      this.createShadowDOM();
-      this.render();
-      this.attachEvents();
-      this.setupConnectionMonitoring();
-      this.trackEvent('widget_loaded');
 
-      if (this.config.onLoad) {
-        const safeOnLoad = this.errorBoundary.wrapCallback(
-          this.config.onLoad as (...args: unknown[]) => unknown,
-          'onLoad'
+      // Idempotency guard (NEV-1607 / B1): if another newsletter widget is
+      // already mounted in this container, skip to prevent stacking
+      // duplicates. Covers two failure modes observed in production:
+      //  - Snippet pasted twice on the host page (header + footer).
+      //  - SPA-like CMS that re-evaluates the script during internal
+      //    navigation, re-running `new NewsletterWidget(...).init()`.
+      if (
+        this.container?.querySelector('[data-nevent-widget="newsletter"]')
+      ) {
+        this.logger.warn(
+          `NewsletterWidget: container "${this.config.containerId || '.nevent-widget'}" already has a newsletter widget mounted. Skipping init() to prevent duplicate.`
         );
-        safeOnLoad(this);
+        return undefined;
       }
 
-      this.initialized = true;
-      this.logger.info('Widget initialized successfully');
-      return this;
+      // Attach the host element to the DOM SYNCHRONOUSLY (before the first
+      // await) so concurrent init() calls on the same container — e.g. two
+      // adjacent <script> tags — see the marker via querySelector and bail
+      // out instead of racing past the guard above.
+      this.createShadowDOM();
+
+      try {
+        await this.loadWidgetConfig();
+        injectSchemaOrg({
+          newsletterId: this.config.newsletterId,
+          title: this.config.messages?.title || this.config.title,
+          description:
+            this.config.messages?.description || this.config.subtitle,
+          companyName: this.config.companyName,
+          privacyPolicyUrl: this.config.privacyPolicyUrl,
+        });
+        injectSeoTags();
+        this.initHttpClient();
+        this.initAnalytics();
+        this.initSentry();
+        this.loadGoogleFonts();
+        this.loadCustomFonts();
+        this.render();
+        this.attachEvents();
+        this.setupConnectionMonitoring();
+        this.trackEvent('widget_loaded');
+
+        if (this.config.onLoad) {
+          const safeOnLoad = this.errorBoundary.wrapCallback(
+            this.config.onLoad as (...args: unknown[]) => unknown,
+            'onLoad'
+          );
+          safeOnLoad(this);
+        }
+
+        this.initialized = true;
+        this.logger.info('Widget initialized successfully');
+        return this;
+      } catch (initError) {
+        // Roll back the host element so the idempotency guard above does not
+        // poison the container for future init() attempts after a partial
+        // failure (e.g. render(), font loaders, analytics throwing). Without
+        // this, a failed init() leaves [data-nevent-widget="newsletter"] in
+        // the DOM and any subsequent init() on the same container is
+        // silently skipped.
+        if (this.hostElement?.parentNode) {
+          this.hostElement.parentNode.removeChild(this.hostElement);
+        }
+        this.hostElement = null;
+        this.shadow = null;
+        throw initError;
+      }
     }, 'init');
   }
 
