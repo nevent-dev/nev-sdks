@@ -286,4 +286,141 @@ describe('Newsletter Widget Sanitization', () => {
       }
     });
   });
+
+  // -------------------------------------------------------------------------
+  // NEV-1607 B3 — @font-face emits the matching format() per file extension
+  // (regression guard against the hard-coded `format('truetype')` that broke
+  // .woff / .woff2 uploads in production)
+  // -------------------------------------------------------------------------
+
+  describe('NEV-1607 B3 — @font-face format hint', () => {
+    it('emits format("woff") for a .woff file (BIGSOUND repro)', async () => {
+      stubFetch({
+        styles: {
+          global: {
+            font: {
+              family: 'HostGrotesk-Regular',
+              type: 'CUSTOM_FONT',
+              customFontId: 'host-grotesk-regular',
+              files: {
+                regular:
+                  'https://prd-nevent-public.s3.eu-west-1.amazonaws.com/fonts/68383f4e/2026/04/hostgrotesk-regular.woff',
+              },
+            },
+          },
+        },
+      });
+
+      const widget = new NewsletterWidget(minimalConfig());
+      await widget.init();
+
+      const style = document.querySelector(
+        'style[data-font-id="custom-font-host-grotesk-regular"]'
+      );
+      expect(style).not.toBeNull();
+      const css = style?.textContent || '';
+      expect(css).toContain("format('woff')");
+      expect(css).not.toContain("format('truetype')");
+    });
+
+    it('emits format("woff2") + format("woff") + format("truetype") in preference order when multiple files are configured', async () => {
+      stubFetch({
+        styles: {
+          global: {
+            font: {
+              family: 'MultiFormat',
+              type: 'CUSTOM_FONT',
+              customFontId: 'multi-format',
+              files: {
+                ttf: 'https://example.com/f.ttf',
+                woff: 'https://example.com/f.woff',
+                woff2: 'https://example.com/f.woff2',
+              },
+            },
+          },
+        },
+      });
+
+      const widget = new NewsletterWidget(minimalConfig());
+      await widget.init();
+
+      const style = document.querySelector(
+        'style[data-font-id="custom-font-multi-format"]'
+      );
+      const css = style?.textContent || '';
+      const woff2Idx = css.indexOf("format('woff2')");
+      const woffIdx = css.indexOf("format('woff')");
+      const ttfIdx = css.indexOf("format('truetype')");
+      expect(woff2Idx).toBeGreaterThan(-1);
+      expect(woffIdx).toBeGreaterThan(woff2Idx);
+      expect(ttfIdx).toBeGreaterThan(woffIdx);
+    });
+
+    it('omits format() entirely when the file extension is unknown (lets the browser sniff)', async () => {
+      stubFetch({
+        styles: {
+          global: {
+            font: {
+              family: 'NoExt',
+              type: 'CUSTOM_FONT',
+              customFontId: 'no-ext',
+              files: {
+                regular: 'https://example.com/font-without-extension',
+              },
+            },
+          },
+        },
+      });
+
+      const widget = new NewsletterWidget(minimalConfig());
+      await widget.init();
+
+      const style = document.querySelector(
+        'style[data-font-id="custom-font-no-ext"]'
+      );
+      const css = style?.textContent || '';
+      expect(css).toContain('url(');
+      expect(css).not.toContain('format(');
+    });
+
+    it("escapes apostrophes in the family name on BOTH @font-face and consumer font-family rules so e.g. \"O'Hara\" does not break either CSS literal", async () => {
+      stubFetch({
+        styles: {
+          global: {
+            font: {
+              family: "O'Hara",
+              type: 'CUSTOM_FONT',
+              customFontId: 'o-hara',
+              files: { regular: 'https://example.com/o-hara.woff' },
+            },
+          },
+        },
+      });
+
+      const widget = new NewsletterWidget(minimalConfig());
+      await widget.init();
+
+      // 1) @font-face registers correctly — the apostrophe is escaped.
+      const fontStyle = document.querySelector(
+        'style[data-font-id="custom-font-o-hara"]'
+      );
+      const fontCSS = fontStyle?.textContent || '';
+      expect(fontCSS).toContain("font-family: 'O\\'Hara'");
+
+      // 2) The consumer rule inside the shadow DOM also escapes the family
+      //    so the CSS literal is well-formed (otherwise the browser would
+      //    parse `font-family: 'O'Hara', system-ui, …`, fail at the second
+      //    `'`, and silently fall back to the system stack — same symptom
+      //    as B3 by another route).
+      const hostEl = document.querySelector(
+        '[data-nevent-widget="newsletter"]'
+      ) as HTMLElement;
+      const shadowStyles = hostEl.shadowRoot?.querySelectorAll('style');
+      const shadowCSS = Array.from(shadowStyles ?? [])
+        .map((s) => s.textContent ?? '')
+        .join('\n');
+      expect(shadowCSS).toContain("'O\\'Hara'");
+      expect(shadowCSS).not.toMatch(/'O'Hara'/);
+    });
+  });
 });

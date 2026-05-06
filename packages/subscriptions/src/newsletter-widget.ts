@@ -30,6 +30,7 @@ import { injectSeoTags } from './newsletter/seo-injector';
 import {
   buildFontSources,
   cssEscapeStringLiteral,
+  cssFontFamilyLiteral,
 } from './newsletter/font-format';
 import {
   createNewsletterI18n,
@@ -1180,7 +1181,7 @@ export class NewsletterWidget {
 
     const fontFaceCSS = `
       @font-face {
-        font-family: '${cssEscapeStringLiteral(customFont.family)}';
+        font-family: ${cssFontFamilyLiteral(customFont.family)};
         src: ${srcDeclarations};
         font-display: swap;
       }
@@ -1193,8 +1194,9 @@ export class NewsletterWidget {
     this.injectedHeadElements.push(styleElement);
 
     this.loadedCustomFonts.add(customFont.family);
+    const formatsList = sources.map((s) => s.format ?? 'sniff').join(', ');
     this.logger.debug(
-      `Custom font loaded: ${customFont.family} (${sources.length} source${sources.length === 1 ? '' : 's'})`
+      `Custom font loaded: ${customFont.family} [${formatsList}]`
     );
   }
 
@@ -1846,37 +1848,43 @@ export class NewsletterWidget {
     // CUSTOM_FONT collapse into the same shape: the configured family wins,
     // and the system stack runs as fallback for the brief window where the
     // remote font hasn't loaded yet (font-display: swap).
+    //
+    // Tenant-supplied family names are wrapped via cssFontFamilyLiteral so
+    // they survive characters like `'` (e.g. "O'Hara"). Without the escape,
+    // a stray apostrophe ends the literal early, the consumer rule fails
+    // CSS parsing and the widget falls back to the system stack — the
+    // exact symptom of B3 reproduced through a different surface.
     const systemStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
     const globalFontFamily = styles?.global?.font?.family
-      ? `'${styles.global.font.family}', ${systemStack}`
+      ? `${cssFontFamilyLiteral(styles.global.font.family)}, ${systemStack}`
       : systemStack;
 
     const titleFontFamily = styles?.title?.font?.family
-      ? `'${styles.title.font.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.title.font.family)}, ${globalFontFamily}`
       : globalFontFamily;
 
     const subtitleFontFamily = styles?.subtitle?.font?.family
-      ? `'${styles.subtitle.font.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.subtitle.font.family)}, ${globalFontFamily}`
       : globalFontFamily;
 
     const inputFontFamily = styles?.input?.font?.family
-      ? `'${styles.input.font.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.input.font.family)}, ${globalFontFamily}`
       : styles?.input?.fontFamily
-        ? `'${styles.input.fontFamily}', ${globalFontFamily}`
+        ? `${cssFontFamilyLiteral(styles.input.fontFamily)}, ${globalFontFamily}`
         : globalFontFamily;
 
     const buttonFontFamily = styles?.button?.font?.family
-      ? `'${styles.button.font.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.button.font.family)}, ${globalFontFamily}`
       : styles?.button?.fontFamily
-        ? `'${styles.button.fontFamily}', ${globalFontFamily}`
+        ? `${cssFontFamilyLiteral(styles.button.fontFamily)}, ${globalFontFamily}`
         : globalFontFamily;
 
     const labelFontFamily = styles?.input?.labelFont?.family
-      ? `'${styles.input.labelFont.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.input.labelFont.family)}, ${globalFontFamily}`
       : globalFontFamily;
 
     const placeholderFontFamily = styles?.input?.placeholderFont?.family
-      ? `'${styles.input.placeholderFont.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.input.placeholderFont.family)}, ${globalFontFamily}`
       : globalFontFamily;
 
     return `

@@ -11,6 +11,7 @@ import {
   detectFontFormat,
   buildFontSources,
   cssEscapeStringLiteral,
+  cssFontFamilyLiteral,
 } from '../src/newsletter/font-format';
 
 describe('detectFontFormat (NEV-1607 B3)', () => {
@@ -113,5 +114,19 @@ describe('cssEscapeStringLiteral (NEV-1607 B3)', () => {
     expect(cssEscapeStringLiteral('Inter-Bold_v1 (regular)')).toBe(
       'Inter-Bold_v1 (regular)'
     );
+  });
+
+  it('escapes raw newlines (LF, CR, FF) — unescaped they would produce a bad-string token and the browser drops the entire CSS rule', () => {
+    expect(cssEscapeStringLiteral('a\nb')).toBe('a\\A b');
+    expect(cssEscapeStringLiteral('a\rb')).toBe('a\\D b');
+    expect(cssEscapeStringLiteral('a\fb')).toBe('a\\C b');
+  });
+});
+
+describe('cssFontFamilyLiteral (NEV-1607 B3)', () => {
+  it('wraps the family name in single quotes with the value escaped', () => {
+    expect(cssFontFamilyLiteral('Inter')).toBe("'Inter'");
+    expect(cssFontFamilyLiteral("O'Hara")).toBe("'O\\'Hara'");
+    expect(cssFontFamilyLiteral('a\\b')).toBe("'a\\\\b'");
   });
 });
