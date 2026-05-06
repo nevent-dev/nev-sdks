@@ -28,6 +28,10 @@ import { adaptFieldConfigurations } from './newsletter/field-adapter';
 import { injectSchemaOrg } from './newsletter/schema-injector';
 import { injectSeoTags } from './newsletter/seo-injector';
 import {
+  buildFontSources,
+  cssEscapeStringLiteral,
+} from './newsletter/font-format';
+import {
   createNewsletterI18n,
   type NewsletterLabels,
 } from './newsletter/i18n/index';
@@ -1136,19 +1140,28 @@ export class NewsletterWidget {
    * they need to be globally available for the browser to resolve the
    * font-family reference inside the Shadow DOM.
    *
-   * @param customFont - Custom font configuration with URL and family name
+   * NEV-1607 (B3): the previous implementation hard-coded
+   * `format('truetype')` for any uploaded file, which caused browsers to
+   * silently reject the rule when the customer uploaded `.woff`/`.woff2`
+   * (the @font-face never registered, the widget fell back to system fonts,
+   * and the customer saw the "fonts don't apply on the embed" bug).
+   * We now detect the format per source via {@link buildFontSources}, emit
+   * one `url(...) format(...)` per file ordered by browser preference, and
+   * omit the format hint entirely when the extension is unknown so the
+   * browser can sniff the content.
+   *
+   * @param customFont - Custom font configuration with URLs and family name
    */
   private injectCustomFont(customFont: CustomFont): void {
     if (!customFont.files || this.loadedCustomFonts.has(customFont.family)) {
       return;
     }
 
-    const fontUrls = Object.values(customFont.files);
-    if (fontUrls.length === 0) {
+    const sources = buildFontSources(customFont.files);
+    if (sources.length === 0) {
       return;
     }
 
-    const fontUrl = fontUrls[0];
     const fontId = `custom-font-${customFont.id}`;
 
     if (document.querySelector(`style[data-font-id="${fontId}"]`)) {
@@ -1156,10 +1169,19 @@ export class NewsletterWidget {
       return;
     }
 
+    const srcDeclarations = sources
+      .map(({ url, format }) => {
+        const escapedUrl = cssEscapeStringLiteral(url);
+        return format
+          ? `url('${escapedUrl}') format('${format}')`
+          : `url('${escapedUrl}')`;
+      })
+      .join(', ');
+
     const fontFaceCSS = `
       @font-face {
-        font-family: '${Sanitizer.escapeHtml(customFont.family)}';
-        src: url('${Sanitizer.escapeHtml(fontUrl ?? '')}') format('truetype');
+        font-family: '${cssEscapeStringLiteral(customFont.family)}';
+        src: ${srcDeclarations};
         font-display: swap;
       }
     `;
@@ -1171,7 +1193,9 @@ export class NewsletterWidget {
     this.injectedHeadElements.push(styleElement);
 
     this.loadedCustomFonts.add(customFont.family);
-    this.logger.debug(`Custom font loaded: ${customFont.family}`);
+    this.logger.debug(
+      `Custom font loaded: ${customFont.family} (${sources.length} source${sources.length === 1 ? '' : 's'})`
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -1818,13 +1842,14 @@ export class NewsletterWidget {
     const primaryColor = this.config.primaryColor;
     const borderRadius = this.extractNumericValue(this.config.borderRadius);
 
-    // Build font-family cascades with fallbacks
-    const globalFontFamily =
-      styles?.global?.font?.family && styles.global.font.type !== 'CUSTOM_FONT'
-        ? `'${styles.global.font.family}', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
-        : styles?.global?.font?.family
-          ? `'${styles.global.font.family}', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
-          : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    // Build font-family cascades with fallbacks. Both GOOGLE_FONT and
+    // CUSTOM_FONT collapse into the same shape: the configured family wins,
+    // and the system stack runs as fallback for the brief window where the
+    // remote font hasn't loaded yet (font-display: swap).
+    const systemStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    const globalFontFamily = styles?.global?.font?.family
+      ? `'${styles.global.font.family}', ${systemStack}`
+      : systemStack;
 
     const titleFontFamily = styles?.title?.font?.family
       ? `'${styles.title.font.family}', ${globalFontFamily}`
