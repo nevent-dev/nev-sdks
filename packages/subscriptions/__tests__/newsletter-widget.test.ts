@@ -141,6 +141,119 @@ describe('NewsletterWidget', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Idempotency (NEV-1607 / B1 — duplicate mount guard)
+  // -------------------------------------------------------------------------
+
+  describe('idempotency (NEV-1607 B1)', () => {
+    it('should mount only one widget when init() is called twice on the same container (snippet duplicado en la página del cliente)', async () => {
+      const widget1 = new NewsletterWidget(minimalConfig());
+      const widget2 = new NewsletterWidget(minimalConfig());
+
+      await widget1.init();
+      await widget2.init();
+
+      const hosts = container.querySelectorAll(
+        '[data-nevent-widget="newsletter"]'
+      );
+      expect(hosts.length).toBe(1);
+    });
+
+    it('should mount only one widget after N repeated init() calls (CMS SPA-like que reejecuta el snippet en cada navegación)', async () => {
+      for (let i = 0; i < 5; i++) {
+        const w = new NewsletterWidget(minimalConfig());
+        await w.init();
+      }
+
+      const hosts = container.querySelectorAll(
+        '[data-nevent-widget="newsletter"]'
+      );
+      expect(hosts.length).toBe(1);
+    });
+
+    it('should return undefined from init() when a widget is already mounted in the container', async () => {
+      const widget1 = new NewsletterWidget(minimalConfig());
+      await widget1.init();
+
+      const widget2 = new NewsletterWidget(minimalConfig());
+      const result = await widget2.init();
+
+      expect(result).toBeUndefined();
+    });
+
+    it('should allow a fresh init() after destroy() of the previous widget', async () => {
+      const widget1 = new NewsletterWidget(minimalConfig());
+      await widget1.init();
+      widget1.destroy();
+
+      const widget2 = new NewsletterWidget(minimalConfig());
+      await widget2.init();
+
+      const hosts = container.querySelectorAll(
+        '[data-nevent-widget="newsletter"]'
+      );
+      expect(hosts.length).toBe(1);
+    });
+
+    it('should mount only one widget when two init() calls race without await between them (snippet duplicado en la misma página, ambos scripts se ejecutan sin pausa)', async () => {
+      const widget1 = new NewsletterWidget(minimalConfig());
+      const widget2 = new NewsletterWidget(minimalConfig());
+
+      // Both inits start back-to-back, no await between them.
+      const p1 = widget1.init();
+      const p2 = widget2.init();
+      await Promise.all([p1, p2]);
+
+      const hosts = container.querySelectorAll(
+        '[data-nevent-widget="newsletter"]'
+      );
+      expect(hosts.length).toBe(1);
+    });
+
+    it('should not poison the container when init() fails after createShadowDOM — the host element is removed and a fresh init() can mount (Codex review hallazgo #1)', async () => {
+      const widget1 = new NewsletterWidget(minimalConfig());
+      // Force a failure after createShadowDOM has appended the host element.
+      // We stub the private `render` method, which runs after loadWidgetConfig.
+      (widget1 as unknown as { render: () => void }).render = () => {
+        throw new Error('forced render failure');
+      };
+      const result1 = await widget1.init();
+      expect(result1).toBeUndefined();
+
+      // Container must be clean — the host was rolled back.
+      expect(
+        container.querySelectorAll('[data-nevent-widget="newsletter"]').length
+      ).toBe(0);
+
+      // A fresh widget on the same container must succeed.
+      const widget2 = new NewsletterWidget(minimalConfig());
+      const result2 = await widget2.init();
+      expect(result2).toBeDefined();
+      expect(
+        container.querySelectorAll('[data-nevent-widget="newsletter"]').length
+      ).toBe(1);
+    });
+
+    it('should not fetch widget config a second time when duplicate is detected (the second init aborts before any network call) (Codex review hallazgo #4)', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ title: 'X' }),
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const widget1 = new NewsletterWidget(minimalConfig());
+      await widget1.init();
+      const callsAfterFirst = fetchMock.mock.calls.length;
+
+      const widget2 = new NewsletterWidget(minimalConfig());
+      const result = await widget2.init();
+
+      expect(result).toBeUndefined();
+      expect(fetchMock.mock.calls.length).toBe(callsAfterFirst);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Shadow DOM
   // -------------------------------------------------------------------------
 

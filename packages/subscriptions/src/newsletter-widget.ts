@@ -28,6 +28,11 @@ import { adaptFieldConfigurations } from './newsletter/field-adapter';
 import { injectSchemaOrg } from './newsletter/schema-injector';
 import { injectSeoTags } from './newsletter/seo-injector';
 import {
+  buildFontSources,
+  cssEscapeStringLiteral,
+  cssFontFamilyLiteral,
+} from './newsletter/font-format';
+import {
   createNewsletterI18n,
   type NewsletterLabels,
 } from './newsletter/i18n/index';
@@ -258,37 +263,74 @@ export class NewsletterWidget {
       }
 
       this.findContainer();
-      await this.loadWidgetConfig();
-      injectSchemaOrg({
-        newsletterId: this.config.newsletterId,
-        title: this.config.messages?.title || this.config.title,
-        description: this.config.messages?.description || this.config.subtitle,
-        companyName: this.config.companyName,
-        privacyPolicyUrl: this.config.privacyPolicyUrl,
-      });
-      injectSeoTags();
-      this.initHttpClient();
-      this.initAnalytics();
-      this.initSentry();
-      this.loadGoogleFonts();
-      this.loadCustomFonts();
-      this.createShadowDOM();
-      this.render();
-      this.attachEvents();
-      this.setupConnectionMonitoring();
-      this.trackEvent('widget_loaded');
 
-      if (this.config.onLoad) {
-        const safeOnLoad = this.errorBoundary.wrapCallback(
-          this.config.onLoad as (...args: unknown[]) => unknown,
-          'onLoad'
+      // Idempotency guard (NEV-1607 / B1): if another newsletter widget is
+      // already mounted in this container, skip to prevent stacking
+      // duplicates. Covers two failure modes observed in production:
+      //  - Snippet pasted twice on the host page (header + footer).
+      //  - SPA-like CMS that re-evaluates the script during internal
+      //    navigation, re-running `new NewsletterWidget(...).init()`.
+      if (
+        this.container?.querySelector('[data-nevent-widget="newsletter"]')
+      ) {
+        this.logger.warn(
+          `NewsletterWidget: container "${this.config.containerId || '.nevent-widget'}" already has a newsletter widget mounted. Skipping init() to prevent duplicate.`
         );
-        safeOnLoad(this);
+        return undefined;
       }
 
-      this.initialized = true;
-      this.logger.info('Widget initialized successfully');
-      return this;
+      // Attach the host element to the DOM SYNCHRONOUSLY (before the first
+      // await) so concurrent init() calls on the same container — e.g. two
+      // adjacent <script> tags — see the marker via querySelector and bail
+      // out instead of racing past the guard above.
+      this.createShadowDOM();
+
+      try {
+        await this.loadWidgetConfig();
+        injectSchemaOrg({
+          newsletterId: this.config.newsletterId,
+          title: this.config.messages?.title || this.config.title,
+          description:
+            this.config.messages?.description || this.config.subtitle,
+          companyName: this.config.companyName,
+          privacyPolicyUrl: this.config.privacyPolicyUrl,
+        });
+        injectSeoTags();
+        this.initHttpClient();
+        this.initAnalytics();
+        this.initSentry();
+        this.loadGoogleFonts();
+        this.loadCustomFonts();
+        this.render();
+        this.attachEvents();
+        this.setupConnectionMonitoring();
+        this.trackEvent('widget_loaded');
+
+        if (this.config.onLoad) {
+          const safeOnLoad = this.errorBoundary.wrapCallback(
+            this.config.onLoad as (...args: unknown[]) => unknown,
+            'onLoad'
+          );
+          safeOnLoad(this);
+        }
+
+        this.initialized = true;
+        this.logger.info('Widget initialized successfully');
+        return this;
+      } catch (initError) {
+        // Roll back the host element so the idempotency guard above does not
+        // poison the container for future init() attempts after a partial
+        // failure (e.g. render(), font loaders, analytics throwing). Without
+        // this, a failed init() leaves [data-nevent-widget="newsletter"] in
+        // the DOM and any subsequent init() on the same container is
+        // silently skipped.
+        if (this.hostElement?.parentNode) {
+          this.hostElement.parentNode.removeChild(this.hostElement);
+        }
+        this.hostElement = null;
+        this.shadow = null;
+        throw initError;
+      }
     }, 'init');
   }
 
@@ -930,7 +972,7 @@ export class NewsletterWidget {
         enabled: true,
         tunnel: sentryConfig?.tunnel ?? `${apiUrl}/diagnostics`,
         environment: sentryConfig?.environment ?? detectedEnv,
-        release: `@nevent/subscriptions@2.2.1`,
+        release: `@nevent/subscriptions@2.3.0`,
         sampleRate: sentryConfig?.sampleRate ?? 1.0,
         tags: {
           sdk: 'subscriptions',
@@ -1099,19 +1141,28 @@ export class NewsletterWidget {
    * they need to be globally available for the browser to resolve the
    * font-family reference inside the Shadow DOM.
    *
-   * @param customFont - Custom font configuration with URL and family name
+   * NEV-1607 (B3): the previous implementation hard-coded
+   * `format('truetype')` for any uploaded file, which caused browsers to
+   * silently reject the rule when the customer uploaded `.woff`/`.woff2`
+   * (the @font-face never registered, the widget fell back to system fonts,
+   * and the customer saw the "fonts don't apply on the embed" bug).
+   * We now detect the format per source via {@link buildFontSources}, emit
+   * one `url(...) format(...)` per file ordered by browser preference, and
+   * omit the format hint entirely when the extension is unknown so the
+   * browser can sniff the content.
+   *
+   * @param customFont - Custom font configuration with URLs and family name
    */
   private injectCustomFont(customFont: CustomFont): void {
     if (!customFont.files || this.loadedCustomFonts.has(customFont.family)) {
       return;
     }
 
-    const fontUrls = Object.values(customFont.files);
-    if (fontUrls.length === 0) {
+    const sources = buildFontSources(customFont.files);
+    if (sources.length === 0) {
       return;
     }
 
-    const fontUrl = fontUrls[0];
     const fontId = `custom-font-${customFont.id}`;
 
     if (document.querySelector(`style[data-font-id="${fontId}"]`)) {
@@ -1119,10 +1170,19 @@ export class NewsletterWidget {
       return;
     }
 
+    const srcDeclarations = sources
+      .map(({ url, format }) => {
+        const escapedUrl = cssEscapeStringLiteral(url);
+        return format
+          ? `url('${escapedUrl}') format('${format}')`
+          : `url('${escapedUrl}')`;
+      })
+      .join(', ');
+
     const fontFaceCSS = `
       @font-face {
-        font-family: '${Sanitizer.escapeHtml(customFont.family)}';
-        src: url('${Sanitizer.escapeHtml(fontUrl ?? '')}') format('truetype');
+        font-family: ${cssFontFamilyLiteral(customFont.family)};
+        src: ${srcDeclarations};
         font-display: swap;
       }
     `;
@@ -1134,7 +1194,10 @@ export class NewsletterWidget {
     this.injectedHeadElements.push(styleElement);
 
     this.loadedCustomFonts.add(customFont.family);
-    this.logger.debug(`Custom font loaded: ${customFont.family}`);
+    const formatsList = sources.map((s) => s.format ?? 'sniff').join(', ');
+    this.logger.debug(
+      `Custom font loaded: ${customFont.family} [${formatsList}]`
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -1781,40 +1844,47 @@ export class NewsletterWidget {
     const primaryColor = this.config.primaryColor;
     const borderRadius = this.extractNumericValue(this.config.borderRadius);
 
-    // Build font-family cascades with fallbacks
-    const globalFontFamily =
-      styles?.global?.font?.family && styles.global.font.type !== 'CUSTOM_FONT'
-        ? `'${styles.global.font.family}', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
-        : styles?.global?.font?.family
-          ? `'${styles.global.font.family}', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`
-          : '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    // Build font-family cascades with fallbacks. Both GOOGLE_FONT and
+    // CUSTOM_FONT collapse into the same shape: the configured family wins,
+    // and the system stack runs as fallback for the brief window where the
+    // remote font hasn't loaded yet (font-display: swap).
+    //
+    // Tenant-supplied family names are wrapped via cssFontFamilyLiteral so
+    // they survive characters like `'` (e.g. "O'Hara"). Without the escape,
+    // a stray apostrophe ends the literal early, the consumer rule fails
+    // CSS parsing and the widget falls back to the system stack — the
+    // exact symptom of B3 reproduced through a different surface.
+    const systemStack = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+    const globalFontFamily = styles?.global?.font?.family
+      ? `${cssFontFamilyLiteral(styles.global.font.family)}, ${systemStack}`
+      : systemStack;
 
     const titleFontFamily = styles?.title?.font?.family
-      ? `'${styles.title.font.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.title.font.family)}, ${globalFontFamily}`
       : globalFontFamily;
 
     const subtitleFontFamily = styles?.subtitle?.font?.family
-      ? `'${styles.subtitle.font.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.subtitle.font.family)}, ${globalFontFamily}`
       : globalFontFamily;
 
     const inputFontFamily = styles?.input?.font?.family
-      ? `'${styles.input.font.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.input.font.family)}, ${globalFontFamily}`
       : styles?.input?.fontFamily
-        ? `'${styles.input.fontFamily}', ${globalFontFamily}`
+        ? `${cssFontFamilyLiteral(styles.input.fontFamily)}, ${globalFontFamily}`
         : globalFontFamily;
 
     const buttonFontFamily = styles?.button?.font?.family
-      ? `'${styles.button.font.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.button.font.family)}, ${globalFontFamily}`
       : styles?.button?.fontFamily
-        ? `'${styles.button.fontFamily}', ${globalFontFamily}`
+        ? `${cssFontFamilyLiteral(styles.button.fontFamily)}, ${globalFontFamily}`
         : globalFontFamily;
 
     const labelFontFamily = styles?.input?.labelFont?.family
-      ? `'${styles.input.labelFont.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.input.labelFont.family)}, ${globalFontFamily}`
       : globalFontFamily;
 
     const placeholderFontFamily = styles?.input?.placeholderFont?.family
-      ? `'${styles.input.placeholderFont.family}', ${globalFontFamily}`
+      ? `${cssFontFamilyLiteral(styles.input.placeholderFont.family)}, ${globalFontFamily}`
       : globalFontFamily;
 
     return `
