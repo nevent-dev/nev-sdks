@@ -1475,14 +1475,23 @@ export class NewsletterWidget {
       const { type, key, width } = layoutElement;
 
       if (type === 'field') {
-        // Try exact match first, then fall back to known legacy key aliases.
-        // This handles newsletters created before the propertyDefinition naming
-        // was standardised (e.g. layoutElement key "firstName" vs semanticKey "name").
+        // Try exact match first, then fall back to known legacy key aliases,
+        // then to propertyDefinitionId.
+        // - exact: layoutElement key matches a fieldName like 'email' / 'firstName'.
+        // - alias: legacy newsletters that use older semantic names (e.g.
+        //   layoutElement key "firstName" vs semanticKey "name").
+        // - propertyDefinitionId: newsletters whose layoutElement key stores the
+        //   raw Mongo ObjectId of a custom field. The backend now returns a
+        //   semanticKey on the fieldConfiguration (e.g. 'email'), so the two
+        //   sides drift unless we explicitly cross-match by id. Without this
+        //   third fallback the SDK silently drops the entire email input —
+        //   making the form unsubmittable.
         const canonicalKey =
           NewsletterWidget.LAYOUT_KEY_ALIASES[key] ?? key;
         const fieldConfig =
           this.fieldConfigurations.find((f) => f.fieldName === key) ??
-          this.fieldConfigurations.find((f) => f.fieldName === canonicalKey);
+          this.fieldConfigurations.find((f) => f.fieldName === canonicalKey) ??
+          this.fieldConfigurations.find((f) => f.propertyDefinitionId === key);
         if (fieldConfig) {
           const configWithWidth = { ...fieldConfig, width };
           const fieldElement = this.formRenderer!.renderField(configWithWidth);
