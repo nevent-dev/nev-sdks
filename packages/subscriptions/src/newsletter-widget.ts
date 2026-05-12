@@ -177,6 +177,14 @@ export class NewsletterWidget {
   /** Whether destroy() has been called */
   private destroyed = false;
 
+  /**
+   * Set to true when the backend returns HTTP 422 on the config endpoint,
+   * indicating the tenant's legal data (companyName / privacyPolicyUrl) is
+   * not yet provisioned. When true, the rest of init() is skipped and a
+   * friendly fallback panel is shown instead of the form.
+   */
+  private widgetUnavailable = false;
+
   // --------------------------------------------------------------------------
   // Event listener references (for cleanup in destroy)
   // --------------------------------------------------------------------------
@@ -287,6 +295,19 @@ export class NewsletterWidget {
 
       try {
         await this.loadWidgetConfig();
+
+        // HTTP 422 means the tenant's legal data is incomplete. A fallback
+        // panel has already been rendered by loadWidgetConfig via
+        // renderUnavailable(). Skip the rest of init to avoid rendering a
+        // broken form on top of it.
+        if (this.widgetUnavailable) {
+          this.initialized = true;
+          this.logger.info(
+            'Widget unavailable (tenant legal incomplete) — skipped rest of init'
+          );
+          return this;
+        }
+
         injectSchemaOrg({
           newsletterId: this.config.newsletterId,
           title: this.config.messages?.title || this.config.title,
@@ -648,6 +669,19 @@ export class NewsletterWidget {
         1
       );
 
+      // 422 = backend Task 4: tenant legal data (companyName / privacyPolicyUrl)
+      // is not yet provisioned. Render a friendly fallback and stop init. This
+      // is an expected "not yet configured" signal — NOT a runtime error, so it
+      // must NOT propagate to onError or Sentry.
+      if (response.status === 422) {
+        this.renderUnavailable();
+        this.widgetUnavailable = true;
+        this.logger.warn(
+          'Widget config returned 422 — tenant legal data incomplete'
+        );
+        return;
+      }
+
       if (response.ok) {
         const serverConfig = (await response.json()) as ServerWidgetConfig;
 
@@ -743,6 +777,21 @@ export class NewsletterWidget {
       this.logger.warn('Error loading widget configuration:', error);
       this.fieldConfigurations = this.getDefaultFieldConfigurations();
     }
+  }
+
+  /**
+   * Renders a minimal "unavailable" panel inside the shadow root when the
+   * backend signals HTTP 422 on the config endpoint. Used to gracefully
+   * inform the user instead of either erroring out or showing a broken form.
+   */
+  private renderUnavailable(): void {
+    const root = this.getRenderRoot();
+    const message = this.i18n.t('widgetUnavailable');
+    root.innerHTML = `
+      <div class="nevent-newsletter-widget nevent-widget-unavailable" role="status" aria-live="polite">
+        <p class="nevent-unavailable-text">${Sanitizer.escapeHtml(message)}</p>
+      </div>
+    `;
   }
 
   /**
@@ -2159,6 +2208,24 @@ export class NewsletterWidget {
         .nevent-fields-container .nevent-field {
           width: 100% !important;
         }
+      }
+
+      /* Unavailable panel (tenant legal data incomplete — HTTP 422) */
+      .nevent-widget-unavailable {
+        padding: 16px;
+        border-radius: 4px;
+        background-color: #fef3f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        font-family: ${globalFontFamily};
+        text-align: center;
+        box-sizing: border-box;
+      }
+
+      .nevent-unavailable-text {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
       }
 
     `;
