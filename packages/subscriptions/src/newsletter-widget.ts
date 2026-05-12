@@ -2510,6 +2510,17 @@ export class NewsletterWidget {
    * can attempt another submission.
    */
   private restoreSubmitButton(): void {
+    // No-op when showLoading() was never called. showError() invokes us
+    // from validation paths (e.g. unchecked GDPR consent) that return
+    // BEFORE showLoading, leaving submitButtonOriginalText === null.
+    // Without this guard we would overwrite the button's textContent with
+    // '', wiping the label visually until the next render — a
+    // user-reported bug where pressing Suscribirse without ticking the
+    // GDPR checkbox left an empty button forever.
+    if (this.submitButtonOriginalText === null) {
+      return;
+    }
+
     const root = this.getRenderRoot();
     const submitButton = root.querySelector(
       '.nevent-submit-button'
@@ -2526,7 +2537,7 @@ export class NewsletterWidget {
     }
 
     // Restore original text and remove the loading aria-label override
-    submitButton.textContent = this.submitButtonOriginalText ?? '';
+    submitButton.textContent = this.submitButtonOriginalText;
     submitButton.removeAttribute('aria-label');
     submitButton.disabled = false;
     this.submitButtonOriginalText = null;
