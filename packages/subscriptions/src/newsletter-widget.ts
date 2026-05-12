@@ -701,10 +701,24 @@ export class NewsletterWidget {
       // ── happy path ──
       const serverConfig = (await response.json()) as ServerWidgetConfig;
 
+      // STRICT: the apiUrl, newsletterId and tenantId the caller passed at
+      // construction time are the source of truth. The server's config
+      // response may carry its own apiUrl (e.g. a backend default), but
+      // honoring it would let one backend silently redirect the SDK to
+      // another — a correctness and security risk (e.g. PRD widget
+      // redirecting to a staging URL because the server config was
+      // misconfigured). We strip them from the merge.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { apiUrl: _ignoredApiUrl, newsletterId: _ignoredNewsletterId, tenantId: _ignoredTenantId, ...serverConfigSafe } = serverConfig as ServerWidgetConfig & {
+        apiUrl?: string;
+        newsletterId?: string;
+        tenantId?: string;
+      };
+
       // Merge server config, handling optional properties correctly
       const mergedConfig = {
         ...this.config,
-        ...serverConfig,
+        ...serverConfigSafe,
         fields: serverConfig.fields
           ? { ...this.config.fields, ...serverConfig.fields }
           : this.config.fields,
