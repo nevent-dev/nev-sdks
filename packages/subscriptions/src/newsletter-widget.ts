@@ -177,6 +177,14 @@ export class NewsletterWidget {
   /** Whether destroy() has been called */
   private destroyed = false;
 
+  /**
+   * Set to true when the backend returns HTTP 422 on the config endpoint,
+   * indicating the tenant's legal data (companyName / privacyPolicyUrl) is
+   * not yet provisioned. When true, the rest of init() is skipped and a
+   * friendly fallback panel is shown instead of the form.
+   */
+  private widgetUnavailable = false;
+
   // --------------------------------------------------------------------------
   // Event listener references (for cleanup in destroy)
   // --------------------------------------------------------------------------
@@ -287,6 +295,19 @@ export class NewsletterWidget {
 
       try {
         await this.loadWidgetConfig();
+
+        // HTTP 422 means the tenant's legal data is incomplete. A fallback
+        // panel has already been rendered by loadWidgetConfig via
+        // renderUnavailable(). Skip the rest of init to avoid rendering a
+        // broken form on top of it.
+        if (this.widgetUnavailable) {
+          this.initialized = true;
+          this.logger.info(
+            'Widget unavailable (tenant legal incomplete) — skipped rest of init'
+          );
+          return this;
+        }
+
         injectSchemaOrg({
           newsletterId: this.config.newsletterId,
           title: this.config.messages?.title || this.config.title,
@@ -648,101 +669,160 @@ export class NewsletterWidget {
         1
       );
 
-      if (response.ok) {
-        const serverConfig = (await response.json()) as ServerWidgetConfig;
-
-        // Merge server config, handling optional properties correctly
-        const mergedConfig = {
-          ...this.config,
-          ...serverConfig,
-          fields: serverConfig.fields
-            ? { ...this.config.fields, ...serverConfig.fields }
-            : this.config.fields,
-          messages: serverConfig.messages
-            ? { ...this.config.messages, ...serverConfig.messages }
-            : this.config.messages,
-          styles: serverConfig.styles
-            ? {
-                global: {
-                  ...this.config.styles?.global,
-                  ...serverConfig.styles.global,
-                },
-                title: {
-                  ...this.config.styles?.title,
-                  ...serverConfig.styles.title,
-                },
-                subtitle: {
-                  ...this.config.styles?.subtitle,
-                  ...serverConfig.styles.subtitle,
-                },
-                input: {
-                  ...this.config.styles?.input,
-                  ...serverConfig.styles.input,
-                },
-                button: {
-                  ...this.config.styles?.button,
-                  ...serverConfig.styles.button,
-                },
-              }
-            : this.config.styles,
-        };
-
-        // Normalize button text key: API may return buttonText or submitButton,
-        // but the SDK template reads messages.submit.
-        // Server-provided buttonText/submitButton always take precedence over a
-        // locally pre-set submit value so the widget reflects what the server configures.
-        if (mergedConfig.messages?.buttonText) {
-          mergedConfig.messages.submit = mergedConfig.messages.buttonText;
-        } else if (mergedConfig.messages?.submitButton) {
-          mergedConfig.messages.submit = mergedConfig.messages.submitButton;
-        }
-
-        this.config = mergedConfig as Required<NewsletterConfig>;
-        this.logger.debug('Widget configuration loaded from server');
-
-        // Store fieldConfigurations if provided by API (adapt from raw API format)
-        if (
-          serverConfig.fieldConfigurations &&
-          serverConfig.fieldConfigurations.length > 0
-        ) {
-          this.fieldConfigurations = adaptFieldConfigurations(
-            serverConfig.fieldConfigurations
-          );
-          this.logger.debug(
-            'Dynamic field configurations loaded from API:',
-            this.fieldConfigurations
-          );
-        } else {
-          this.fieldConfigurations = this.getDefaultFieldConfigurations();
-          this.logger.debug(
-            'Using default field configurations (backward compatibility)'
-          );
-        }
-
-        // Store layoutElements if provided by API
-        if (
-          serverConfig.styles?.global?.layoutElements &&
-          serverConfig.styles.global.layoutElements.length > 0
-        ) {
-          this.layoutElements = serverConfig.styles.global.layoutElements;
-          this.logger.debug(
-            'Layout elements loaded from API:',
-            this.layoutElements
-          );
-        }
-
-        // Enrich field configs with semantic keys from layout elements
-        this.enrichFieldConfigsFromLayout();
-      } else {
+      if (response.status >= 400 && response.status < 500) {
+        // Expected 4xx — newsletter not provisioned yet, deleted, inactive,
+        // or tenant legal incomplete (422). Don't render a form, but also
+        // don't surface to the embedder via onError — it's not a runtime
+        // error from their perspective, it's a known state of the data.
+        this.renderUnavailable();
+        this.widgetUnavailable = true;
         this.logger.warn(
-          'Could not load widget configuration from server, using defaults'
+          `Widget config returned ${response.status} — widget unavailable`
         );
-        this.fieldConfigurations = this.getDefaultFieldConfigurations();
+        return;
       }
+
+      if (!response.ok) {
+        // 5xx — real server failure. Render the unavailable panel (same UX)
+        // but DO report to Sentry so operators see it. Still skip the rest
+        // of init — never render a form with unknown config.
+        this.renderUnavailable();
+        this.widgetUnavailable = true;
+        this.logger.error(
+          `Widget config returned ${response.status} — server failure`
+        );
+        this.sentryReporter?.captureException(
+          new Error(`Widget config HTTP ${response.status}`),
+          { context: 'loadWidgetConfig' }
+        );
+        return;
+      }
+
+      // ── happy path ──
+      const serverConfig = (await response.json()) as ServerWidgetConfig;
+
+      // STRICT: the apiUrl, newsletterId and tenantId the caller passed at
+      // construction time are the source of truth. The server's config
+      // response may carry its own apiUrl (e.g. a backend default), but
+      // honoring it would let one backend silently redirect the SDK to
+      // another — a correctness and security risk (e.g. PRD widget
+      // redirecting to a staging URL because the server config was
+      // misconfigured). We strip them from the merge.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { apiUrl: _ignoredApiUrl, newsletterId: _ignoredNewsletterId, tenantId: _ignoredTenantId, ...serverConfigSafe } = serverConfig as ServerWidgetConfig & {
+        apiUrl?: string;
+        newsletterId?: string;
+        tenantId?: string;
+      };
+
+      // Merge server config, handling optional properties correctly
+      const mergedConfig = {
+        ...this.config,
+        ...serverConfigSafe,
+        fields: serverConfig.fields
+          ? { ...this.config.fields, ...serverConfig.fields }
+          : this.config.fields,
+        messages: serverConfig.messages
+          ? { ...this.config.messages, ...serverConfig.messages }
+          : this.config.messages,
+        styles: serverConfig.styles
+          ? {
+              global: {
+                ...this.config.styles?.global,
+                ...serverConfig.styles.global,
+              },
+              title: {
+                ...this.config.styles?.title,
+                ...serverConfig.styles.title,
+              },
+              subtitle: {
+                ...this.config.styles?.subtitle,
+                ...serverConfig.styles.subtitle,
+              },
+              input: {
+                ...this.config.styles?.input,
+                ...serverConfig.styles.input,
+              },
+              button: {
+                ...this.config.styles?.button,
+                ...serverConfig.styles.button,
+              },
+            }
+          : this.config.styles,
+      };
+
+      // Normalize button text key: API may return buttonText or submitButton,
+      // but the SDK template reads messages.submit.
+      // Server-provided buttonText/submitButton always take precedence over a
+      // locally pre-set submit value so the widget reflects what the server configures.
+      if (mergedConfig.messages?.buttonText) {
+        mergedConfig.messages.submit = mergedConfig.messages.buttonText;
+      } else if (mergedConfig.messages?.submitButton) {
+        mergedConfig.messages.submit = mergedConfig.messages.submitButton;
+      }
+
+      this.config = mergedConfig as Required<NewsletterConfig>;
+      this.logger.debug('Widget configuration loaded from server');
+
+      // Store fieldConfigurations if provided by API (adapt from raw API format)
+      if (
+        serverConfig.fieldConfigurations &&
+        serverConfig.fieldConfigurations.length > 0
+      ) {
+        this.fieldConfigurations = adaptFieldConfigurations(
+          serverConfig.fieldConfigurations
+        );
+        this.logger.debug(
+          'Dynamic field configurations loaded from API:',
+          this.fieldConfigurations
+        );
+      } else {
+        this.fieldConfigurations = this.getDefaultFieldConfigurations();
+        this.logger.debug(
+          'Using default field configurations (backward compatibility)'
+        );
+      }
+
+      // Store layoutElements if provided by API
+      if (
+        serverConfig.styles?.global?.layoutElements &&
+        serverConfig.styles.global.layoutElements.length > 0
+      ) {
+        this.layoutElements = serverConfig.styles.global.layoutElements;
+        this.logger.debug(
+          'Layout elements loaded from API:',
+          this.layoutElements
+        );
+      }
+
+      // Enrich field configs with semantic keys from layout elements
+      this.enrichFieldConfigsFromLayout();
     } catch (error) {
-      this.logger.warn('Error loading widget configuration:', error);
-      this.fieldConfigurations = this.getDefaultFieldConfigurations();
+      // Network error, JSON parse error, timeout. Treat same as 5xx:
+      // render unavailable + report to Sentry so operators see it.
+      this.renderUnavailable();
+      this.widgetUnavailable = true;
+      this.logger.error('Error loading widget configuration:', error);
+      this.sentryReporter?.captureException(
+        error instanceof Error ? error : new Error(String(error)),
+        { context: 'loadWidgetConfig' }
+      );
     }
+  }
+
+  /**
+   * Renders a minimal "unavailable" panel inside the shadow root when the
+   * backend signals HTTP 422 on the config endpoint. Used to gracefully
+   * inform the user instead of either erroring out or showing a broken form.
+   */
+  private renderUnavailable(): void {
+    const root = this.getRenderRoot();
+    const message = this.i18n.t('widgetUnavailable');
+    root.innerHTML = `
+      <div class="nevent-newsletter-widget nevent-widget-unavailable" role="status" aria-live="polite">
+        <p class="nevent-unavailable-text">${Sanitizer.escapeHtml(message)}</p>
+      </div>
+    `;
   }
 
   /**
@@ -1409,14 +1489,23 @@ export class NewsletterWidget {
       const { type, key, width } = layoutElement;
 
       if (type === 'field') {
-        // Try exact match first, then fall back to known legacy key aliases.
-        // This handles newsletters created before the propertyDefinition naming
-        // was standardised (e.g. layoutElement key "firstName" vs semanticKey "name").
+        // Try exact match first, then fall back to known legacy key aliases,
+        // then to propertyDefinitionId.
+        // - exact: layoutElement key matches a fieldName like 'email' / 'firstName'.
+        // - alias: legacy newsletters that use older semantic names (e.g.
+        //   layoutElement key "firstName" vs semanticKey "name").
+        // - propertyDefinitionId: newsletters whose layoutElement key stores the
+        //   raw Mongo ObjectId of a custom field. The backend now returns a
+        //   semanticKey on the fieldConfiguration (e.g. 'email'), so the two
+        //   sides drift unless we explicitly cross-match by id. Without this
+        //   third fallback the SDK silently drops the entire email input —
+        //   making the form unsubmittable.
         const canonicalKey =
           NewsletterWidget.LAYOUT_KEY_ALIASES[key] ?? key;
         const fieldConfig =
           this.fieldConfigurations.find((f) => f.fieldName === key) ??
-          this.fieldConfigurations.find((f) => f.fieldName === canonicalKey);
+          this.fieldConfigurations.find((f) => f.fieldName === canonicalKey) ??
+          this.fieldConfigurations.find((f) => f.propertyDefinitionId === key);
         if (fieldConfig) {
           const configWithWidth = { ...fieldConfig, width };
           const fieldElement = this.formRenderer!.renderField(configWithWidth);
@@ -1743,6 +1832,24 @@ export class NewsletterWidget {
    * @returns Sanitized HTML string for GDPR consent text
    */
   private buildGDPRHtml(): string {
+    if (!this.config.companyName || !this.config.privacyPolicyUrl) {
+      // Should never happen if loadWidgetConfig gate worked, but defend
+      // against future regressions. Return an empty string for the checkbox
+      // text so the user sees an empty (but valid) checkbox instead of a
+      // literal {{companyName}} placeholder, and we get a Sentry alert.
+      this.logger.error(
+        'buildGDPRHtml called without companyName/privacyPolicyUrl — ' +
+          'this is a regression in widget initialization'
+      );
+      this.sentryReporter?.captureException(
+        new Error(
+          'buildGDPRHtml: missing config.companyName or config.privacyPolicyUrl'
+        ),
+        { context: 'buildGDPRHtml' }
+      );
+      return '';
+    }
+
     // Use config message or i18n fallback
     let gdprText = this.config.messages.gdprText || this.i18n.t('gdprText');
 
@@ -1750,27 +1857,23 @@ export class NewsletterWidget {
     const privacyLabel =
       this.config.messages.privacyText || this.i18n.t('privacyPolicyLabel');
 
-    if (this.config.companyName) {
-      gdprText = gdprText
-        .replace(
-          '{{companyName}}',
-          Sanitizer.escapeHtml(this.config.companyName)
-        )
-        .replace(
-          '[COMPANY_NAME]',
-          Sanitizer.escapeHtml(this.config.companyName)
-        );
-    }
+    gdprText = gdprText
+      .replace('{{companyName}}', Sanitizer.escapeHtml(this.config.companyName))
+      .replace('[COMPANY_NAME]', Sanitizer.escapeHtml(this.config.companyName));
 
-    if (this.config.privacyPolicyUrl) {
-      const escapedUrl = Sanitizer.escapeHtml(this.config.privacyPolicyUrl);
-      const privacyLink = `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer">${Sanitizer.escapeHtml(privacyLabel)}</a>`;
-      gdprText = gdprText
-        .replace('{{privacyPolicyLink}}', privacyLink)
-        .replace('[PRIVACY_POLICY_LINK]', privacyLink);
-    }
+    const escapedUrl = Sanitizer.escapeHtml(this.config.privacyPolicyUrl);
+    const privacyLink = `<a href="${escapedUrl}" target="_blank" rel="noopener noreferrer">${Sanitizer.escapeHtml(privacyLabel)}</a>`;
+    gdprText = gdprText
+      .replace('{{privacyPolicyLink}}', privacyLink)
+      .replace('[PRIVACY_POLICY_LINK]', privacyLink);
 
-    // Sanitize the final HTML (allows <a> tags but strips everything dangerous)
+    // Normalize line endings (Windows/Mac → \n) and turn newlines into
+    // <br> tags. The Sanitizer whitelist allows <br>, so this survives
+    // the subsequent sanitizeHtml() call. Lets the promoter break the
+    // consent into paragraphs from the textarea naturally.
+    gdprText = gdprText.replace(/\r\n?/g, '\n').replace(/\n/g, '<br>');
+
+    // Sanitize the final HTML (allows <a> and <br>, strips everything dangerous)
     return Sanitizer.sanitizeHtml(gdprText);
   }
 
@@ -2161,6 +2264,24 @@ export class NewsletterWidget {
         }
       }
 
+      /* Unavailable panel (tenant legal data incomplete — HTTP 422) */
+      .nevent-widget-unavailable {
+        padding: 16px;
+        border-radius: 4px;
+        background-color: #fef3f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        font-family: ${globalFontFamily};
+        text-align: center;
+        box-sizing: border-box;
+      }
+
+      .nevent-unavailable-text {
+        margin: 0;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+
     `;
   }
 
@@ -2403,6 +2524,17 @@ export class NewsletterWidget {
    * can attempt another submission.
    */
   private restoreSubmitButton(): void {
+    // No-op when showLoading() was never called. showError() invokes us
+    // from validation paths (e.g. unchecked GDPR consent) that return
+    // BEFORE showLoading, leaving submitButtonOriginalText === null.
+    // Without this guard we would overwrite the button's textContent with
+    // '', wiping the label visually until the next render — a
+    // user-reported bug where pressing Suscribirse without ticking the
+    // GDPR checkbox left an empty button forever.
+    if (this.submitButtonOriginalText === null) {
+      return;
+    }
+
     const root = this.getRenderRoot();
     const submitButton = root.querySelector(
       '.nevent-submit-button'
@@ -2419,7 +2551,7 @@ export class NewsletterWidget {
     }
 
     // Restore original text and remove the loading aria-label override
-    submitButton.textContent = this.submitButtonOriginalText ?? '';
+    submitButton.textContent = this.submitButtonOriginalText;
     submitButton.removeAttribute('aria-label');
     submitButton.disabled = false;
     this.submitButtonOriginalText = null;

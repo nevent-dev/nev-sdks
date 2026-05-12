@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nevent · Verificación GDPR Newsletter</title>
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --card: #ffffff;
+      --text: #212529;
+      --text-muted: #6c757d;
+      --border: #dee2e6;
+      --primary: #0d6efd;
+      --ok-bg: #d1e7dd;
+      --ok-fg: #0a3622;
+      --warn-bg: #fff3cd;
+      --warn-fg: #664d03;
+      --danger-bg: #f8d7da;
+      --danger-fg: #842029;
+      --code-bg: #f1f3f5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      margin: 0; padding: 2rem;
+      background: var(--bg); color: var(--text);
+    }
+    .container { max-width: 760px; margin: 0 auto; }
+    h1 { margin-top: 0; }
+    .card {
+      background: var(--card); padding: 1.5rem; border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+      margin-bottom: 1.5rem;
+    }
+    .card h2 { margin-top: 0; font-size: 1.1rem; }
+    label { display: block; font-size: 0.875rem; font-weight: 600; margin-top: 0.75rem; }
+    input {
+      width: 100%; padding: 0.5rem; border: 1px solid var(--border);
+      border-radius: 4px; font-size: 0.9rem; margin-top: 0.25rem;
+    }
+    button {
+      margin-top: 1rem; padding: 0.6rem 1.2rem; background: var(--primary);
+      color: #fff; border: none; border-radius: 4px;
+      cursor: pointer; font-weight: 600; font-size: 0.9rem;
+    }
+    button:hover { filter: brightness(1.05); }
+    .verdict {
+      margin-top: 1rem; padding: 0.75rem 1rem;
+      border-radius: 4px; font-size: 0.875rem; line-height: 1.5;
+    }
+    .verdict.ok { background: var(--ok-bg); color: var(--ok-fg); }
+    .verdict.warn { background: var(--warn-bg); color: var(--warn-fg); }
+    .verdict.danger { background: var(--danger-bg); color: var(--danger-fg); }
+    code, pre {
+      background: var(--code-bg); padding: 0.15rem 0.4rem;
+      border-radius: 3px; font-size: 0.8rem; font-family: "SF Mono", Menlo, monospace;
+    }
+    pre { padding: 0.75rem; overflow-x: auto; line-height: 1.4; }
+    ol li { margin-bottom: 0.4rem; }
+    .muted { color: var(--text-muted); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Verificación visual del checkbox GDPR</h1>
+    <p class="muted">
+      Embebe el SDK <code>@nevent/subscriptions</code> apuntando a tu backend.
+      Sirve para validar manualmente Tasks 4 + 7 + 11 de la rama
+      <code>feat/newsletter-gdpr-checkbox</code>.
+    </p>
+
+    <div class="card">
+      <h2>Configuración</h2>
+      <label>API URL</label>
+      <input id="apiUrl" value="http://localhost:8080" />
+      <label>Newsletter ID</label>
+      <input id="newsletterId" placeholder="p. ej. 6634a8b9c0d1e2f3a4b5c6d7" />
+      <label>Tenant ID</label>
+      <input id="tenantId" placeholder="p. ej. 6547c6a70f6fa76418cb3c1a" />
+      <button onclick="mountWidget()">Montar widget</button>
+      <div id="verdict"></div>
+    </div>
+
+    <div class="card">
+      <h2>Widget</h2>
+      <div id="widget-container"></div>
+    </div>
+
+    <div class="card">
+      <h2>Casos a verificar</h2>
+      <ol>
+        <li>
+          <strong>Tenant con legal vacío</strong>: borra
+          <code>tenant.legal.companyName</code> o
+          <code>tenant.legal.privacyPolicy</code> en Mongo (o desde el admin).
+          Recarga: el widget debe mostrar <code>"Formulario no disponible.
+          Contacta con el organizador del evento."</code> en lugar del form.
+        </li>
+        <li>
+          <strong>Tenant con legal completo · modo default</strong>: razón social
+          del tenant aparece interpolada en el texto del checkbox y el enlace
+          a la política es clicable. Submit sin marcar el check muestra el
+          error i18n <code>gdprRequired</code>.
+        </li>
+        <li>
+          <strong>Modo personalizar</strong>: cambia el
+          <code>widgetMessages.gdprText</code> del newsletter desde el admin
+          (Tasks 9). El widget refleja el texto custom interpolado.
+        </li>
+        <li>
+          <strong>Snapshot persistido</strong>: tras un submit exitoso,
+          en Mongo:
+          <pre>db.newsletter_consent_snapshots.find().sort({createdAt:-1}).limit(1).pretty()</pre>
+          Debe aparecer un documento con el texto literal interpolado y un
+          <code>hash</code> SHA-256 de 64 chars. El suscriptor recién creado:
+          <pre>db.newsletter_subscribers.find({email:"…"},{consents:1}).pretty()</pre>
+          tiene <code>consents[0].version</code> igual al hash del snapshot.
+        </li>
+      </ol>
+    </div>
+
+    <p class="muted">
+      Si algo va mal: abre la consola del navegador y comprueba los logs
+      con prefijo <code>[Newsletter]</code>. Para 422 del endpoint
+      <code>/config</code>, el SDK NO debe llamar a <code>onError</code> —
+      solo renderizar el panel "no disponible".
+    </p>
+  </div>
+
+  <script type="module">
+    // Importa el bundle local recién construido. Si lanzas un build:
+    //   pnpm --filter @nevent/subscriptions build
+    // se regenera dist/nevent-subscriptions.js.
+    import { NewsletterWidget } from '../packages/subscriptions/dist/nevent-subscriptions.js';
+
+    window.mountWidget = async () => {
+      const container = document.getElementById('widget-container');
+      const verdict = document.getElementById('verdict');
+      container.innerHTML = '';
+      verdict.innerHTML = '';
+
+      const apiUrl = document.getElementById('apiUrl').value.trim();
+      const newsletterId = document.getElementById('newsletterId').value.trim();
+      const tenantId = document.getElementById('tenantId').value.trim();
+
+      if (!newsletterId || !tenantId) {
+        verdict.className = 'verdict warn';
+        verdict.textContent = 'Faltan newsletterId o tenantId.';
+        return;
+      }
+
+      try {
+        const widget = new NewsletterWidget({
+          newsletterId, tenantId, apiUrl,
+          containerId: 'widget-container',
+          debug: true,
+          onSuccess: (resp) => {
+            verdict.className = 'verdict ok';
+            verdict.innerHTML =
+              '<strong>Submit OK.</strong> Respuesta backend:' +
+              '<pre>' + JSON.stringify(resp, null, 2) + '</pre>' +
+              'Verifica en MongoDB: ' +
+              '<code>db.newsletter_consent_snapshots.find().sort({createdAt:-1}).limit(1).pretty()</code>';
+          },
+          onError: (err) => {
+            verdict.className = 'verdict danger';
+            verdict.innerHTML = '<strong>Error.</strong> ' + (err.message ?? err);
+          },
+        });
+        await widget.init();
+        verdict.className = 'verdict ok';
+        verdict.textContent =
+          'Widget montado. Verifica visualmente y prueba el submit.';
+      } catch (e) {
+        verdict.className = 'verdict danger';
+        verdict.innerHTML = '<strong>Init falló.</strong> ' + e.message;
+      }
+    };
+  </script>
+</body>
+</html>
