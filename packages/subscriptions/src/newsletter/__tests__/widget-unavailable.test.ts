@@ -48,6 +48,23 @@ function stubOk() {
   );
 }
 
+function stubOkWithGdprText(gdprText: string) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({
+        title: 'Test Newsletter',
+        companyName: 'TestCo',
+        privacyPolicyUrl: 'https://example.com/privacy',
+        messages: { gdprText },
+      }),
+    } as Response)
+  );
+}
+
 function stub404() {
   vi.stubGlobal(
     'fetch',
@@ -231,5 +248,25 @@ describe('NewsletterWidget — widget-config error handling', () => {
     expect(text).toMatch(/unavailable|no disponible/i);
 
     expect(root?.querySelector('input[type="email"]')).toBeNull();
+  });
+
+  it('renders newlines in gdprText as <br> tags (multi-paragraph consent)', async () => {
+    stubOkWithGdprText('Line one.\nLine two.\r\nLine three.');
+
+    const widget = new NewsletterWidget(minimalConfig());
+    await widget.init();
+
+    const root = getShadowRoot(container);
+    const gdprText = root?.querySelector('.nevent-gdpr-text');
+    expect(gdprText).not.toBeNull();
+    // After normalization, both \n and \r\n become <br>.
+    const html = gdprText?.innerHTML ?? '';
+    const brCount = (html.match(/<br\s*\/?>/g) ?? []).length;
+    expect(brCount).toBe(2);
+    expect(html).toContain('Line one.');
+    expect(html).toContain('Line two.');
+    expect(html).toContain('Line three.');
+    // Raw \n must NOT survive — those would render as spaces, defeating the purpose.
+    expect(html.includes('\n')).toBe(false);
   });
 });

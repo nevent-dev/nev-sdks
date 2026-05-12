@@ -1844,7 +1844,13 @@ export class NewsletterWidget {
       .replace('{{privacyPolicyLink}}', privacyLink)
       .replace('[PRIVACY_POLICY_LINK]', privacyLink);
 
-    // Sanitize the final HTML (allows <a> tags but strips everything dangerous)
+    // Normalize line endings (Windows/Mac → \n) and turn newlines into
+    // <br> tags. The Sanitizer whitelist allows <br>, so this survives
+    // the subsequent sanitizeHtml() call. Lets the promoter break the
+    // consent into paragraphs from the textarea naturally.
+    gdprText = gdprText.replace(/\r\n?/g, '\n').replace(/\n/g, '<br>');
+
+    // Sanitize the final HTML (allows <a> and <br>, strips everything dangerous)
     return Sanitizer.sanitizeHtml(gdprText);
   }
 
