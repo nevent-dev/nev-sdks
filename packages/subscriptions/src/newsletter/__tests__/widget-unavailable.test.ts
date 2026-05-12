@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 /**
- * Tests for HTTP 422 graceful fallback behavior.
+ * Tests for widget-config error handling — the SDK must NEVER render a
+ * subscription form when the backend config endpoint returns anything other
+ * than 200 with a valid payload.
  *
- * When GET /public/widget/{id}/config returns 422, the backend is signaling
- * that the tenant's legal data (companyName / privacyPolicyUrl) is not yet
- * provisioned. The SDK must render a localized fallback message and skip
- * the rest of widget initialization — without calling onError.
+ * Behavior by status class:
+ *  - 4xx (incl. 422, 404): render unavailable panel, skip init, do NOT call
+ *    onError (expected "not provisioned" state, not an embedder error).
+ *  - 5xx and network errors: render unavailable panel, skip init, DO report
+ *    to Sentry via sentryReporter (real server failure, operators must see it).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NewsletterWidget } from '../../newsletter-widget';
@@ -45,6 +48,18 @@ function stubOk() {
   );
 }
 
+function stub404() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ errors: 'Newsletter not found or not active' }),
+    } as Response)
+  );
+}
+
 function stub500() {
   vi.stubGlobal(
     'fetch',
@@ -54,6 +69,13 @@ function stub500() {
       headers: new Headers({ 'content-type': 'application/json' }),
       json: async () => ({ error: 'INTERNAL_SERVER_ERROR' }),
     } as Response)
+  );
+}
+
+function stubNetworkError() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn().mockRejectedValue(new TypeError('Failed to fetch'))
   );
 }
 
@@ -78,7 +100,7 @@ function getShadowRoot(container: HTMLElement): ShadowRoot | null {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('NewsletterWidget — HTTP 422 (tenant legal incomplete)', () => {
+describe('NewsletterWidget — widget-config error handling', () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
@@ -152,15 +174,62 @@ describe('NewsletterWidget — HTTP 422 (tenant legal incomplete)', () => {
     expect(form).not.toBeNull();
   });
 
-  it('does NOT show the unavailable panel when /config returns 500 (falls back to defaults)', async () => {
+  it('renders the unavailable fallback when /config returns 404', async () => {
+    stub404();
+
+    const widget = new NewsletterWidget(minimalConfig());
+    const onError = vi.fn();
+    (widget as unknown as { config: { onError: typeof onError } }).config.onError = onError;
+    await widget.init();
+
+    const root = getShadowRoot(container);
+    expect(root).not.toBeNull();
+
+    const unavailablePanel = root?.querySelector('.nevent-widget-unavailable');
+    expect(unavailablePanel).not.toBeNull();
+
+    const text = unavailablePanel?.textContent ?? '';
+    expect(text).toMatch(/unavailable|no disponible/i);
+
+    expect(root?.querySelector('input[type="email"]')).toBeNull();
+    expect(root?.querySelector('.nevent-gdpr-text')).toBeNull();
+    // 4xx is not a runtime error — must NOT surface to embedder via onError
+    expect(onError).not.toHaveBeenCalled();
+  });
+
+  it('renders the unavailable fallback when /config returns 500 AND does not render a form', async () => {
     stub500();
 
     const widget = new NewsletterWidget(minimalConfig());
     await widget.init();
 
     const root = getShadowRoot(container);
-    // 500 falls back to defaults and still renders a form
-    expect(root?.querySelector('.nevent-widget-unavailable')).toBeNull();
-    expect(root?.querySelector('form')).not.toBeNull();
+    expect(root).not.toBeNull();
+
+    const unavailablePanel = root?.querySelector('.nevent-widget-unavailable');
+    expect(unavailablePanel).not.toBeNull();
+
+    const text = unavailablePanel?.textContent ?? '';
+    expect(text).toMatch(/unavailable|no disponible/i);
+
+    expect(root?.querySelector('input[type="email"]')).toBeNull();
+  });
+
+  it('renders the unavailable fallback on network error AND does not render a form', async () => {
+    stubNetworkError();
+
+    const widget = new NewsletterWidget(minimalConfig());
+    await widget.init();
+
+    const root = getShadowRoot(container);
+    expect(root).not.toBeNull();
+
+    const unavailablePanel = root?.querySelector('.nevent-widget-unavailable');
+    expect(unavailablePanel).not.toBeNull();
+
+    const text = unavailablePanel?.textContent ?? '';
+    expect(text).toMatch(/unavailable|no disponible/i);
+
+    expect(root?.querySelector('input[type="email"]')).toBeNull();
   });
 });
