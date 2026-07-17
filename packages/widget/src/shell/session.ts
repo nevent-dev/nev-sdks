@@ -35,12 +35,15 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
 
   const refresh = (): Promise<void> => {
     refreshing ??= (async () => {
-      const res = await fetchFn(`${base}/widget/v1/sessions/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` },
-      })
-      if (res.ok) session = (await res.json()) as WidgetSession
-      refreshing = null
+      try {
+        const res = await fetchFn(`${base}/widget/v1/sessions/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` },
+        })
+        if (res.ok) session = (await res.json()) as WidgetSession
+      } finally {
+        refreshing = null
+      }
     })()
     return refreshing
   }
