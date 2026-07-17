@@ -25,4 +25,23 @@ describe('api-queue', () => {
     const b = installGlobalStub(w)
     expect(a).toBe(b)
   })
+  it('no pierde llamadas reentrantes al stub global durante el drain', () => {
+    const w = {} as Window & { NeventWidget?: ApiStub }
+    const stub = installGlobalStub(w)
+    stub('boot', 'inst_123')
+    const calls: Array<[string, unknown[]]> = []
+    const handler = (method: string, args: unknown[]): void => {
+      calls.push([method, args])
+      if (method === 'boot') {
+        // Reentrant: el propio handler de 'boot' llama de vuelta al stub global
+        // de forma síncrona, como haría un callback de inicialización.
+        w.NeventWidget!('open')
+      }
+    }
+    drainQueue(stub, handler)
+    expect(calls).toEqual([
+      ['boot', ['inst_123']],
+      ['open', []],
+    ])
+  })
 })

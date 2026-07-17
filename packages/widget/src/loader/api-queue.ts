@@ -25,6 +25,6 @@ export function drainQueue(stub: ApiStub, handler: (method: string, args: unknow
   const pending = stub.q ?? []
   delete stub.q
   const dispatch = (method: string, args: unknown[]): void => handler(method, args)
-  pending.forEach(([method, ...args]) => dispatch(method, args))
   stub.__dispatch = dispatch
+  pending.forEach(([method, ...args]) => dispatch(method, args))
 }
