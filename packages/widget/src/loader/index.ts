@@ -6,6 +6,7 @@ interface LoaderOptions { shellUrl: string }
 interface Instance {
   instanceId: string
   installationId: string
+  opts: unknown
   container: HTMLElement
   iframe: HTMLIFrameElement
   shellOrigin: string
@@ -22,7 +23,7 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
     instance.iframe.contentWindow?.postMessage(seal(type, payload, instance.instanceId), instance.shellOrigin)
   }
 
-  const boot = (installationId: string): void => {
+  const boot = (installationId: string, bootOpts?: unknown): void => {
     if (instance) return
     const instanceId = `nevw_${Math.random().toString(36).slice(2, 10)}`
     const container = w.document.createElement('div')
@@ -33,7 +34,9 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
     iframe.src = `${opts.shellUrl}#${instanceId}`
     iframe.style.cssText = 'border:0;width:0;height:0'
     container.appendChild(iframe)
-    w.document.body.appendChild(container)
+    // Fallback a documentElement: un <script> clásico en <head> puede ejecutarse
+    // antes de que exista document.body.
+    ;(w.document.body ?? w.document.documentElement).appendChild(container)
     const shellOrigin = new URL(opts.shellUrl, w.location.href).origin
 
     const onMessage = (ev: MessageEvent): void => {
@@ -42,13 +45,13 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
       const env = openEnvelope(ev.data, { instanceId: instance.instanceId })
       if (!env || !isCommand(env.type, SHELL_TO_LOADER)) return
       if (env.type === 'ready') {
-        sendToShell('init', { installationId: instance.installationId })
+        sendToShell('init', { installationId: instance.installationId, opts: instance.opts })
         return
       }
       instance.listeners.get(env.type)?.forEach((cb) => cb(env.payload))
     }
     w.addEventListener('message', onMessage)
-    instance = { instanceId, installationId, container, iframe, shellOrigin, listeners: new Map(), onMessage }
+    instance = { instanceId, installationId, opts: bootOpts, container, iframe, shellOrigin, listeners: new Map(), onMessage }
   }
 
   const destroy = (): void => {
@@ -61,7 +64,7 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
   drainQueue(stub, (method, args) => {
     switch (method) {
       case 'boot':
-        boot(String(args[0]))
+        boot(String(args[0]), args[1])
         break
       case 'open':
       case 'close':
@@ -73,8 +76,8 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
         sendToShell('update', args[0] ?? null)
         break
       case 'on': {
-        const [event, cb] = args as [string, (p: unknown) => void]
-        if (!instance) return
+        const [event, cb] = args as [string, ((p: unknown) => void) | undefined]
+        if (!instance || typeof cb !== 'function') return
         const set = instance.listeners.get(event) ?? new Set()
         set.add(cb)
         instance.listeners.set(event, set)
@@ -98,10 +101,13 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
   })
 }
 
-// Autoarranque cuando se carga como script clásico en una página host (no en tests)
-declare const __VITEST__: boolean | undefined
-if (typeof document !== 'undefined' && typeof __VITEST__ === 'undefined' && document.currentScript) {
-  const currentScript = document.currentScript as HTMLScriptElement
+// Autoarranque cuando se carga como script clásico en una página host.
+// document.currentScript solo está definido durante la ejecución síncrona de
+// un <script> clásico; en un import ESM (p.ej. bajo Vitest) es null, así que
+// esta guarda basta para no auto-arrancar en tests sin depender de globals
+// inyectadas por el bundler.
+if (typeof document !== 'undefined' && document.currentScript instanceof HTMLScriptElement) {
+  const currentScript = document.currentScript
   const shellUrl = currentScript.getAttribute('data-shell') ?? new URL('./shell.html', currentScript.src).href
   bootLoader(window, { shellUrl })
 }

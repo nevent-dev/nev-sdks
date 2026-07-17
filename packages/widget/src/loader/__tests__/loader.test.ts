@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { bootLoader } from '../index'
 import { seal } from '../../protocol/envelope'
 import type { ApiStub } from '../api-queue'
@@ -24,6 +24,13 @@ function bootedInstanceId(): string {
 beforeEach(() => {
   document.body.innerHTML = ''
   delete (window as Window & { NeventWidget?: ApiStub }).NeventWidget
+})
+
+// jsdom crea un browsing context real por cada <iframe> arrancado con boot();
+// sin destroy() estas instancias se acumulan durante el archivo y confunden
+// el teardown del entorno jsdom de Vitest (window[i].close is not a function).
+afterEach(() => {
+  ;(window as Window & { NeventWidget?: ApiStub }).NeventWidget?.('destroy')
 })
 
 describe('loader', () => {
@@ -76,5 +83,28 @@ describe('loader', () => {
     getApi()('identify', 'token-firmado')
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('identify'))
     warn.mockRestore()
+  })
+  it('boot(installationId, opts) reenvía opts al shell en el init', () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    getApi()('boot', 'inst_demo_festival_01', { foo: 1 })
+    const iframe = document.querySelector('iframe')!
+    const post = vi.fn()
+    Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: post } })
+    fakeShellMessage('ready', null, bootedInstanceId())
+    expect(post).toHaveBeenCalledTimes(1)
+    const [env] = post.mock.calls[0]!
+    expect(env).toMatchObject({
+      ns: 'nevw',
+      type: 'init',
+      payload: { installationId: 'inst_demo_festival_01', opts: { foo: 1 } },
+    })
+  })
+  it('on() sin callback no registra nada ni lanza al recibir el evento', () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    getApi()('boot', 'inst_demo_festival_01')
+    const iframe = document.querySelector('iframe')!
+    Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+    expect(() => getApi()('on', 'opened')).not.toThrow()
+    expect(() => fakeShellMessage('opened', null, bootedInstanceId())).not.toThrow()
   })
 })
