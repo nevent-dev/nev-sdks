@@ -36,7 +36,7 @@ export function Composer({ viewState, onSend, onStop }: ComposerProps) {
   return (
     <div class="composer">
       {viewState.showStopButton && (
-        <button class="stopbtn" onClick={onStop}>
+        <button type="button" class="stopbtn" onClick={onStop}>
           <i aria-hidden="true" /> Detener respuesta
         </button>
       )}
@@ -55,12 +55,12 @@ export function Composer({ viewState, onSend, onStop }: ComposerProps) {
           onInput={(e) => setDraft((e.target as HTMLTextAreaElement).value)}
           onKeyDown={onKeyDown}
         />
-        <button class="iconbtn" aria-label="Adjuntar archivo" title="Próximamente" disabled>
+        <button type="button" class="iconbtn" aria-label="Adjuntar archivo" title="Próximamente" disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5L12.5 4a4 4 0 0 1 5.7 5.7L9.7 18.2a2 2 0 0 1-2.9-2.9l8-8" />
           </svg>
         </button>
-        <button class="send" aria-label="Enviar" disabled={sendDisabled} onClick={trySend}>
+        <button type="button" class="send" aria-label="Enviar" disabled={sendDisabled} onClick={trySend}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 12l16-7-4.5 14L11 13z" /><path d="M20 5L11 13" />
           </svg>
