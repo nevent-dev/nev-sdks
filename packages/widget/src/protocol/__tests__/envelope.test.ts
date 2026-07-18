@@ -21,4 +21,7 @@ describe('envelope', () => {
     expect(isCommand('open', LOADER_TO_SHELL)).toBe(true)
     expect(isCommand('eval', LOADER_TO_SHELL)).toBe(false)
   })
+  it('LOADER_TO_SHELL incluye viewport (rev.3: detección móvil la envía el loader, el shell nunca evalúa matchMedia)', () => {
+    expect(LOADER_TO_SHELL).toContain('viewport')
+  })
 })

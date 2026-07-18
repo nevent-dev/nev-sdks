@@ -9,7 +9,7 @@ export interface Envelope<T = unknown> {
   payload: T
 }
 
-export const LOADER_TO_SHELL = ['init', 'open', 'close', 'toggle', 'update', 'destroy', 'consent'] as const
+export const LOADER_TO_SHELL = ['init', 'open', 'close', 'toggle', 'update', 'destroy', 'consent', 'viewport'] as const
 export const SHELL_TO_LOADER = ['ready', 'opened', 'closed', 'unread_changed', 'error', 'resize'] as const
 
 export function seal<T>(type: string, payload: T, instanceId: string): Envelope<T> {
