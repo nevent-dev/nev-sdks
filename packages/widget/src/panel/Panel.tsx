@@ -3,6 +3,7 @@ import type { Transport } from '../transport'
 import { useStoreState } from './use-store'
 import { useFocusTrap } from './focus-trap'
 import { useResizeReport } from './use-resize-report'
+import { useViewportHeight } from './use-viewport-height'
 import { computeViewState } from './view-state'
 import { Header } from './Header'
 import { ConnectionBanner } from './ConnectionBanner'
@@ -42,9 +43,7 @@ export function Panel({ config, transport, onMinimize, onClose, onResize, viewpo
   // decide con la señal del HOST (viewportKind), nunca con matchMedia local.
   const containerRef = useFocusTrap(true, onClose, viewportKind === 'desktop')
   useResizeReport(onResize)
-  // useViewportHeight(viewportKind === 'mobile' ? viewportHeight : null) se
-  // añade en Task 14 (Responsive) — mantener el orden de tareas evita una
-  // referencia a un módulo que aún no existe.
+  useViewportHeight(viewportKind === 'mobile' ? viewportHeight : null)
 
   const trailing = (
     <>

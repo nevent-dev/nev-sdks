@@ -222,3 +222,34 @@ html, body { margin: 0; }
 .file .fs { font-size: 11px; opacity: .72; margin-top: 1px; font-variant-numeric: tabular-nums; }
 .file .bar { height: 3px; border-radius: 2px; background: var(--glass-strong); margin-top: 5px; overflow: hidden; }
 .file .bar i { display: block; height: 100%; width: var(--progress, 0%); background: var(--brand-ink); border-radius: 2px; transition: width .2s; }
+
+/* ===== Responsive real (spec §9: 100dvh + safe-area + VisualViewport —
+   NO una media query de ancho dentro del iframe, ver cabecera de Task 14).
+   [data-viewport] y [data-mode] los fija App.tsx declarativamente en
+   [data-part="root"] (Task 17) — Panel/Launcher no los tocan. ===== */
+[data-part="root"][data-viewport="mobile"][data-mode="launcher"] {
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+[data-part="root"][data-viewport="mobile"][data-mode="panel"] { padding: 0; }
+
+[data-viewport="mobile"] .panel {
+  width: 100vw;
+  height: var(--viewport-h, 100dvh);
+  border-radius: 0;
+  animation: none;
+  /* box-sizing:border-box (Task 13, .panel base) incluye este padding DENTRO
+     de --viewport-h en vez de sumarlo por encima (Important safe-area, ronda
+     2) — si sumara, la caja exterior superaría la altura que el loader dio
+     al iframe y la protección inferior quedaría recortada justo donde más
+     falta hace. Idéntico razonamiento se aplica a left/right (Important
+     safe-area landscape, ronda 3): 100vw ya es el ancho exacto del CSS
+     viewport, así que sumar padding lateral DENTRO de la caja (border-box)
+     nunca desborda — un móvil apaisado con notch lateral (p.ej. iPhone en
+     landscape) necesita esa reserva para que el contenido no quede debajo
+     del recorte físico de la pantalla. */
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+[data-viewport="mobile"] .head { padding-top: calc(10px + env(safe-area-inset-top)); }
