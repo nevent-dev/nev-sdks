@@ -1,4 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render } from 'preact'
 import { startShell } from '../main'
 import { seal } from '../../protocol/envelope'
 import { fixtureConfig } from '../../contract/fixtures'
@@ -31,9 +32,16 @@ function sendCommand(type: string, instanceId: string, source: Window, origin: s
   window.dispatchEvent(new MessageEvent('message', { data: seal(type, null, instanceId), origin, source }))
 }
 
+let currentRoot: HTMLElement
+
 beforeEach(() => {
   document.body.innerHTML = '<div id="root"></div>'
+  currentRoot = document.getElementById('root')!
   window.location.hash = '#nevw_test1'
+})
+
+afterEach(() => {
+  render(null, currentRoot) // desmonta de verdad: ejecuta los cleanups de useEffect (incl. transport.destroy())
 })
 
 describe('shell', () => {
@@ -116,5 +124,31 @@ describe('shell', () => {
     sendInit('nevw_test1', parentSource)
     await vi.waitFor(() => expect(createClient).toHaveBeenCalledTimes(1))
     await vi.waitFor(() => expect(document.querySelector('[data-part=launcher]')).not.toBeNull())
+  })
+
+  it('Critical (latch) — un viewport que llega DURANTE el createClient() async se retiene y App monta con el ÚLTIMO valor recibido, nunca con el fallback desktop inventado', async () => {
+    let resolveClient!: (c: SessionClient) => void
+    const createClient = vi.fn(() => new Promise<SessionClient>((resolve) => { resolveClient = resolve }))
+    const parentPost = vi.fn()
+    const parentSource = makeParentSource(parentPost)
+    startShell(window, { apiBase: 'https://api.test', createClient })
+    sendInit('nevw_test1', parentSource)
+    await vi.waitFor(() => expect(createClient).toHaveBeenCalledTimes(1))
+
+    // Dos viewport llegan MIENTRAS createClient() sigue pendiente — la
+    // ventana de carrera exacta que perdía el mensaje: el bus no tiene NINGÚN
+    // suscriptor todavía (App ni siquiera existe como VNode).
+    window.dispatchEvent(new MessageEvent('message', {
+      data: seal('viewport', { kind: 'desktop', height: 700 }, 'nevw_test1'), origin: PARENT_ORIGIN, source: parentSource,
+    }))
+    window.dispatchEvent(new MessageEvent('message', {
+      data: seal('viewport', { kind: 'mobile', height: 640 }, 'nevw_test1'), origin: PARENT_ORIGIN, source: parentSource,
+    }))
+
+    resolveClient(fakeClient())
+    await vi.waitFor(() => expect(document.querySelector('[data-part=root]')).not.toBeNull())
+    // data-viewport refleja el ÚLTIMO mensaje latcheado (mobile), no el
+    // fallback {kind:'desktop', height:0} inventado ni el primero de los dos.
+    expect(document.querySelector('[data-part=root]')?.getAttribute('data-viewport')).toBe('mobile')
   })
 })

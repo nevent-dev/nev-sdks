@@ -17,15 +17,19 @@ interface ShellOptions {
   createClient?: typeof realCreateSessionClient
 }
 
+interface ViewportPayload { kind: 'mobile' | 'desktop'; height: number }
+
 export function startShell(w: Window, opts: ShellOptions): void {
   const instanceId = w.location.hash.slice(1)
   const createClient = opts.createClient ?? realCreateSessionClient
   let parent: { post: (env: unknown) => void; origin: string; source: Window } | null = null
   let commandCb: ((type: string, payload: unknown) => void) | null = null
+  let latchedViewport: ViewportPayload | null = null
 
   const bus: ShellBus = {
     onCommand: (cb) => { commandCb = cb },
     emit: (type, payload = null) => parent?.post(seal(type, payload, instanceId)),
+    getLatchedViewport: () => latchedViewport,
   }
 
   w.addEventListener('message', (ev: MessageEvent) => {
@@ -48,12 +52,9 @@ export function startShell(w: Window, opts: ShellOptions): void {
         .then((client) => {
           applyTheme(document.documentElement, client.getConfig().theme)
           const root = w.document.getElementById('root')
-          if (root) render(<App config={client.getConfig()} bus={bus} />, root)
+          if (root) render(<App client={client} bus={bus} />, root)
         })
         .catch((err: unknown) => {
-          // TODO(plan de theming): reenviar al parent vía bus.emit('error', ...)
-          // para que el anfitrión pueda reaccionar (p.ej. 403 por embeddingOrigin
-          // no permitido). Por ahora, al menos no morir en silencio.
           console.error('[nevent-widget] fallo al arrancar la sesión', err)
         })
       return
@@ -65,6 +66,18 @@ export function startShell(w: Window, opts: ShellOptions): void {
     // esta comprobación cualquier tercero en la página podría pilotar el
     // widget suplantando al anfitrión real.
     if (!parent || ev.source !== parent.source || ev.origin !== parent.origin) return
+    // Retener el ÚLTIMO viewport SIEMPRE, exista o no ya un App montado
+    // escuchando (commandCb puede seguir siendo null: createClient() es
+    // async). Sin este latch, un viewport que llega durante esa espera se
+    // pierde y App monta con el fallback {kind:'desktop', height:0} inventado
+    // — en móvil, sin otro cambio de breakpoint ni de VisualViewport, nunca
+    // se corrige (Critical, ronda 3).
+    if (env.type === 'viewport') {
+      const p = env.payload as { kind?: unknown; height?: unknown } | null
+      if (p?.kind === 'mobile' || p?.kind === 'desktop') {
+        latchedViewport = { kind: p.kind, height: typeof p.height === 'number' ? p.height : 0 }
+      }
+    }
     commandCb?.(env.type, env.payload)
   })
 
