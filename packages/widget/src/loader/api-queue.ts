@@ -4,10 +4,19 @@ export interface ApiStub {
   (...call: ApiCall): void
   q?: ApiCall[]
   __dispatch?: (method: string, args: unknown[]) => void
+  __installed?: true
 }
 
 export function installGlobalStub(w: Window & { NeventWidget?: ApiStub }): ApiStub {
-  if (w.NeventWidget) return w.NeventWidget
+  const existing = w.NeventWidget
+  // Idempotencia real: solo reutilizamos el global si YA es el stub que este
+  // propio módulo instaló antes (doble inclusión del script). Si el global lo
+  // definió el snippet del anfitrión (el patrón estándar
+  // `window.X = window.X || function(){(...).q.push(arguments)}` que
+  // examples/host-demo.html usa), ese objeto no sabe leer __dispatch: sin este
+  // reemplazo, cualquier llamada posterior al boot (open, close, on...) se
+  // quedaría encolada para siempre porque su cuerpo solo hace push a .q.
+  if (existing?.__installed) return existing
   const stub: ApiStub = (...call: ApiCall) => {
     const dispatch = stub.__dispatch
     if (dispatch) {
@@ -17,6 +26,8 @@ export function installGlobalStub(w: Window & { NeventWidget?: ApiStub }): ApiSt
     }
     ;(stub.q = stub.q ?? []).push(call)
   }
+  stub.__installed = true
+  if (existing?.q?.length) stub.q = existing.q
   w.NeventWidget = stub
   return stub
 }
