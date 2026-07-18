@@ -100,14 +100,3 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
     }
   })
 }
-
-// Autoarranque cuando se carga como script clásico en una página host.
-// document.currentScript solo está definido durante la ejecución síncrona de
-// un <script> clásico; en un import ESM (p.ej. bajo Vitest) es null, así que
-// esta guarda basta para no auto-arrancar en tests sin depender de globals
-// inyectadas por el bundler.
-if (typeof document !== 'undefined' && document.currentScript instanceof HTMLScriptElement) {
-  const currentScript = document.currentScript
-  const shellUrl = currentScript.getAttribute('data-shell') ?? new URL('./shell.html', currentScript.src).href
-  bootLoader(window, { shellUrl })
-}
