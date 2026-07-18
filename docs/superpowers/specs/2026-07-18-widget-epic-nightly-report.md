@@ -56,6 +56,14 @@ Codex pasó cada spec y cada plan por 3-4 vueltas antes de tocar código, cazand
 2. **Bypass del plano legacy `/chatbot`** para GA: sigue público sin las protecciones nuevas. El token widget no lo abre, pero un atacante puede abrir su propia sesión guest legacy. Decisión: endurecer legacy o aceptar el bypass.
 3. 🔴 **Credenciales en claro en `application*.properties` de nev-api** (hallazgo lateral de Codex, no inspeccionado). Rotar + Secrets Manager.
 
+## Backend Plan 2 (conversación) — PLANIFICADO Y CODEX-APROBADO (GO), pendiente de implementar
+Tras cerrar las fundaciones, se planificó el **núcleo de la conversación** (endpoints de mensajes/stream/cancel/events — el desbloqueo real). El plan (`nev-api/docs/superpowers/plans/2026-07-18-widget-backend-conversation.md`, 15 tareas, 6063 líneas) **pasó el gate de Codex con GO sin reservas** tras 5 rondas de convergencia (11→6→6→3→GO). Toda la profundidad transaccional está resuelta y aprobada:
+- **Motor de generación propio del widget** (`WidgetGenerationService`) que reutiliza los adapters IA (Gemini/OpenAI/Anthropic) + RAG documental, pero es dueño de su persistencia vía `WidgetEventPublisher` — cero efectos del streaming legacy, así CANCELLED = puro no-append.
+- Admisión atómica (guest+conversación+turno+evento+reserva en una tx, upsert sin huérfanos), cuota autoritativa ligada al turnId sin decremento al cancelar, fencing de lease por intento (worker superado por takeover para sin completar), replay sin huecos (seq contiguo + 409 en hueco), Redis gobernado por propiedad, rate-limit fixed-window Lua con trusted-proxy.
+- **Decisión de producto anotada:** el output-guardrail obliga a bufferizar la respuesta antes de emitir chunks sanitizados → el streaming no es token-a-token en v1 (correctness-first; el contrato SSE no cambia). Refinamiento futuro: sanitización incremental.
+
+**La implementación de sus 15 tareas es la próxima sesión** (código transaccional Mongo intrincado — se hace bien con capacidad fresca, no a la hora 7). Arranca desde un plan Codex-aprobado: ejecutar el pipeline gateado (subagentes Sonnet + doble revisión), igual que Plan 1.
+
 ## Qué falta para la integración final completa (trabajo de próximas sesiones)
 La integración "landing → widget → nev-api local → escalado → bandeja admin → agente → widget" **no es alcanzable con solo fundaciones**: requiere
 - **Backend `/widget/v1` Planes 2-4:** endpoints de mensajes (`POST /messages` con Idempotency-Key), streaming del turno (`POST /stream`), canal de eventos (`GET /events` SSE + `/events/poll`), integración CAS del handoff, cancelación, rate-limit + cuota atómica, uploads. **Sin estos endpoints, no hay conversación real que integrar** — hoy el backend solo tiene bootstrap+sesión+config.
