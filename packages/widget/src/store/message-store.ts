@@ -88,6 +88,18 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   }
   const indexOf = (pred: (m: StoredMessage) => boolean): number => messages.findIndex(pred)
 
+  // Fail paths (HTTP error / stream disconnect) never carry the server messageId
+  // the way the ack / done frame do, and the durable message.created payload
+  // carries no back-reference to clientId/turnId either — so, unlike
+  // ackOptimistic/finishBotTurn, there is no id to reconcile against exactly.
+  // Best-effort fallback: if a durable message of the same role arrived no
+  // earlier than this placeholder, the send actually succeeded server-side and
+  // this placeholder is superseded — drop it instead of marking it failed.
+  // Residual limitation: two concurrent unacked sends of the same role cannot
+  // be told apart by this signal (see P2 task 5 report).
+  const supersededByDurable = (placeholder: StoredMessage, role: StoredMessage['role']): boolean =>
+    messages.some((m) => m.seq !== null && m.role === role && Date.parse(m.createdAt) >= Date.parse(placeholder.createdAt))
+
   const mergeSnapshotMessages = (base: StoredMessage[], snap: MessagesSnapshot): StoredMessage[] => {
     const next = base.slice()
     for (const m of snap.messages) {
@@ -184,7 +196,15 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     }
     setMessages(next)
   }
-  const failOptimistic = (clientId: string): void => setStatus(clientId, 'failed')
+  const failOptimistic = (clientId: string): void => {
+    const oi = indexOf((m) => m.clientId === clientId)
+    if (oi === -1) return
+    const placeholder = messages[oi]!
+    const next = messages.slice()
+    if (supersededByDurable(placeholder, 'user')) next.splice(oi, 1) // durable twin arrived: send actually succeeded
+    else next[oi] = { ...placeholder, status: 'failed' }
+    setMessages(next)
+  }
   const retryOptimistic = (clientId: string): void => setStatus(clientId, 'pending')
 
   const beginBotTurn = (turnId: string): void => {
@@ -219,7 +239,8 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     if (i === -1) return
     const m = messages[i]!
     const next = messages.slice()
-    if (m.text === '') next.splice(i, 1)
+    if (supersededByDurable(m, 'bot')) next.splice(i, 1) // durable twin arrived: the turn actually completed
+    else if (m.text === '') next.splice(i, 1)
     else next[i] = { ...m, streaming: false, turnId: null }
     setMessages(next)
   }

@@ -37,6 +37,23 @@ describe('message store — optimistic + streaming', () => {
     expect(s.getState().messages[0]?.status).toBe('pending')
   })
 
+  it('durable-before-failOptimistic: the send actually succeeded, so the placeholder is dropped, not failed', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.applyDurableEvent(msgEvent(2, 'msg_srv', 'user', 'Hola')) // durable wins the race (send succeeded server-side)
+    s.failOptimistic('cid_1') // the client's HTTP call itself timed out
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', status: 'sent' })
+  })
+
+  it('failOptimistic with NO durable twin still marks failed (regression)', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.failOptimistic('cid_1')
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'cid_1', status: 'failed' })
+  })
+
   it('streams a bot turn: begin → deltas accumulate → done finalizes with messageId', () => {
     const s = createMessageStore(clock)
     s.beginBotTurn('t1')
@@ -81,6 +98,24 @@ describe('message store — optimistic + streaming', () => {
     s.beginBotTurn('t_empty'); s.failBotTurn('t_empty')
     expect(s.getState().messages).toHaveLength(0)
     s.beginBotTurn('t_partial'); s.appendBotDelta('t_partial', 'a medias'); s.failBotTurn('t_partial')
+    expect(s.getState().messages[0]).toMatchObject({ streaming: false, text: 'a medias' })
+  })
+
+  it('durable-before-failBotTurn: the turn actually completed, so the placeholder is dropped, not failed', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1')
+    s.appendBotDelta('t1', 'texto final') // all deltas landed before the disconnect
+    s.applyDurableEvent(msgEvent(5, 'msg_bot', 'bot', 'texto final')) // durable replay beats the stream teardown
+    s.failBotTurn('t1') // the stream disconnected after the durable replay
+    const bots = s.getState().messages.filter((m) => m.role === 'bot')
+    expect(bots).toHaveLength(1)
+    expect(bots[0]).toMatchObject({ id: 'msg_bot', status: 'sent' })
+  })
+
+  it('failBotTurn with NO durable twin still marks failed / drops empty (regression)', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1'); s.appendBotDelta('t1', 'a medias'); s.failBotTurn('t1')
+    expect(s.getState().messages).toHaveLength(1)
     expect(s.getState().messages[0]).toMatchObject({ streaming: false, text: 'a medias' })
   })
 
