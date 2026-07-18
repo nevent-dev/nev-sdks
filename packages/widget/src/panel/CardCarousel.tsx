@@ -35,7 +35,7 @@ export function CardCarousel({ items, onAction }: CardCarouselProps) {
             <div class="d">{item.description}</div>
             {/* <button>, no el <span class="act"> del mock — sin teclado
                 accesible en origen (spec §6: navegable 100% por teclado). */}
-            <button class="act" onClick={() => handle(item.action)}>{item.action.label}</button>
+            <button type="button" class="act" onClick={() => handle(item.action)}>{item.action.label}</button>
           </div>
         </div>
       ))}

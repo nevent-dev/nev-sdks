@@ -11,6 +11,10 @@
   --accent-sun-a: #f59e0b; --accent-sun-b: #ef4444;
   --bubble-user: var(--brand-a); --bubble-user-ink: var(--brand-ink);
   --bubble-bot: var(--surface-2); --bubble-bot-ink: var(--ink);
+  /* Superficies derivadas del rich content — invariantes al tema (scrim siempre oscuro) */
+  --scrim: rgba(12, 13, 16, .75); --on-scrim: #fff;
+  --file-user-bg: color-mix(in srgb, #fff 14%, var(--brand-a));
+  --glass: rgba(255, 255, 255, .2); --glass-strong: rgba(255, 255, 255, .28);
   --shadow-panel: 0 24px 64px rgba(16, 19, 25, .16), 0 4px 16px rgba(16, 19, 25, .08);
   --shadow-bubble: 0 8px 24px rgba(109, 74, 255, .35);
   --r-panel: 20px; --r-bubble: 14px;

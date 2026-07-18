@@ -150,7 +150,7 @@
 .card { scroll-snap-align: start; flex: 0 0 200px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
 .card .img { height: 78px; background: var(--brand-grad); position: relative; }
 .card .img.sun { background: linear-gradient(135deg, var(--accent-sun-a), var(--accent-sun-b)); }
-.card .img .price { position: absolute; right: 8px; bottom: 8px; background: rgba(12, 13, 16, .75); color: #fff; font: 600 11.5px var(--font-body); padding: 3px 8px; border-radius: 99px; }
+.card .img .price { position: absolute; right: 8px; bottom: 8px; background: var(--scrim); color: var(--on-scrim); font: 600 11.5px var(--font-body); padding: 3px 8px; border-radius: 99px; }
 .card .bd { padding: 10px 12px 12px; }
 .card .bd .t { font: 600 13px var(--font-display); color: var(--ink); }
 .card .bd .d { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
@@ -169,11 +169,11 @@
    este plan; era CSS muerto — Important #8, ronda 2). */
 .file { display: flex; align-items: center; gap: 9px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; min-width: 210px; }
 .file-meta { flex: 1; }
-.file-user { background: color-mix(in srgb, #fff 14%, var(--brand-a)); border-color: transparent; color: var(--brand-ink); }
+.file-user { background: var(--file-user-bg); border-color: transparent; color: var(--brand-ink); }
 .file .fi { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-soft); color: var(--brand-a); display: grid; place-items: center; flex-shrink: 0; }
-.file-user .fi { background: rgba(255, 255, 255, .2); color: #fff; }
+.file-user .fi { background: var(--glass); color: var(--brand-ink); }
 .file .fi svg { width: 15px; height: 15px; }
 .file .fn { font: 500 12.5px var(--font-body); color: inherit; }
 .file .fs { font-size: 11px; opacity: .72; margin-top: 1px; font-variant-numeric: tabular-nums; }
-.file .bar { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .28); margin-top: 5px; overflow: hidden; }
-.file .bar i { display: block; height: 100%; width: var(--progress, 0%); background: #fff; border-radius: 2px; transition: width .2s; }
+.file .bar { height: 3px; border-radius: 2px; background: var(--glass-strong); margin-top: 5px; overflow: hidden; }
+.file .bar i { display: block; height: 100%; width: var(--progress, 0%); background: var(--brand-ink); border-radius: 2px; transition: width .2s; }
