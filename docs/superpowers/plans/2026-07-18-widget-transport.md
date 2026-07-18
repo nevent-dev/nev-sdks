@@ -2035,9 +2035,19 @@ function durableEvent(seq: number, id: string, text: string) {
   }
 }
 const EMPTY: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_0' }
-function sseThenError(frames: string[]): Response { // emits frames, then errors the body (a real drop)
+function sseThenError(frames: string[]): Response {
+  // A pull-driven stream: each pull delivers one frame; once frames are
+  // exhausted the NEXT pull errors. This guarantees the consumer READS the
+  // frame before the drop (enqueue + error in the same start() would discard
+  // the queued chunk — the error tears the stream down before it is read).
   const enc = new TextEncoder()
-  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.error(new Error('drop')) } })
+  let i = 0
+  const body = new ReadableStream<Uint8Array>({
+    pull(c) {
+      if (i < frames.length) c.enqueue(enc.encode(frames[i++]!))
+      else c.error(new Error('drop'))
+    },
+  })
   return new Response(body, { status: 200 })
 }
 
@@ -2359,10 +2369,16 @@ function sseOpen(frames: string[]): Response { // parks open
   const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)) } })
   return new Response(body, { status: 200 })
 }
-function sseErr(frames: string[]): Response { // emits frames, then a REAL error (network drop mid-stream)
+function controllableSse(frames: string[]): { response: Response; error: () => void } {
+  // Emits frames now, but the ERROR is fired by the test — AFTER it has observed
+  // the frame land in the store — so the drop is provably "frame delivered, then
+  // dropped", not a stream torn down before its chunk was read.
   const enc = new TextEncoder()
-  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.error(new Error('drop')) } })
-  return new Response(body, { status: 200 })
+  let ctrl!: ReadableStreamDefaultController<Uint8Array>
+  const body = new ReadableStream<Uint8Array>({
+    start(c) { ctrl = c; for (const f of frames) c.enqueue(enc.encode(f)) },
+  })
+  return { response: new Response(body, { status: 200 }), error: () => ctrl.error(new Error('drop')) }
 }
 const immediate: Scheduler = { setTimeout: (fn) => { queueMicrotask(fn); return 0 }, clearTimeout: () => {} }
 const EMPTY: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_0' }
@@ -2417,6 +2433,7 @@ describe('createTransport (integration)', () => {
   it('a stream that ERRORS after delivering an event reconciles and dedups the overlap (gap-free)', async () => {
     n = 0
     let eventsCall = 0
+    let firstStream: { response: Response; error: () => void } | null = null
     const authorizedFetch = vi.fn(async (path: string) => {
       if (path.includes('/messages') && path.includes('limit')) {
         // after the drop, the re-snapshot returns m2 (overlap) + the missed m3
@@ -2426,15 +2443,20 @@ describe('createTransport (integration)', () => {
       }
       if (path.includes('/events?')) {
         eventsCall += 1
-        if (eventsCall === 1) return sseErr([botEvt(2, 'm2', 'primero')]) // delivers m2, then a real error drop
-        return sseOpen([]) // subsequent stream parks quietly
+        if (eventsCall === 1) { firstStream = controllableSse([botEvt(2, 'm2', 'primero')]); return firstStream.response }
+        return sseOpen([]) // the post-reconnect stream parks quietly
       }
       return jsonRes({})
     })
     const t = createTransport(fakeClient(authorizedFetch), opts())
     t.openChannel()
+    // 1) the SSE frame m2 is delivered and applied to the store...
+    await vi.waitFor(() => expect(t.store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    // 2) ...THEN we drop the live stream with a real error...
+    firstStream!.error()
+    // 3) ...the channel reconciles (the re-snapshot brings the missed m3) and dedups the m2 overlap.
     await vi.waitFor(() => expect(t.store.getState().messages.some((m) => m.id === 'm3')).toBe(true))
-    expect(t.store.getState().messages.filter((m) => m.id === 'm2')).toHaveLength(1) // overlap deduped
+    expect(t.store.getState().messages.filter((m) => m.id === 'm2')).toHaveLength(1)
     t.destroy()
   })
 })
@@ -2550,7 +2572,7 @@ Deferred (out of scope, declared): visual panel/10 states (Plan 3); theming; ric
 
 **2. Codex rev.1 blockers — each closed:** (1) Task 6 throws `stream_incomplete`; Task 3 abort-unblock + decoder flush. (2) Task 5 `finishBotTurn` no-cursor; Task 4 `replaceSnapshot`; Task 9 generation guard. (3) Task 4 seq-guarded state/agent + immutable; Task 5 both race orders. (4) Task 9 progress-only failure reset + single loop + poll cursor; Task 8 breaker removed. (5) Task 4 `ConversationState | null`. (6) Task 7 no auto-resend, degrade-subsequent, `AbortError` no-fallback, open-on-accepted. (7) Task 9 chained single-loop + offline connection; every channel test `close()`s.
 
-**2b. Codex rev.2 blockers — each closed:** (A) Task 4 `getState` deep-freezes array + every message; `applySnapshot`/`replaceSnapshot` mutate then `notify()` once (atomic). (B) Task 4 `replaceSnapshot` resets agent identity **and** `lastAgentSeq=-1` so a valid lower-seq `agent.joined` re-applies (test added). (C) Task 9 `consecutiveFailures` hoisted + zeroed on first frame (test: frame-then-error never polls); `pollOnce` applies `body.cursor` monotonically via `advanceCursorTo` (test with 0 events); 409-from-poll resets failures + hard-reconciles (test). (D) Task 9 chained `launch()` + shared per-run `AbortController` (no concurrent reconciliation after suspend→resume); Task 11 drop test uses `controller.error(...)`, not a clean `close()`.
+**2b. Codex rev.2 blockers — each closed:** (A) Task 4 `getState` deep-freezes array + every message; `applySnapshot`/`replaceSnapshot` mutate then `notify()` once (atomic). (B) Task 4 `replaceSnapshot` resets agent identity **and** `lastAgentSeq=-1` so a valid lower-seq `agent.joined` re-applies (test added). (C) Task 9 `consecutiveFailures` hoisted + zeroed on first frame (test: frame-then-error never polls); `pollOnce` applies `body.cursor` monotonically via `advanceCursorTo` (test with 0 events); 409-from-poll resets failures + hard-reconciles (test). (D) Task 9 chained `launch()` + shared per-run `AbortController` (no concurrent reconciliation after suspend→resume); the drop is a real `controller.error(...)` **after the frame is read** — Task 9's helper is pull-driven (frame on one pull, error on the next), Task 11's is test-driven (the test fires the error only after it observes m2 in the store), so neither discards the queued frame.
 
 **3. Placeholder scan:** no `TODO`/`TBD`/"add error handling"/"similar to Task N". Every code step ships complete code; every test step ships real assertions.
 
