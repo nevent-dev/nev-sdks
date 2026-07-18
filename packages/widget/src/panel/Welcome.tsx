@@ -20,7 +20,7 @@ export function Welcome({ config, onChip }: WelcomeProps) {
       {welcome.quickReplies.length > 0 && (
         <div class="chips">
           {welcome.quickReplies.map((text) => (
-            <button key={text} class="chip" onClick={() => onChip(text)}>{text}</button>
+            <button key={text} type="button" class="chip" onClick={() => onChip(text)}>{text}</button>
           ))}
         </div>
       )}
