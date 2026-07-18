@@ -2,31 +2,48 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the headless transport + observable state store behind the widget panel — message store (single source of truth), optimistic send with idempotency, bot-turn SSE streaming with cancel, a durable inbound events channel with reconciliation/dedup, a client-view state machine driven only by server events, polling fallback, and page-lifecycle wiring — all tested via jsdom + mocked `fetch`/`ReadableStream`.
+**Goal:** Build the headless transport + observable state store behind the widget panel — message store (single immutable source of truth), optimistic send with idempotency, bot-turn SSE streaming with cancel, a durable inbound events channel with reconciliation/dedup, a client-view state machine driven only by server events, polling fallback, and page-lifecycle wiring — all tested via jsdom + mocked `fetch`/`ReadableStream`.
 
-**Architecture:** A `createMessageStore()` closure holds the only mutable state (messages, conversation state, cursor, agent identity, connection status) and is observable via `subscribe`/`getState` so the Plan 3 panel can consume it with `useSyncExternalStore`. A generic fetch-streaming SSE parser feeds two consumers: `runStreamingTurn` (POST `/stream`) and the `EventsChannel` (GET `/events`). The channel does head-first reconciliation (snapshot → tail), dedups by `eventId`/`messageId`, reconnects with backoff+jitter+circuit-breaker, and falls back to `/events/poll` after two consecutive stream failures. The state machine `BOT_ACTIVE → ESCALATED_WAITING → AGENT_ACTIVE → RESOLVED` is set **only** from server `conversation.state_changed` events and snapshots — never inferred from message contents. A `createTransport(client)` facade wires store + sender + channel + lifecycle into one object the shell (Plan 3) consumes.
+**Architecture:** A `createMessageStore()` closure holds the only mutable state (messages, conversation state, cursor, agent identity, connection status) with **copy-on-write** so every published snapshot is immutable; it is observable via `subscribe`/`getState` so the Plan 3 panel can consume it with `useSyncExternalStore`. A generic fetch-streaming SSE parser feeds two consumers: `runStreamingTurn` (POST `/stream`) and the `EventsChannel` (GET `/events`). The channel runs a **single generation-serialized loop**: head-first reconciliation (snapshot → tail), dedup by `eventId`/`messageId`, reconnect with jittered/capped backoff, and fallback to `/events/poll` after two consecutive stream failures. The state machine `BOT_ACTIVE → ESCALATED_WAITING → AGENT_ACTIVE → RESOLVED` starts **null** and is set **only** from server `conversation.state_changed` events and snapshots (monotonic by seq — old replays never revert it). A `createTransport(client)` facade wires store + sender + channel + lifecycle into one object the shell (Plan 3) consumes.
 
 **Tech Stack:** TypeScript (strict + `exactOptionalPropertyTypes` + `noUncheckedIndexedAccess`), Preact (Plan 3 only — Plan 2 is headless), Vitest + jsdom, `fetch` + `ReadableStream` (WHATWG streams), `crypto.randomUUID()`.
+
+## Codex rev.1 NO-GO → rev.2 resolution map
+
+Codex reviewed the rev.1 plan and returned NO-GO with 7 blockers (all correct). This rev.2 resolves each:
+
+| # | Blocker | Resolved in |
+|---|---|---|
+| 1 | Turn drop after accepted/delta silently "succeeds"; abort can't cancel a blocked read; TextDecoder not flushed | Task 3 (abort-unblock + flush) + Task 6 (`runStreamingTurn` throws `stream_incomplete` on EOF-without-DONE; distinguishes `AbortError`) |
+| 2 | `finishBotTurn` advances the durable cursor with a lateral eventId (skips intermediate `state_changed`); 409 can't lower the cursor; stale reconciliations apply after close/suspend | Task 5 (`finishBotTurn` never touches cursor) + Task 4 (`replaceSnapshot` hard reset) + Task 9 (generation-serialized loop) |
+| 3 | Old overlapping replays revert state/agent identity; durable-before-ack and durable-before-finish both duplicate; store mutates previously published objects | Task 4 (seq-guarded state/agent, immutable copy-on-write) + Task 5 (both race orders dedup) |
+| 4 | Polling never reached: a 200 that opens then drops resets `consecutiveFailures` | Task 9 (failures reset only on **progress** = first frame; single loop; poll consumes its own cursor; real reset on 409; circuit breaker realized as capped/jittered backoff + polling — separate breaker object removed, Task 8) |
+| 5 | Server-only state violated by defaulting to `BOT_ACTIVE` | Task 4 (`ConversationState \| null` until first snapshot/event; older snapshot/replay can't lower state) |
+| 6 | Plan auto-resends via `/messages` after a `/stream` drop but the test expects `failed`; cancel triggers fallback; channel opens before the conversation exists | Task 7 (no auto-resend of the **current** message; degrade only **subsequent** sends; `AbortError` never falls back; channel opens on `accepted`/2xx) |
+| 7 | `resume()` not idempotent; grouped lifecycle events cause concurrent reconciliations; offline doesn't set `connection='offline'`; tests leak channels/timers | Task 9 (`running` guard + generation; offline path sets `connection`) + Task 10 + every channel test calls `close()` and injects a scheduler |
 
 ## Global Constraints
 
 - **Package / worktree:** `packages/widget` in worktree `/Users/mblanco/Desarrollo/nev-sdks-worktrees/widget-rewrite`. Branch `feat/widget-rewrite` (Plan 1 already merged in).
-- **TS strictness:** `strict: true`, `exactOptionalPropertyTypes: true`, `noUncheckedIndexedAccess: true`, `noImplicitOverride: true`. **Zero `@ts-ignore`.** Optional object properties must be omitted (not set to `undefined`); array/`Map.get` results are `T | undefined` and must be narrowed before use.
+- **TS strictness:** `strict: true`, `exactOptionalPropertyTypes: true`, `noUncheckedIndexedAccess: true`, `noImplicitOverride: true`. **Zero `@ts-ignore`.** Optional object properties must be omitted (not set to `undefined`); array index and `Map.get` results are `T | undefined` and must be narrowed (or `!`-asserted only after an explicit `!== -1`/`has` check) before use.
 - **Reuse, do not reinvent:** all authenticated HTTP goes through `SessionClient.authorizedFetch(path, init?)` from `src/shell/session.ts` (adds `Authorization: Bearer`, refreshes+retries once on 401). Do **not** create a second auth path. `path` starts with `/widget/v1/...`; `authorizedFetch` prepends the API base.
-- **Reuse contract types:** `WidgetEvent`, `WidgetConfig`, `WidgetSession` from `src/contract/types.ts`. Extend that file (additively) for wire shapes not yet defined (turn frames, ephemeral events, snapshot, poll) — Task 1 does this and notes it.
+- **Reuse contract types:** `WidgetEvent`, `WidgetConfig`, `WidgetSession` from `src/contract/types.ts`. Extend that file (additively) for wire shapes not yet defined — Task 1 does this and notes it.
 - **EventSource is banned** (cannot send `Authorization`). All SSE is consumed via `fetch` streaming + the parser in Task 3.
-- **SSE parser must handle:** partial chunks split mid-event, `\r\n` and `\n` line endings, comment/heartbeat lines (`:` prefix), the `accepted`/`delta`(s)/`DONE`/`ERROR` turn vocabulary and the `message.created`/`conversation.state_changed`/`agent.joined`/`agent.typing` event vocabulary, and reconnection carrying the cursor via `?after=` query (not `Last-Event-ID`).
-- **Cursor = `eventId`**, format `evt_v1_{conversationId}_{seq}` (backend spec §2.4). The client sends the full `eventId` string as `?after=`; it derives the numeric `seq` (trailing segment) only for local ordering/dedup.
-- **State is server-dictated:** conversation state changes **only** on a `conversation.state_changed` event or a snapshot `state` field. The client never infers state by walking messages.
-- **Testing:** Vitest + jsdom. Mock `fetch` and build `ReadableStream`s by hand. No real network, no timers left running (inject a scheduler where delays matter). Every task ends green (`npm test` for the touched files).
+- **Immutable store (Codex #3):** every value returned by `getState()` is a frozen object built by copy-on-write. Mutators never mutate a `StoredMessage` or array that a prior `getState()` handed out — they always create new objects. `getState()` returns a stable reference between mutations (`useSyncExternalStore`-safe).
+- **Server-dictated state (Codex #5):** `conversationState` starts `null` and changes **only** on a `conversation.state_changed` event or a snapshot `state`, and only when the change is **newer by seq** (never revert on an old replay). The client never infers state by walking messages.
+- **Durable cursor ownership (Codex #2):** only a snapshot, a durable SSE event, or a poll response advances/sets the cursor. `finishBotTurn()` (the bot-turn DONE) must **never** advance the cursor nor mark an eventId applied — the authoritative `message.created` arrives via the channel and carries the real seq.
+- **Generation serialization (Codex #2/#7):** the channel tags each reconcile/connect/poll run with a generation captured at start; `open/close/suspend/resume` bump the generation; no async continuation applies store data unless its generation is still current.
+- **Cursor = `eventId`**, format `evt_v1_{conversationId}_{seq}` (backend §2.4). The client sends the full string as `?after=`; it derives the numeric `seq` (trailing segment) only for ordering/dedup.
+- **Testing:** Vitest + jsdom. Mock `fetch`; build `ReadableStream`s by hand; inject a `Scheduler` wherever delays matter (never real timers). Every channel test ends with `close()`. Every task ends green.
 - **Commits:** Conventional Commits, in Castilian Spanish (e.g. `feat(widget): parser SSE por fetch-streaming`). One commit per task.
 - **Run tests from the package dir:** `cd /Users/mblanco/Desarrollo/nev-sdks-worktrees/widget-rewrite/packages/widget`. Single file: `npx vitest run src/<path>.test.ts`. Typecheck: `npm run typecheck`.
 
 ### Out of scope (deferred)
 
-- **Plan 3 (visual panel):** rendering the 10 mock states, the composer, scroll behavior, focus/a11y, theming/tokens. Plan 2 only exposes the observable store + transport API the panel binds to.
-- **Plan 4:** rich content schema rendering, file upload flow, feedback 👍/👎 wire calls, i18n. (The store carries plain message text only; rich payloads are a Plan 4 concern.)
-- **Bootstrap/session** (`config`/`sessions`/`refresh`) — owned by Plan 1's `session.ts`. Plan 2 consumes `SessionClient` as-is. Note: Plan 1's `WidgetSession` has `guestHandle` while the backend contract §4.1 returns `resumeSecret`; reconciling that is a bootstrap concern, not Plan 2.
+- **Plan 3 (visual panel):** rendering the 10 mock states, composer, scroll, focus/a11y, theming/tokens. Plan 2 only exposes the observable store + transport API.
+- **Plan 4:** rich content schema rendering, file upload flow, feedback 👍/👎 wire calls, i18n.
+- **Bootstrap/session** (`config`/`sessions`/`refresh`) — owned by Plan 1's `session.ts`. Plan 2 consumes `SessionClient` as-is. (Plan 1's `WidgetSession.guestHandle` vs backend `resumeSecret` is encapsulated by `authorizedFetch` and reconciled in the bootstrap layer — not this plan.)
+- **Circuit breaker as a distinct object:** realized here as capped + jittered backoff plus the polling fallback; there is no separate breaker class (avoids dead code).
 
 ---
 
@@ -34,19 +51,19 @@
 
 | File | Responsibility |
 |---|---|
-| `src/contract/types.ts` (modify) | Add wire types: `ConversationState`, `TurnStreamFrame`, `WidgetEphemeralEvent`, `WidgetMessage`, `MessagesSnapshot`, `EventsPollResponse`. |
-| `src/contract/fixtures.ts` (modify) | Add fixtures for the new shapes so store/channel tests share one contract source. |
-| `src/transport/cursor.ts` | `cursorSeq(eventId)` + `isNewerCursor(a,b)` — derive/compare `seq` from the durable cursor string. |
-| `src/transport/sse.ts` | `parseSSEStream(body, signal?)` — generic fetch-streaming SSE frame parser. |
-| `src/store/message-store.ts` | `createMessageStore()` — the single observable source of truth (state, dedup, optimistic, streaming buffer, connection). |
-| `src/transport/turn.ts` | `runStreamingTurn(...)` — consume the POST `/stream` SSE into store handlers. |
-| `src/transport/send.ts` | `createSender(...)` — optimistic send, idempotency keys, streaming↔non-streaming, retry, cancel. |
-| `src/transport/backoff.ts` | `createBackoff(...)` — exponential backoff + jitter + circuit breaker. |
-| `src/transport/events-channel.ts` | `createEventsChannel(...)` — reconcile, consume, dedup, reconnect, poll fallback, lifecycle. |
-| `src/shell/lifecycle.ts` | `bindPageLifecycle(target, handlers)` — freeze/resume/pageshow/online/offline/visibilitychange → suspend/resume. |
-| `src/transport/index.ts` | `createTransport(client, opts?)` — facade wiring store + sender + channel + lifecycle for the shell. |
+| `src/contract/types.ts` (modify) | Wire types: `ConversationState`, `TurnStreamFrame`, `WidgetEphemeralEvent`, `WidgetMessage`, `MessagesSnapshot`, `EventsPollResponse`. |
+| `src/contract/fixtures.ts` (modify) | Fixtures for the new shapes (shared contract source for tests). |
+| `src/transport/cursor.ts` | `cursorSeq` / `isNewerCursor`. |
+| `src/transport/sse.ts` | `parseSSEStream` — fetch-streaming SSE parser (partial chunks, abort-unblock, decoder flush). |
+| `src/store/message-store.ts` | `createMessageStore` — immutable observable source of truth. |
+| `src/transport/turn.ts` | `runStreamingTurn` — consume POST `/stream`; throw on incomplete; propagate abort. |
+| `src/transport/send.ts` | `createSender` — optimistic send, idempotency, degrade-subsequent, retry, cancel. |
+| `src/transport/backoff.ts` | `createBackoff` — capped exponential backoff + jitter. |
+| `src/transport/events-channel.ts` | `createEventsChannel` — generation-serialized loop: reconcile, consume, dedup, 409 hard reset, reconnect, polling, offline, suspend/resume. |
+| `src/shell/lifecycle.ts` | `bindPageLifecycle` — freeze/resume/pageshow/online/offline/visibilitychange → suspend/resume. |
+| `src/transport/index.ts` | `createTransport` — facade wiring store + sender + channel + lifecycle. |
 
-Each `src/x/y.ts` has its tests in `src/x/__tests__/y.test.ts` (matching the existing convention: `vitest.config.ts` includes `src/**/__tests__/**/*.test.{ts,tsx}`).
+Tests live in `src/<dir>/__tests__/<name>.test.ts` (existing convention; `vitest.config.ts` includes `src/**/__tests__/**/*.test.{ts,tsx}`).
 
 ---
 
@@ -58,18 +75,20 @@ Each `src/x/y.ts` has its tests in `src/x/__tests__/y.test.ts` (matching the exi
 - Test: `src/contract/__tests__/fixtures.test.ts` (extend existing)
 
 **Interfaces:**
-- Consumes: existing `WidgetEvent`, `WidgetConfig`, `WidgetSession` (unchanged).
+- Consumes: existing `WidgetEvent`, `WidgetConfig`, `WidgetSession` (unchanged shapes).
 - Produces: `ConversationState`, `TurnStreamFrame`, `WidgetEphemeralEvent`, `WidgetMessage`, `MessagesSnapshot`, `EventsPollResponse`; fixtures `fixtureSnapshot()`, `fixtureTurnFrames()`, `fixturePollResponse()`.
 
 - [ ] **Step 1: Add the wire types to `src/contract/types.ts`**
 
-Append to the end of `src/contract/types.ts`. Also replace the inline state union in the existing `conversation.state_changed` variant with the new alias (identical literals — additive, keeps one definition):
+Append to the end of the file, then update the existing `conversation.state_changed` variant to use the alias:
 
 ```typescript
 export type ConversationState = 'BOT_ACTIVE' | 'ESCALATED_WAITING' | 'AGENT_ACTIVE' | 'RESOLVED'
 
 // Frames of the bot-turn stream (POST /widget/v1/conversations/current/stream).
-// Vocabulary per backend §4.2: accepted → delta(s) → DONE | ERROR.
+// Vocabulary per backend §4.2: accepted → delta(s) → DONE | ERROR. `done` still
+// carries eventId on the wire; the client does not use it to move the cursor
+// (the authoritative message.created arrives via the durable channel).
 export type TurnStreamFrame =
   | { type: 'accepted'; turnId: string; userMessageId: string }
   | { type: 'delta'; turnId: string; seq: number; delta: string }
@@ -104,7 +123,7 @@ export interface EventsPollResponse {
 }
 ```
 
-Then edit the existing `conversation.state_changed` line so the payload references the alias:
+Edit the existing `conversation.state_changed` line to reference the alias (identical literals):
 
 ```typescript
   | (EventBase & { type: 'conversation.state_changed'; payload: { state: ConversationState } })
@@ -112,7 +131,7 @@ Then edit the existing `conversation.state_changed` line so the payload referenc
 
 - [ ] **Step 2: Add fixtures to `src/contract/fixtures.ts`**
 
-Append (keep the existing `import type` line; add the new names to it):
+Replace the existing `import type` line with the extended one and append the fixtures:
 
 ```typescript
 import type {
@@ -145,9 +164,7 @@ export function fixturePollResponse(): EventsPollResponse {
 }
 ```
 
-- [ ] **Step 3: Write the failing test**
-
-Append to `src/contract/__tests__/fixtures.test.ts` (add the new imports to the existing import line):
+- [ ] **Step 3: Write the failing test** — append to `src/contract/__tests__/fixtures.test.ts` (add imports to the existing import line):
 
 ```typescript
 import { fixtureSnapshot, fixtureTurnFrames, fixturePollResponse } from '../fixtures'
@@ -160,8 +177,7 @@ describe('transport fixtures', () => {
     expect(s.messages[0]?.messageId).toBe('msg_0001')
   })
   it('turn frames end in a done frame with messageId + eventId', () => {
-    const frames = fixtureTurnFrames()
-    const last = frames.at(-1)
+    const last = fixtureTurnFrames().at(-1)
     expect(last?.type).toBe('done')
     if (last?.type === 'done') {
       expect(last.messageId).toBe('msg_bot_1')
@@ -176,17 +192,9 @@ describe('transport fixtures', () => {
 })
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [ ] **Step 4: Run + typecheck** — `npx vitest run src/contract/__tests__/fixtures.test.ts && npm run typecheck` → PASS, no type errors.
 
-Run: `npx vitest run src/contract/__tests__/fixtures.test.ts`
-Expected: PASS (new + existing cases green).
-
-- [ ] **Step 5: Typecheck**
-
-Run: `npm run typecheck`
-Expected: no errors.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/contract/types.ts src/contract/fixtures.ts src/contract/__tests__/fixtures.test.ts
@@ -204,9 +212,7 @@ git commit -m "feat(widget): tipos y fixtures de transporte (turno, eventos efí
 **Interfaces:**
 - Produces: `cursorSeq(eventId: string): number` (trailing seq; `-1` if unparseable), `isNewerCursor(candidate: string, current: string | null): boolean`.
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/transport/__tests__/cursor.test.ts`:
+- [ ] **Step 1: Write the failing test** — create `src/transport/__tests__/cursor.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
@@ -231,19 +237,13 @@ describe('cursor', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/transport/__tests__/cursor.test.ts` → FAIL (cannot resolve `../cursor`).
 
-Run: `npx vitest run src/transport/__tests__/cursor.test.ts`
-Expected: FAIL — cannot resolve `../cursor`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/transport/cursor.ts`:
+- [ ] **Step 3: Implement** — create `src/transport/cursor.ts`:
 
 ```typescript
 // The durable cursor is the eventId string `evt_v1_{conversationId}_{seq}`
-// (backend §2.4). We send the whole string as `?after=`; only the trailing
-// numeric seq is meaningful for local ordering/dedup.
+// (backend §2.4). Only the trailing numeric seq is meaningful for ordering.
 export function cursorSeq(eventId: string): number {
   const i = eventId.lastIndexOf('_')
   if (i < 0 || i === eventId.length - 1) return -1
@@ -257,21 +257,18 @@ export function isNewerCursor(candidate: string, current: string | null): boolea
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/transport/__tests__/cursor.test.ts`
-Expected: PASS.
+- [ ] **Step 4: Run to verify it passes** — `npx vitest run src/transport/__tests__/cursor.test.ts` → PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/transport/cursor.ts src/transport/__tests__/cursor.test.ts
-git commit -m "feat(widget): helper de cursor durable (seq + comparación)"
+git commit -m "feat(widget): helper de cursor durable (seq + comparación numérica)"
 ```
 
 ---
 
-## Task 3: Fetch-streaming SSE parser
+## Task 3: Fetch-streaming SSE parser (abort-unblock + decoder flush)
 
 **Files:**
 - Create: `src/transport/sse.ts`
@@ -281,9 +278,9 @@ git commit -m "feat(widget): helper de cursor durable (seq + comparación)"
 - Produces: `interface SSEEvent { event: string; data: string; id?: string }`, `async function* parseSSEStream(body: ReadableStream<Uint8Array>, signal?: AbortSignal): AsyncGenerator<SSEEvent>`.
 - Consumed by: Task 6 (`turn.ts`), Task 9 (`events-channel.ts`).
 
-- [ ] **Step 1: Write the failing test**
+**Codex #1 requirements covered here:** aborting must cancel a **blocked** `read()` (via `reader.cancel()` on the abort event); the `TextDecoder` must be **flushed** at EOF so a multi-byte char split across byte boundaries decodes correctly; an aborted stream yields no trailing frame.
 
-Create `src/transport/__tests__/sse.test.ts`. The helper builds a stream that emits caller-controlled chunks (to exercise mid-event splits):
+- [ ] **Step 1: Write the failing test** — create `src/transport/__tests__/sse.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
@@ -299,7 +296,6 @@ function streamOf(chunks: string[]): ReadableStream<Uint8Array> {
     },
   })
 }
-
 async function collect(chunks: string[]): Promise<SSEEvent[]> {
   const out: SSEEvent[] = []
   for await (const ev of parseSSEStream(streamOf(chunks))) out.push(ev)
@@ -308,56 +304,60 @@ async function collect(chunks: string[]): Promise<SSEEvent[]> {
 
 describe('parseSSEStream', () => {
   it('parses a single well-formed frame', async () => {
-    const out = await collect(['event: accepted\ndata: {"turnId":"t1"}\n\n'])
-    expect(out).toEqual([{ event: 'accepted', data: '{"turnId":"t1"}' }])
+    expect(await collect(['event: accepted\ndata: {"turnId":"t1"}\n\n']))
+      .toEqual([{ event: 'accepted', data: '{"turnId":"t1"}' }])
   })
-
   it('reassembles a frame split mid-event across chunks', async () => {
-    const out = await collect(['event: del', 'ta\ndata: {"seq":', '1}\n\n'])
-    expect(out).toEqual([{ event: 'delta', data: '{"seq":1}' }])
+    expect(await collect(['event: del', 'ta\ndata: {"seq":', '1}\n\n']))
+      .toEqual([{ event: 'delta', data: '{"seq":1}' }])
   })
-
-  it('handles two frames arriving in one chunk and CRLF line endings', async () => {
+  it('handles two frames in one chunk and CRLF line endings', async () => {
     const out = await collect(['event: a\r\ndata: 1\r\n\r\nevent: b\r\ndata: 2\r\n\r\n'])
     expect(out.map((e) => e.event)).toEqual(['a', 'b'])
     expect(out.map((e) => e.data)).toEqual(['1', '2'])
   })
-
   it('ignores comment/heartbeat lines but keeps the surrounding frame', async () => {
-    const out = await collect([': keep-alive\n\nevent: done\ndata: {}\n\n'])
-    expect(out).toEqual([{ event: 'done', data: '{}' }])
+    expect(await collect([': keep-alive\n\nevent: done\ndata: {}\n\n']))
+      .toEqual([{ event: 'done', data: '{}' }])
   })
-
-  it('joins multiple data: lines with newlines and reads id:', async () => {
-    const out = await collect(['id: evt_v1_c_7\nevent: message.created\ndata: line1\ndata: line2\n\n'])
-    expect(out[0]).toEqual({ event: 'message.created', data: 'line1\nline2', id: 'evt_v1_c_7' })
+  it('yields an event-only heartbeat frame (liveness signal for the channel)', async () => {
+    expect(await collect(['event: heartbeat\n\n'])).toEqual([{ event: 'heartbeat', data: '' }])
   })
-
-  it('flushes a trailing frame that has no final blank line', async () => {
-    const out = await collect(['event: x\ndata: 1'])
-    expect(out).toEqual([{ event: 'x', data: '1' }])
+  it('joins multiple data: lines and reads id:', async () => {
+    const out = await collect(['id: evt_v1_c_7\nevent: message.created\ndata: a\ndata: b\n\n'])
+    expect(out[0]).toEqual({ event: 'message.created', data: 'a\nb', id: 'evt_v1_c_7' })
   })
-
-  it('stops early when the signal is aborted', async () => {
+  it('flushes a trailing frame with no final blank line', async () => {
+    expect(await collect(['event: x\ndata: 1'])).toEqual([{ event: 'x', data: '1' }])
+  })
+  it('decodes a multi-byte char split across chunk byte boundaries (decoder flush)', async () => {
+    const enc = new TextEncoder()
+    const full = enc.encode('data: 👋\n\n') // 👋 = 4 bytes (0xF0 0x9F 0x91 0x8B)
+    const cut = full.indexOf(0xf0) + 2       // split inside the emoji
+    const body = new ReadableStream<Uint8Array>({
+      start(c) { c.enqueue(full.slice(0, cut)); c.enqueue(full.slice(cut)); c.close() },
+    })
+    const out: SSEEvent[] = []
+    for await (const ev of parseSSEStream(body)) out.push(ev)
+    expect(out[0]?.data).toBe('👋')
+  })
+  it('aborting unblocks a read parked on a never-ending stream', async () => {
     const ac = new AbortController()
-    const gen = parseSSEStream(streamOf(['event: a\ndata: 1\n\n', 'event: b\ndata: 2\n\n']), ac.signal)
-    const first = await gen.next()
-    expect((first.value as SSEEvent).event).toBe('a')
+    let cancelled = false
+    const body = new ReadableStream<Uint8Array>({ start() { /* never enqueue, never close */ }, cancel() { cancelled = true } })
+    const gen = parseSSEStream(body, ac.signal)
+    const parked = gen.next() // blocks on read()
     ac.abort()
-    const second = await gen.next()
-    expect(second.done).toBe(true)
+    const r = await parked
+    expect(r.done).toBe(true)
+    expect(cancelled).toBe(true)
   })
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/transport/__tests__/sse.test.ts` → FAIL (cannot resolve `../sse`).
 
-Run: `npx vitest run src/transport/__tests__/sse.test.ts`
-Expected: FAIL — cannot resolve `../sse`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/transport/sse.ts`:
+- [ ] **Step 3: Implement** — create `src/transport/sse.ts`:
 
 ```typescript
 export interface SSEEvent {
@@ -381,7 +381,7 @@ function parseFrame(frame: string): SSEEvent | null {
     else if (field === 'data') { dataLines.push(value); hasField = true }
     else if (field === 'id') { id = value; hasField = true }
   }
-  if (!hasField) return null // frame was only comments/heartbeat
+  if (!hasField) return null // frame was only comment/heartbeat colons
   const base: SSEEvent = { event, data: dataLines.join('\n') }
   return id === undefined ? base : { ...base, id }
 }
@@ -393,82 +393,86 @@ export async function* parseSSEStream(
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buffer = ''
+  // A parked reader.read() only resolves when data arrives OR the stream is
+  // cancelled. Cancelling on abort unblocks it (resolves with {done:true}).
+  const onAbort = (): void => { void reader.cancel().catch(() => {}) }
+  if (signal) {
+    if (signal.aborted) { await reader.cancel().catch(() => {}); reader.releaseLock(); return }
+    signal.addEventListener('abort', onAbort)
+  }
   try {
     while (true) {
-      if (signal?.aborted) return
       const { done, value } = await reader.read()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
-      buffer = buffer.replace(/\r\n/g, '\n') // reunited across chunks before splitting
+      buffer = buffer.replace(/\r\n/g, '\n') // \r\n reunites across chunks before splitting
       let idx = buffer.indexOf('\n\n')
       while (idx !== -1) {
         const frame = parseFrame(buffer.slice(0, idx))
         buffer = buffer.slice(idx + 2)
         if (frame) yield frame
-        if (signal?.aborted) return
         idx = buffer.indexOf('\n\n')
       }
     }
+    if (signal?.aborted) return // aborted mid-turn: do not emit a partial tail
+    buffer += decoder.decode() // flush any bytes the decoder was holding
     const tail = parseFrame(buffer)
     if (tail) yield tail
   } finally {
-    try { await reader.cancel() } catch { /* stream already closed */ }
+    if (signal) signal.removeEventListener('abort', onAbort)
+    try { await reader.cancel() } catch { /* already closed */ }
     reader.releaseLock()
   }
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/transport/__tests__/sse.test.ts`
-Expected: PASS (all 7 cases).
+- [ ] **Step 4: Run to verify it passes** — `npx vitest run src/transport/__tests__/sse.test.ts` → PASS (all cases, including abort-unblock and decoder flush).
 
 - [ ] **Step 5: Typecheck + commit**
 
 ```bash
 npm run typecheck
 git add src/transport/sse.ts src/transport/__tests__/sse.test.ts
-git commit -m "feat(widget): parser SSE por fetch-streaming (chunks parciales, heartbeats, CRLF)"
+git commit -m "feat(widget): parser SSE por fetch-streaming (chunks parciales, abort desbloquea lectura, flush del decoder)"
 ```
 
 ---
 
-## Task 4: Message store — durable core
+## Task 4: Message store — durable core (immutable, null state, no-revert)
 
 **Files:**
 - Create: `src/store/message-store.ts`
 - Test: `src/store/__tests__/message-store.test.ts`
 
 **Interfaces:**
-- Consumes: `WidgetEvent`, `ConversationState`, `MessagesSnapshot`, `WidgetMessage` (Task 1); `cursorSeq`, `isNewerCursor` (Task 2).
-- Produces (this task defines the store's public surface; Task 5 adds the remaining mutators):
+- Consumes: `WidgetEvent`, `ConversationState`, `MessagesSnapshot` (Task 1); `cursorSeq` (Task 2).
+- Produces (Task 5 adds the remaining mutators to `MessageStore`):
   ```typescript
   type MessageStatus = 'pending' | 'sent' | 'failed'
   type ConnectionStatus = 'idle' | 'live' | 'reconnecting' | 'polling' | 'offline'
   interface StoredMessage {
-    id: string; role: 'user' | 'bot' | 'agent'; text: string
-    status: MessageStatus; seq: number | null; streaming: boolean
-    createdAt: string; clientId: string | null
+    readonly id: string; readonly role: 'user' | 'bot' | 'agent'; readonly text: string
+    readonly status: MessageStatus; readonly seq: number | null; readonly streaming: boolean
+    readonly createdAt: string; readonly clientId: string | null; readonly turnId: string | null
   }
   interface StoreState {
-    messages: StoredMessage[]; conversationState: ConversationState; cursor: string | null
-    agentName: string | null; agentAvatarUrl: string | null; agentTyping: boolean
-    connection: ConnectionStatus
+    readonly messages: readonly StoredMessage[]; readonly conversationState: ConversationState | null
+    readonly cursor: string | null; readonly agentName: string | null; readonly agentAvatarUrl: string | null
+    readonly agentTyping: boolean; readonly connection: ConnectionStatus
   }
   interface MessageStore {
     getState(): StoreState
     subscribe(listener: () => void): () => void
     applySnapshot(s: MessagesSnapshot): void
+    replaceSnapshot(s: MessagesSnapshot): void
     applyDurableEvent(e: WidgetEvent): void
-    // Task 5 extends: addOptimistic, ackOptimistic, failOptimistic, retryOptimistic,
+    // Task 5 adds: addOptimistic, ackOptimistic, failOptimistic, retryOptimistic,
     // beginBotTurn, appendBotDelta, finishBotTurn, failBotTurn, setAgentTyping, setConnection
   }
   function createMessageStore(now?: () => string): MessageStore
   ```
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/store/__tests__/message-store.test.ts`:
+- [ ] **Step 1: Write the failing test** — create `src/store/__tests__/message-store.test.ts`:
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest'
@@ -488,12 +492,18 @@ function stateEvent(seq: number, state: 'BOT_ACTIVE' | 'ESCALATED_WAITING' | 'AG
     occurredAt: '2026-07-17T14:04:00Z', type: 'conversation.state_changed', payload: { state },
   }
 }
+function agentJoined(seq: number, name: string): WidgetEvent {
+  return {
+    eventId: `evt_v1_conv_demo_01_${seq}`, schemaVersion: 1, conversationId: 'conv_demo_01',
+    occurredAt: '2026-07-17T14:09:00Z', type: 'agent.joined', payload: { agentName: name, agentAvatarUrl: null },
+  }
+}
 
 describe('message store — durable core', () => {
-  it('starts idle and empty', () => {
+  it('starts idle, empty, with a NULL conversationState (server-dictated)', () => {
     const s = createMessageStore()
     expect(s.getState().messages).toEqual([])
-    expect(s.getState().conversationState).toBe('BOT_ACTIVE')
+    expect(s.getState().conversationState).toBeNull()
     expect(s.getState().cursor).toBeNull()
     expect(s.getState().connection).toBe('idle')
   })
@@ -503,12 +513,11 @@ describe('message store — durable core', () => {
     s.applySnapshot(fixtureSnapshot())
     const st = s.getState()
     expect(st.messages.map((m) => m.id)).toEqual(['msg_0001'])
-    expect(st.messages[0]?.role).toBe('bot')
     expect(st.conversationState).toBe('BOT_ACTIVE')
     expect(st.cursor).toBe('evt_v1_conv_demo_01_1')
   })
 
-  it('appends durable message.created events ordered and advances the cursor', () => {
+  it('appends durable message.created ordered and advances the cursor', () => {
     const s = createMessageStore()
     s.applyDurableEvent(msgEvent(2, 'm2', 'bot', 'segundo'))
     s.applyDurableEvent(msgEvent(3, 'm3', 'user', 'tercero'))
@@ -516,57 +525,62 @@ describe('message store — durable core', () => {
     expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_3')
   })
 
-  it('dedups replayed events by messageId (overlap after reconnect)', () => {
+  it('dedups replayed events by eventId (overlap after reconnect)', () => {
     const s = createMessageStore()
     s.applyDurableEvent(msgEvent(2, 'm2', 'bot', 'hola'))
-    s.applyDurableEvent(msgEvent(2, 'm2', 'bot', 'hola')) // exact replay
+    s.applyDurableEvent(msgEvent(2, 'm2', 'bot', 'hola'))
     expect(s.getState().messages).toHaveLength(1)
   })
 
-  it('does not rewind the cursor on an older replayed event', () => {
+  it('does not rewind the cursor on an older replayed event; orders by seq', () => {
     const s = createMessageStore()
     s.applyDurableEvent(msgEvent(5, 'm5', 'bot', 'nuevo'))
     s.applyDurableEvent(msgEvent(3, 'm3', 'bot', 'viejo'))
     expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_5')
-    expect(s.getState().messages.map((m) => m.id)).toEqual(['m3', 'm5']) // ordered by seq
+    expect(s.getState().messages.map((m) => m.id)).toEqual(['m3', 'm5'])
   })
 
-  it('sets state ONLY from conversation.state_changed events', () => {
+  it('sets state ONLY from state_changed; an OLDER replay never reverts it', () => {
     const s = createMessageStore()
-    s.applyDurableEvent(stateEvent(4, 'ESCALATED_WAITING'))
-    expect(s.getState().conversationState).toBe('ESCALATED_WAITING')
     s.applyDurableEvent(stateEvent(6, 'AGENT_ACTIVE'))
+    s.applyDurableEvent(stateEvent(4, 'ESCALATED_WAITING')) // stale, out of order
     expect(s.getState().conversationState).toBe('AGENT_ACTIVE')
   })
 
-  it('records agent identity from agent.joined', () => {
+  it('records agent identity from the newest agent.joined only', () => {
     const s = createMessageStore()
-    s.applyDurableEvent({
-      eventId: 'evt_v1_conv_demo_01_7', schemaVersion: 1, conversationId: 'conv_demo_01',
-      occurredAt: '2026-07-17T14:09:00Z', type: 'agent.joined', payload: { agentName: 'Laura', agentAvatarUrl: null },
-    })
+    s.applyDurableEvent(agentJoined(7, 'Laura'))
+    s.applyDurableEvent(agentJoined(5, 'Pedro')) // stale
     expect(s.getState().agentName).toBe('Laura')
-    expect(s.getState().agentAvatarUrl).toBeNull()
   })
 
-  it('snapshot after events advances the cursor to the max and preserves order', () => {
+  it('applySnapshot after events keeps the max cursor and merges (no rewind, no dup)', () => {
     const s = createMessageStore()
     s.applyDurableEvent(msgEvent(5, 'm5', 'bot', 'live'))
     s.applySnapshot(fixtureSnapshot()) // snapshotCursor seq=1, message msg_0001
-    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_5') // not rewound to 1
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_5')
     expect(s.getState().messages.map((m) => m.id)).toEqual(['msg_0001', 'm5'])
   })
 
-  it('notifies subscribers on change and returns a stable snapshot between changes', () => {
+  it('replaceSnapshot hard-resets the cursor DOWN and clears dedup (409 recovery)', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(msgEvent(9, 'm9', 'bot', 'lejano'))
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_9')
+    s.replaceSnapshot(fixtureSnapshot()) // snapshotCursor seq=1
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_1') // forced down
+    expect(s.getState().messages.map((m) => m.id)).toEqual(['msg_0001']) // rebuilt from snapshot
+  })
+
+  it('publishes a stable snapshot between changes and a NEW one after a change', () => {
     const s = createMessageStore()
     const listener = vi.fn()
     const unsub = s.subscribe(listener)
     const before = s.getState()
     s.applyDurableEvent(msgEvent(2, 'm2', 'bot', 'x'))
     expect(listener).toHaveBeenCalledTimes(1)
-    expect(s.getState()).not.toBe(before) // new snapshot object after a change
+    expect(s.getState()).not.toBe(before)
     const a = s.getState()
-    expect(s.getState()).toBe(a) // stable reference between changes (useSyncExternalStore-safe)
+    expect(s.getState()).toBe(a)
     unsub()
     s.applyDurableEvent(msgEvent(3, 'm3', 'bot', 'y'))
     expect(listener).toHaveBeenCalledTimes(1)
@@ -574,171 +588,181 @@ describe('message store — durable core', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/store/__tests__/message-store.test.ts` → FAIL (cannot resolve `../message-store`).
 
-Run: `npx vitest run src/store/__tests__/message-store.test.ts`
-Expected: FAIL — cannot resolve `../message-store`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/store/message-store.ts`:
+- [ ] **Step 3: Implement** — create `src/store/message-store.ts`:
 
 ```typescript
 import type { WidgetEvent, ConversationState, MessagesSnapshot } from '../contract/types'
-import { cursorSeq, isNewerCursor } from '../transport/cursor'
+import { cursorSeq } from '../transport/cursor'
 
 export type MessageStatus = 'pending' | 'sent' | 'failed'
 export type ConnectionStatus = 'idle' | 'live' | 'reconnecting' | 'polling' | 'offline'
 
 export interface StoredMessage {
-  id: string
-  role: 'user' | 'bot' | 'agent'
-  text: string
-  status: MessageStatus
-  seq: number | null
-  streaming: boolean
-  createdAt: string
-  clientId: string | null
+  readonly id: string
+  readonly role: 'user' | 'bot' | 'agent'
+  readonly text: string
+  readonly status: MessageStatus
+  readonly seq: number | null
+  readonly streaming: boolean
+  readonly createdAt: string
+  readonly clientId: string | null
+  readonly turnId: string | null
 }
 
 export interface StoreState {
-  messages: StoredMessage[]
-  conversationState: ConversationState
-  cursor: string | null
-  agentName: string | null
-  agentAvatarUrl: string | null
-  agentTyping: boolean
-  connection: ConnectionStatus
+  readonly messages: readonly StoredMessage[]
+  readonly conversationState: ConversationState | null
+  readonly cursor: string | null
+  readonly agentName: string | null
+  readonly agentAvatarUrl: string | null
+  readonly agentTyping: boolean
+  readonly connection: ConnectionStatus
 }
 
 export interface MessageStore {
   getState(): StoreState
   subscribe(listener: () => void): () => void
   applySnapshot(snapshot: MessagesSnapshot): void
+  replaceSnapshot(snapshot: MessagesSnapshot): void
   applyDurableEvent(event: WidgetEvent): void
 }
 
 // Display order: durable events strictly by seq among themselves; anything
-// without a seq (snapshot history, optimistic, streaming) falls back to its
-// server/client timestamp. Both are server-monotonic within a conversation.
+// without a seq (snapshot history / optimistic / streaming) by its timestamp.
 function compareMessages(a: StoredMessage, b: StoredMessage): number {
   if (a.seq !== null && b.seq !== null) return a.seq - b.seq
   return Date.parse(a.createdAt) - Date.parse(b.createdAt)
 }
 
 export function createMessageStore(now: () => string = () => new Date().toISOString()): MessageStore {
-  const messages: StoredMessage[] = []
-  const byMessageId = new Map<string, StoredMessage>()
+  // `messages` is treated as immutable and REPLACED (never mutated) on every
+  // change, so any array/object a prior getState() handed out stays frozen.
+  let messages: readonly StoredMessage[] = []
   const appliedEventIds = new Set<string>()
-  let conversationState: ConversationState = 'BOT_ACTIVE'
+  let conversationState: ConversationState | null = null
   let cursor: string | null = null
   let agentName: string | null = null
   let agentAvatarUrl: string | null = null
   let agentTyping = false
   let connection: ConnectionStatus = 'idle'
+  let lastStateSeq = -1
+  let lastAgentSeq = -1
 
   const listeners = new Set<() => void>()
-  let snapshot: StoreState | null = null
+  let published: StoreState | null = null
 
-  const invalidate = (): void => {
-    snapshot = null
+  const notify = (): void => {
+    published = null
     for (const l of listeners) l()
   }
-  const sort = (): void => { messages.sort(compareMessages) }
-
+  const setMessages = (next: StoredMessage[]): void => {
+    next.sort(compareMessages)
+    messages = next
+    notify()
+  }
   const advanceCursor = (eventId: string): void => {
-    if (isNewerCursor(eventId, cursor)) cursor = eventId
+    if (cursor === null || cursorSeq(eventId) > cursorSeq(cursor)) cursor = eventId
+  }
+  const indexOf = (pred: (m: StoredMessage) => boolean): number => messages.findIndex(pred)
+
+  const mergeSnapshotMessages = (base: StoredMessage[], snap: MessagesSnapshot): StoredMessage[] => {
+    const next = base.slice()
+    for (const m of snap.messages) {
+      if (next.some((x) => x.id === m.messageId)) continue
+      next.push({
+        id: m.messageId, role: m.role, text: m.text, status: 'sent',
+        seq: null, streaming: false, createdAt: m.createdAt, clientId: null, turnId: null,
+      })
+    }
+    return next
   }
 
   const applyDurableEvent = (event: WidgetEvent): void => {
     if (appliedEventIds.has(event.eventId)) return
     appliedEventIds.add(event.eventId)
+    const seq = cursorSeq(event.eventId)
     advanceCursor(event.eventId)
     if (event.type === 'message.created') {
-      const existing = byMessageId.get(event.payload.messageId)
-      if (existing) {
-        existing.text = event.payload.text
-        existing.seq = cursorSeq(event.eventId)
-        existing.status = 'sent'
-        sort()
+      const i = indexOf((m) => m.id === event.payload.messageId)
+      if (i !== -1) {
+        const next = messages.slice()
+        next[i] = { ...next[i]!, text: event.payload.text, seq, status: 'sent', streaming: false, turnId: null }
+        setMessages(next)
       } else {
-        const m: StoredMessage = {
+        setMessages([...messages, {
           id: event.payload.messageId, role: event.payload.role, text: event.payload.text,
-          status: 'sent', seq: cursorSeq(event.eventId), streaming: false,
-          createdAt: event.occurredAt, clientId: null,
-        }
-        messages.push(m)
-        byMessageId.set(m.id, m)
-        sort()
+          status: 'sent', seq, streaming: false, createdAt: event.occurredAt, clientId: null, turnId: null,
+        }])
       }
     } else if (event.type === 'conversation.state_changed') {
-      conversationState = event.payload.state
+      if (seq > lastStateSeq) { conversationState = event.payload.state; lastStateSeq = seq; notify() }
     } else if (event.type === 'agent.joined') {
-      agentName = event.payload.agentName
-      agentAvatarUrl = event.payload.agentAvatarUrl
+      if (seq > lastAgentSeq) { agentName = event.payload.agentName; agentAvatarUrl = event.payload.agentAvatarUrl; lastAgentSeq = seq; notify() }
     }
-    invalidate()
   }
 
-  const applySnapshot = (s: MessagesSnapshot): void => {
-    for (const m of s.messages) {
-      if (byMessageId.has(m.messageId)) continue
-      const stored: StoredMessage = {
-        id: m.messageId, role: m.role, text: m.text, status: 'sent',
-        seq: null, streaming: false, createdAt: m.createdAt, clientId: null,
-      }
-      messages.push(stored)
-      byMessageId.set(stored.id, stored)
-    }
-    sort()
-    conversationState = s.state
-    advanceCursor(s.snapshotCursor)
-    invalidate()
+  const applySnapshot = (snap: MessagesSnapshot): void => {
+    const snapSeq = cursorSeq(snap.snapshotCursor)
+    setMessages(mergeSnapshotMessages(messages.slice(), snap))
+    if (snapSeq >= lastStateSeq) { conversationState = snap.state; lastStateSeq = snapSeq }
+    advanceCursor(snap.snapshotCursor)
+    notify()
+  }
+
+  const replaceSnapshot = (snap: MessagesSnapshot): void => {
+    // Hard reset for CURSOR_RESET_REQUIRED: drop dedup + cursor and rebuild from
+    // the fresh snapshot, keeping only unsent optimistic / in-flight streaming.
+    appliedEventIds.clear()
+    const keep = messages.filter((m) => m.status !== 'sent' || m.streaming)
+    cursor = snap.snapshotCursor
+    const snapSeq = cursorSeq(snap.snapshotCursor)
+    conversationState = snap.state
+    lastStateSeq = snapSeq
+    setMessages(mergeSnapshotMessages(keep, snap))
   }
 
   return {
     getState(): StoreState {
-      snapshot ??= {
-        messages: messages.slice(),
-        conversationState, cursor, agentName, agentAvatarUrl, agentTyping, connection,
-      }
-      return snapshot
+      published ??= Object.freeze({
+        messages, conversationState, cursor, agentName, agentAvatarUrl, agentTyping, connection,
+      })
+      return published
     },
     subscribe(listener): () => void {
       listeners.add(listener)
       return () => { listeners.delete(listener) }
     },
     applySnapshot,
+    replaceSnapshot,
     applyDurableEvent,
   }
 }
 ```
 
-> Note for Task 5: `messages`, `byMessageId`, `appliedEventIds`, `invalidate`, `sort`, `advanceCursor`, and the mutable `agentTyping`/`connection` bindings live in this closure. Task 5 adds its mutators inside `createMessageStore` and to the returned object. The `now` param is unused here but is the injectable clock Task 5 uses for optimistic/streaming `createdAt`.
+> Note for Task 5: `messages`, `appliedEventIds`, `now`, `indexOf`, `setMessages`, `notify`, `advanceCursor`, and the mutable scalars live in this closure. Task 5 adds mutators inside `createMessageStore` and to the returned object. Copy-on-write is mandatory: never mutate an existing `StoredMessage` — always spread into a new object and `setMessages(next)` with a fresh array.
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/store/__tests__/message-store.test.ts`
-Expected: PASS (all cases).
+- [ ] **Step 4: Run to verify it passes** — `npx vitest run src/store/__tests__/message-store.test.ts` → PASS.
 
 - [ ] **Step 5: Typecheck + commit**
 
 ```bash
 npm run typecheck
 git add src/store/message-store.ts src/store/__tests__/message-store.test.ts
-git commit -m "feat(widget): store observable núcleo (snapshot, eventos durables, dedup, cursor, estado)"
+git commit -m "feat(widget): store observable inmutable (snapshot/replaceSnapshot, dedup, cursor, estado sin retroceso)"
 ```
 
 ---
 
-## Task 5: Message store — optimistic + streaming mutators
+## Task 5: Message store — optimistic + streaming (race-order dedup)
 
 **Files:**
 - Modify: `src/store/message-store.ts`
 - Test: `src/store/__tests__/message-store-optimistic.test.ts`
 
 **Interfaces:**
-- Consumes: the Task 4 store closure.
+- Consumes: the Task 4 closure.
 - Produces (added to `MessageStore`):
   ```typescript
   addOptimistic(clientId: string, text: string): void
@@ -747,15 +771,13 @@ git commit -m "feat(widget): store observable núcleo (snapshot, eventos durable
   retryOptimistic(clientId: string): void
   beginBotTurn(turnId: string): void
   appendBotDelta(turnId: string, delta: string): void
-  finishBotTurn(turnId: string, messageId: string, eventId: string): void
+  finishBotTurn(turnId: string, messageId: string): void   // NO eventId — never touches the cursor
   failBotTurn(turnId: string): void
   setAgentTyping(isTyping: boolean): void
   setConnection(status: ConnectionStatus): void
   ```
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/store/__tests__/message-store-optimistic.test.ts`:
+- [ ] **Step 1: Write the failing test** — create `src/store/__tests__/message-store-optimistic.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
@@ -763,6 +785,12 @@ import { createMessageStore } from '../message-store'
 import type { WidgetEvent } from '../../contract/types'
 
 const clock = () => '2026-07-17T15:00:00Z'
+function msgEvent(seq: number, messageId: string, role: 'bot' | 'agent' | 'user', text: string): WidgetEvent {
+  return {
+    eventId: `evt_v1_conv_demo_01_${seq}`, schemaVersion: 1, conversationId: 'conv_demo_01',
+    occurredAt: '2026-07-17T15:00:01Z', type: 'message.created', payload: { messageId, role, text },
+  }
+}
 
 describe('message store — optimistic + streaming', () => {
   it('optimistic user message goes pending → sent on ack', () => {
@@ -773,17 +801,13 @@ describe('message store — optimistic + streaming', () => {
     expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv_1', status: 'sent', clientId: 'cid_1' })
   })
 
-  it('an acked optimistic message dedups against its durable message.created', () => {
+  it('durable-before-ack: the durable and the ack do not duplicate', () => {
     const s = createMessageStore(clock)
     s.addOptimistic('cid_1', 'Hola')
-    s.ackOptimistic('cid_1', 'msg_srv_1')
-    const durable: WidgetEvent = {
-      eventId: 'evt_v1_conv_demo_01_2', schemaVersion: 1, conversationId: 'conv_demo_01',
-      occurredAt: '2026-07-17T15:00:01Z', type: 'message.created', payload: { messageId: 'msg_srv_1', role: 'user', text: 'Hola' },
-    }
-    s.applyDurableEvent(durable)
-    expect(s.getState().messages.filter((m) => m.id === 'msg_srv_1')).toHaveLength(1)
-    expect(s.getState().messages[0]?.seq).toBe(2) // reconciled with durable seq
+    s.applyDurableEvent(msgEvent(2, 'msg_srv', 'user', 'Hola')) // durable wins the race
+    s.ackOptimistic('cid_1', 'msg_srv')
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', seq: 2 })
   })
 
   it('failOptimistic then retryOptimistic flips failed → pending', () => {
@@ -797,36 +821,61 @@ describe('message store — optimistic + streaming', () => {
 
   it('streams a bot turn: begin → deltas accumulate → done finalizes with messageId', () => {
     const s = createMessageStore(clock)
-    s.beginBotTurn('turn_1')
+    s.beginBotTurn('t1')
     expect(s.getState().messages[0]).toMatchObject({ role: 'bot', streaming: true, text: '' })
-    s.appendBotDelta('turn_1', 'Sí, ')
-    s.appendBotDelta('turn_1', 'claro.')
+    s.appendBotDelta('t1', 'Sí, ')
+    s.appendBotDelta('t1', 'claro.')
     expect(s.getState().messages[0]?.text).toBe('Sí, claro.')
-    s.finishBotTurn('turn_1', 'msg_bot_1', 'evt_v1_conv_demo_01_5')
-    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_bot_1', streaming: false, seq: 5 })
+    s.finishBotTurn('t1', 'msg_bot_1')
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_bot_1', streaming: false })
   })
 
-  it('a finished bot turn dedups against its durable replay', () => {
+  it('finishBotTurn does NOT advance the durable cursor', () => {
     const s = createMessageStore(clock)
-    s.beginBotTurn('turn_1')
-    s.appendBotDelta('turn_1', 'texto')
-    s.finishBotTurn('turn_1', 'msg_bot_1', 'evt_v1_conv_demo_01_5')
-    s.applyDurableEvent({
-      eventId: 'evt_v1_conv_demo_01_5', schemaVersion: 1, conversationId: 'conv_demo_01',
-      occurredAt: '2026-07-17T15:00:02Z', type: 'message.created', payload: { messageId: 'msg_bot_1', role: 'bot', text: 'texto' },
-    })
+    s.applyDurableEvent(msgEvent(2, 'm2', 'user', 'q')) // cursor = 2
+    s.beginBotTurn('t1'); s.appendBotDelta('t1', 'x')
+    s.finishBotTurn('t1', 'm_bot')
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_2') // unchanged
+  })
+
+  it('durable-before-finish: the durable bot message and finishBotTurn do not duplicate', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1')
+    s.appendBotDelta('t1', 'parcial')
+    s.applyDurableEvent(msgEvent(5, 'msg_bot', 'bot', 'texto final')) // durable arrives first
+    s.finishBotTurn('t1', 'msg_bot')
+    const bots = s.getState().messages.filter((m) => m.role === 'bot')
+    expect(bots).toHaveLength(1)
+    expect(bots[0]?.text).toBe('texto final') // durable is authoritative
+  })
+
+  it('finish-before-durable: the durable replay updates, does not duplicate', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1'); s.appendBotDelta('t1', 'texto')
+    s.finishBotTurn('t1', 'msg_bot')
+    s.applyDurableEvent(msgEvent(5, 'msg_bot', 'bot', 'texto'))
     expect(s.getState().messages.filter((m) => m.role === 'bot')).toHaveLength(1)
+    expect(s.getState().messages[0]?.seq).toBe(5) // reconciled with the durable seq
   })
 
-  it('failBotTurn removes an empty streaming placeholder but keeps a partial one', () => {
+  it('failBotTurn removes an empty placeholder but keeps a partial one', () => {
     const s = createMessageStore(clock)
-    s.beginBotTurn('turn_empty')
-    s.failBotTurn('turn_empty')
+    s.beginBotTurn('t_empty'); s.failBotTurn('t_empty')
     expect(s.getState().messages).toHaveLength(0)
-    s.beginBotTurn('turn_partial')
-    s.appendBotDelta('turn_partial', 'a medias')
-    s.failBotTurn('turn_partial')
+    s.beginBotTurn('t_partial'); s.appendBotDelta('t_partial', 'a medias'); s.failBotTurn('t_partial')
     expect(s.getState().messages[0]).toMatchObject({ streaming: false, text: 'a medias' })
+  })
+
+  it('never mutates a previously published snapshot (copy-on-write)', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    const snapA = s.getState()
+    const msgA = snapA.messages[0]!
+    s.ackOptimistic('cid_1', 'msg_1')
+    expect(s.getState()).not.toBe(snapA)
+    expect(snapA.messages[0]).toBe(msgA)    // old snapshot object untouched
+    expect(msgA.id).toBe('cid_1')            // still the original value
+    expect(s.getState().messages[0]?.id).toBe('msg_1')
   })
 
   it('setAgentTyping and setConnection update reactive flags', () => {
@@ -839,20 +888,16 @@ describe('message store — optimistic + streaming', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/store/__tests__/message-store-optimistic.test.ts` → FAIL (`addOptimistic is not a function`).
 
-Run: `npx vitest run src/store/__tests__/message-store-optimistic.test.ts`
-Expected: FAIL — `addOptimistic is not a function`.
-
-- [ ] **Step 3: Extend the store implementation**
-
-In `src/store/message-store.ts`, add the new method signatures to the `MessageStore` interface:
+- [ ] **Step 3: Extend the interface** — add to `MessageStore` in `src/store/message-store.ts`:
 
 ```typescript
 export interface MessageStore {
   getState(): StoreState
   subscribe(listener: () => void): () => void
   applySnapshot(snapshot: MessagesSnapshot): void
+  replaceSnapshot(snapshot: MessagesSnapshot): void
   applyDurableEvent(event: WidgetEvent): void
   addOptimistic(clientId: string, text: string): void
   ackOptimistic(clientId: string, messageId: string): void
@@ -860,107 +905,92 @@ export interface MessageStore {
   retryOptimistic(clientId: string): void
   beginBotTurn(turnId: string): void
   appendBotDelta(turnId: string, delta: string): void
-  finishBotTurn(turnId: string, messageId: string, eventId: string): void
+  finishBotTurn(turnId: string, messageId: string): void
   failBotTurn(turnId: string): void
   setAgentTyping(isTyping: boolean): void
   setConnection(status: ConnectionStatus): void
 }
 ```
 
-Inside `createMessageStore`, add a turn→placeholder index near the other `const` declarations:
+- [ ] **Step 4: Add the mutators** — inside `createMessageStore`, before the `return`:
 
 ```typescript
-  const byTurnId = new Map<string, StoredMessage>()
-  const byClientId = new Map<string, StoredMessage>()
-```
+  const setStatus = (clientId: string, status: MessageStatus): void => {
+    const i = indexOf((m) => m.clientId === clientId)
+    if (i === -1) return
+    const next = messages.slice()
+    next[i] = { ...next[i]!, status }
+    setMessages(next)
+  }
 
-In `addOptimistic`, register the message in `byClientId`. Add these functions before the `return`:
-
-```typescript
   const addOptimistic = (clientId: string, text: string): void => {
-    const m: StoredMessage = {
+    setMessages([...messages, {
       id: clientId, role: 'user', text, status: 'pending', seq: null,
-      streaming: false, createdAt: now(), clientId,
-    }
-    messages.push(m)
-    byClientId.set(clientId, m)
-    sort()
-    invalidate()
+      streaming: false, createdAt: now(), clientId, turnId: null,
+    }])
   }
   const ackOptimistic = (clientId: string, messageId: string): void => {
-    const m = byClientId.get(clientId)
-    if (!m) return
-    m.id = messageId
-    m.status = 'sent'
-    byMessageId.set(messageId, m)
-    invalidate()
-  }
-  const failOptimistic = (clientId: string): void => {
-    const m = byClientId.get(clientId)
-    if (!m) return
-    m.status = 'failed'
-    invalidate()
-  }
-  const retryOptimistic = (clientId: string): void => {
-    const m = byClientId.get(clientId)
-    if (!m) return
-    m.status = 'pending'
-    invalidate()
-  }
-  const beginBotTurn = (turnId: string): void => {
-    const m: StoredMessage = {
-      id: `turn:${turnId}`, role: 'bot', text: '', status: 'sent', seq: null,
-      streaming: true, createdAt: now(), clientId: null,
+    const oi = indexOf((m) => m.clientId === clientId && m.id !== messageId)
+    if (oi === -1) return // already acked (idempotent)
+    const durableI = indexOf((m) => m.id === messageId)
+    const next = messages.slice()
+    if (durableI !== -1 && durableI !== oi) {
+      next.splice(oi, 1) // durable arrived first: keep it, drop the placeholder
+    } else {
+      next[oi] = { ...next[oi]!, id: messageId, status: 'sent' }
     }
-    messages.push(m)
-    byTurnId.set(turnId, m)
-    sort()
-    invalidate()
+    setMessages(next)
+  }
+  const failOptimistic = (clientId: string): void => setStatus(clientId, 'failed')
+  const retryOptimistic = (clientId: string): void => setStatus(clientId, 'pending')
+
+  const beginBotTurn = (turnId: string): void => {
+    setMessages([...messages, {
+      id: `turn:${turnId}`, role: 'bot', text: '', status: 'sent', seq: null,
+      streaming: true, createdAt: now(), clientId: null, turnId,
+    }])
   }
   const appendBotDelta = (turnId: string, delta: string): void => {
-    const m = byTurnId.get(turnId)
-    if (!m) return
-    m.text += delta
-    invalidate()
+    const i = indexOf((m) => m.turnId === turnId)
+    if (i === -1) return
+    const next = messages.slice()
+    next[i] = { ...next[i]!, text: next[i]!.text + delta }
+    setMessages(next)
   }
-  const finishBotTurn = (turnId: string, messageId: string, eventId: string): void => {
-    const m = byTurnId.get(turnId)
-    if (!m) return
-    m.id = messageId
-    m.streaming = false
-    m.seq = cursorSeq(eventId)
-    byMessageId.set(messageId, m)
-    byTurnId.delete(turnId)
-    appliedEventIds.add(eventId) // durable replay of this message will dedup
-    advanceCursor(eventId)
-    sort()
-    invalidate()
+  const finishBotTurn = (turnId: string, messageId: string): void => {
+    const ti = indexOf((m) => m.turnId === turnId)
+    if (ti === -1) return
+    const durableI = indexOf((m) => m.id === messageId)
+    const next = messages.slice()
+    if (durableI !== -1 && durableI !== ti) {
+      next.splice(ti, 1) // durable already present: discard the streaming placeholder
+    } else {
+      next[ti] = { ...next[ti]!, id: messageId, streaming: false, turnId: null }
+    }
+    setMessages(next)
+    // Do NOT advance the cursor / mark eventId applied: the durable message.created
+    // for this messageId arrives via the channel with the authoritative seq.
   }
   const failBotTurn = (turnId: string): void => {
-    const m = byTurnId.get(turnId)
-    if (!m) return
-    byTurnId.delete(turnId)
-    if (m.text === '') {
-      const i = messages.indexOf(m)
-      if (i !== -1) messages.splice(i, 1)
-    } else {
-      m.streaming = false
-    }
-    invalidate()
+    const i = indexOf((m) => m.turnId === turnId)
+    if (i === -1) return
+    const m = messages[i]!
+    const next = messages.slice()
+    if (m.text === '') next.splice(i, 1)
+    else next[i] = { ...m, streaming: false, turnId: null }
+    setMessages(next)
   }
   const setAgentTyping = (isTyping: boolean): void => {
     if (agentTyping === isTyping) return
-    agentTyping = isTyping
-    invalidate()
+    agentTyping = isTyping; notify()
   }
   const setConnection = (status: ConnectionStatus): void => {
     if (connection === status) return
-    connection = status
-    invalidate()
+    connection = status; notify()
   }
 ```
 
-Add all of these to the returned object (after `applyDurableEvent`):
+Add them to the returned object (after `applyDurableEvent`):
 
 ```typescript
     addOptimistic, ackOptimistic, failOptimistic, retryOptimistic,
@@ -968,26 +998,18 @@ Add all of these to the returned object (after `applyDurableEvent`):
     setAgentTyping, setConnection,
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/store/__tests__/message-store-optimistic.test.ts`
-Expected: PASS.
-
-- [ ] **Step 5: Run the whole store suite + typecheck**
-
-Run: `npx vitest run src/store && npm run typecheck`
-Expected: PASS, no type errors.
+- [ ] **Step 5: Run to verify it passes** — `npx vitest run src/store && npm run typecheck` → PASS, no type errors.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add src/store/message-store.ts src/store/__tests__/message-store-optimistic.test.ts
-git commit -m "feat(widget): store — mensajes optimistas y buffer de streaming del turno"
+git commit -m "feat(widget): store — optimistas y streaming con dedup en ambos órdenes de carrera; finishBotTurn no toca el cursor"
 ```
 
 ---
 
-## Task 6: Bot-turn streaming consumer
+## Task 6: Bot-turn streaming consumer (throw on incomplete, propagate abort)
 
 **Files:**
 - Create: `src/transport/turn.ts`
@@ -1000,7 +1022,7 @@ git commit -m "feat(widget): store — mensajes optimistas y buffer de streaming
   interface TurnHandlers {
     onAccepted(turnId: string, userMessageId: string): void
     onDelta(turnId: string, delta: string): void
-    onDone(turnId: string, messageId: string, eventId: string): void
+    onDone(turnId: string, messageId: string): void   // eventId is on the wire but unused here
     onError(code: string): void
   }
   function runStreamingTurn(
@@ -1008,10 +1030,9 @@ git commit -m "feat(widget): store — mensajes optimistas y buffer de streaming
     handlers: TurnHandlers, signal: AbortSignal,
   ): Promise<void>
   ```
+- **Codex #1:** if the stream reaches EOF after `accepted`/`delta` without a terminal `DONE`/`ERROR`, throw `Error('stream_incomplete')`. If the signal was aborted, throw a `DOMException('AbortError')` (the caller must treat abort as a user cancel, never a fallback trigger).
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/transport/__tests__/turn.test.ts`:
+- [ ] **Step 1: Write the failing test** — create `src/transport/__tests__/turn.test.ts`:
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest'
@@ -1019,10 +1040,13 @@ import { runStreamingTurn, type TurnHandlers } from '../turn'
 
 function sseResponse(frames: string[], status = 200): Response {
   const enc = new TextEncoder()
-  const body = new ReadableStream<Uint8Array>({
-    start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.close() },
-  })
+  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.close() } })
   return new Response(body, { status, headers: { 'Content-Type': 'text/event-stream' } })
+}
+function openResponse(frames: string[]): Response { // emits frames, never closes
+  const enc = new TextEncoder()
+  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)) } })
+  return new Response(body, { status: 200 })
 }
 function handlers(): TurnHandlers & { log: string[] } {
   const log: string[] = []
@@ -1030,7 +1054,7 @@ function handlers(): TurnHandlers & { log: string[] } {
     log,
     onAccepted: (t, u) => log.push(`accepted:${t}:${u}`),
     onDelta: (t, d) => log.push(`delta:${t}:${d}`),
-    onDone: (t, m, e) => log.push(`done:${t}:${m}:${e}`),
+    onDone: (t, m) => log.push(`done:${t}:${m}`),
     onError: (c) => log.push(`error:${c}`),
   }
 }
@@ -1045,7 +1069,7 @@ describe('runStreamingTurn', () => {
     ]))
     const h = handlers()
     await runStreamingTurn({ authorizedFetch }, 'idem-1', 'Hola', h, new AbortController().signal)
-    expect(h.log).toEqual(['accepted:t1:u1', 'delta:t1:Sí, ', 'delta:t1:claro.', 'done:t1:m1:evt_v1_c_5'])
+    expect(h.log).toEqual(['accepted:t1:u1', 'delta:t1:Sí, ', 'delta:t1:claro.', 'done:t1:m1'])
     const [path, init] = authorizedFetch.mock.calls[0]!
     expect(path).toBe('/widget/v1/conversations/current/stream')
     expect(new Headers(init?.headers).get('Idempotency-Key')).toBe('idem-1')
@@ -1062,30 +1086,45 @@ describe('runStreamingTurn', () => {
     expect(h.log).toEqual(['accepted:t1:u1', 'error:quota_exceeded'])
   })
 
-  it('throws on a non-OK HTTP status (transport failure, caller falls back)', async () => {
-    const authorizedFetch = vi.fn(async () => sseResponse([], 503))
+  it('throws stream_incomplete when EOF arrives after accepted/delta without DONE', async () => {
+    const authorizedFetch = vi.fn(async () => sseResponse([
+      'event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n',
+      'event: delta\ndata: {"turnId":"t1","delta":"parcial"}\n\n',
+    ])) // stream closes (EOF), no DONE
     const h = handlers()
-    await expect(runStreamingTurn({ authorizedFetch }, 'idem-1', 'Hola', h, new AbortController().signal))
+    await expect(runStreamingTurn({ authorizedFetch }, 'idem', 'Hola', h, new AbortController().signal))
+      .rejects.toThrow('stream_incomplete')
+    expect(h.log).toEqual(['accepted:t1:u1', 'delta:t1:parcial'])
+  })
+
+  it('throws AbortError (not stream_incomplete) when aborted mid-turn', async () => {
+    const ac = new AbortController()
+    const h = handlers()
+    const authorizedFetch = vi.fn(async () => openResponse(['event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n']))
+    const p = runStreamingTurn({ authorizedFetch }, 'idem', 'Hola', h, ac.signal)
+    await vi.waitFor(() => expect(h.log).toContain('accepted:t1:u1'))
+    ac.abort()
+    await expect(p).rejects.toMatchObject({ name: 'AbortError' })
+  })
+
+  it('throws on a non-OK HTTP status', async () => {
+    const authorizedFetch = vi.fn(async () => sseResponse([], 503))
+    await expect(runStreamingTurn({ authorizedFetch }, 'idem', 'Hola', handlers(), new AbortController().signal))
       .rejects.toThrow(/stream_http:503/)
   })
 
   it('passes the abort signal through to authorizedFetch', async () => {
     const ac = new AbortController()
-    const authorizedFetch = vi.fn(async () => sseResponse(['event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n']))
-    await runStreamingTurn({ authorizedFetch }, 'idem-1', 'Hola', handlers(), ac.signal)
+    const authorizedFetch = vi.fn(async () => sseResponse(['event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n', 'event: done\ndata: {"turnId":"t1","messageId":"m1","eventId":"evt_v1_c_5"}\n\n']))
+    await runStreamingTurn({ authorizedFetch }, 'idem', 'Hola', handlers(), ac.signal)
     expect(authorizedFetch.mock.calls[0]![1]?.signal).toBe(ac.signal)
   })
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/transport/__tests__/turn.test.ts` → FAIL (cannot resolve `../turn`).
 
-Run: `npx vitest run src/transport/__tests__/turn.test.ts`
-Expected: FAIL — cannot resolve `../turn`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/transport/turn.ts`:
+- [ ] **Step 3: Implement** — create `src/transport/turn.ts`:
 
 ```typescript
 import type { SessionClient } from '../shell/session'
@@ -1094,7 +1133,7 @@ import { parseSSEStream } from './sse'
 export interface TurnHandlers {
   onAccepted(turnId: string, userMessageId: string): void
   onDelta(turnId: string, delta: string): void
-  onDone(turnId: string, messageId: string, eventId: string): void
+  onDone(turnId: string, messageId: string): void
   onError(code: string): void
 }
 
@@ -1122,6 +1161,7 @@ export async function runStreamingTurn(
     signal,
   })
   if (!res.ok || !res.body) throw new Error(`stream_http:${res.status}`)
+  let settled = false
   for await (const ev of parseSSEStream(res.body, signal)) {
     const name = ev.event.toLowerCase()
     const p = asRecord(ev.data)
@@ -1130,33 +1170,34 @@ export async function runStreamingTurn(
     } else if (name === 'delta' || name === 'deltas') {
       handlers.onDelta(str(p['turnId']), str(p['delta']))
     } else if (name === 'done') {
-      handlers.onDone(str(p['turnId']), str(p['messageId']), str(p['eventId']))
+      handlers.onDone(str(p['turnId']), str(p['messageId']))
+      settled = true
       return
     } else if (name === 'error') {
       handlers.onError(str(p['code']) || 'stream_error')
+      settled = true
       return
     }
-    // unknown/heartbeat frames are ignored
+    // unknown / heartbeat frames ignored
   }
+  if (signal.aborted) throw new DOMException('turno cancelado', 'AbortError')
+  if (!settled) throw new Error('stream_incomplete') // EOF without DONE|ERROR → drop
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/transport/__tests__/turn.test.ts`
-Expected: PASS.
+- [ ] **Step 4: Run to verify it passes** — `npx vitest run src/transport/__tests__/turn.test.ts` → PASS.
 
 - [ ] **Step 5: Typecheck + commit**
 
 ```bash
 npm run typecheck
 git add src/transport/turn.ts src/transport/__tests__/turn.test.ts
-git commit -m "feat(widget): consumidor del turno del bot por SSE (accepted/delta/done/error)"
+git commit -m "feat(widget): consumidor del turno del bot (lanza stream_incomplete en EOF sin DONE, propaga AbortError)"
 ```
 
 ---
 
-## Task 7: Sender — optimistic send, retry, cancel, streaming↔non-streaming
+## Task 7: Sender — optimistic send, cancel, degrade-subsequent (no auto-resend)
 
 **Files:**
 - Create: `src/transport/send.ts`
@@ -1181,15 +1222,14 @@ git commit -m "feat(widget): consumidor del turno del bot por SSE (accepted/delt
   function createSender(deps: SenderDeps): Sender
   ```
 
-**Behavior notes:**
-- Each send mints one `clientId = uuid()` which doubles as the `Idempotency-Key`. `retry(clientId)` re-sends with the **same** key (backend is idempotent), so a duplicate never creates a second turn.
-- Streaming path: `runStreamingTurn`; on `onAccepted` → `store.ackOptimistic`; on `onDelta` → `beginBotTurn` (first delta) then `appendBotDelta`; on `onDone` → `finishBotTurn`; on `onError` → `failBotTurn`. A **transport** failure (throw) flips the sender to non-streaming for subsequent sends (degradation §9) and marks the message failed.
-- Non-streaming path: POST `/messages` with `Idempotency-Key`; on 2xx → `ackOptimistic(clientId, userMessageId)`. The bot reply and any state change arrive via the events channel (Task 9), so the sender does **not** apply state from the response (single source = durable events).
-- `cancel()` aborts the in-flight stream and, if a `turnId` is known, POSTs `/turns/{turnId}/cancel` (idempotent, fire-and-forget).
+**Codex #6 policy (exact):**
+- `clientId = uuid()` doubles as the `Idempotency-Key`; `retry(clientId)` re-sends with the **same** key (backend dedups) — the only place a message is re-attempted.
+- On a **transport** failure of the streaming path (throw that is not `AbortError`): mark **this** message `failed` and flip `useStreaming=false` so **subsequent** sends use non-streaming. **Never** auto-resend the current message on another endpoint (especially after `accepted`).
+- `AbortError` (from `cancel()`): never marks failed, never falls back; it finalizes the in-flight bot placeholder (`failBotTurn`) and returns.
+- The conversation channel is opened via `onConversationStarted`, called **only** on `accepted` (streaming) or a 2xx (non-streaming) — never at `send()` entry.
+- `send()`/`retry()` resolve regardless of delivery outcome; the result is reflected in the store (`pending`/`sent`/`failed`) so the panel reacts to state, not to promise rejection.
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/transport/__tests__/send.test.ts`:
+- [ ] **Step 1: Write the failing test** — create `src/transport/__tests__/send.test.ts`:
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest'
@@ -1200,6 +1240,11 @@ function sse(frames: string[], status = 200): Response {
   const enc = new TextEncoder()
   const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.close() } })
   return new Response(body, { status })
+}
+function openSse(frames: string[]): Response {
+  const enc = new TextEncoder()
+  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)) } })
+  return new Response(body, { status: 200 })
 }
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -1222,18 +1267,42 @@ describe('createSender', () => {
     const msgs = store.getState().messages
     expect(msgs.find((m) => m.role === 'user')).toMatchObject({ id: 'u1', status: 'sent' })
     expect(msgs.find((m) => m.role === 'bot')).toMatchObject({ id: 'm1', text: 'Hola 👋', streaming: false })
-    const idem = new Headers(authorizedFetch.mock.calls[0]![1]?.headers).get('Idempotency-Key')
-    expect(idem).toBe('cid_1')
+    expect(new Headers(authorizedFetch.mock.calls[0]![1]?.headers).get('Idempotency-Key')).toBe('cid_1')
   })
 
-  it('a network failure marks the message failed; retry reuses the same Idempotency-Key', async () => {
+  it('a stream transport failure marks THIS message failed and does NOT auto-resend', async () => {
+    n = 0
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async () => { throw new Error('network') })
+    const sender = createSender({ client: { authorizedFetch }, store, streaming: true, uuid })
+    await sender.send('Hola')
+    expect(store.getState().messages[0]?.status).toBe('failed')
+    expect(authorizedFetch).toHaveBeenCalledTimes(1) // NO second endpoint attempt for this message
+  })
+
+  it('after a stream failure, the NEXT send degrades to non-streaming POST /messages', async () => {
+    n = 0
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let call = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      call += 1
+      if (call === 1) throw new Error('network')       // first (streaming) send fails
+      return json({ turnId: 't2', userMessageId: 'u2', state: 'BOT_ACTIVE' }) // subsequent: non-streaming
+    })
+    const sender = createSender({ client: { authorizedFetch }, store, streaming: true, uuid })
+    await sender.send('uno')
+    await sender.send('dos')
+    expect(store.getState().messages.find((m) => m.clientId === 'cid_2')).toMatchObject({ id: 'u2', status: 'sent' })
+    expect(String(authorizedFetch.mock.calls[1]![0])).toBe('/widget/v1/conversations/current/messages')
+  })
+
+  it('retry re-sends with the SAME Idempotency-Key', async () => {
     n = 0
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     let call = 0
     const authorizedFetch = vi.fn(async () => {
       call += 1
       if (call === 1) throw new Error('network')
-      // second attempt (retry) succeeds via non-streaming fallback
       return json({ turnId: 't1', userMessageId: 'u1', state: 'BOT_ACTIVE' })
     })
     const sender = createSender({ client: { authorizedFetch }, store, streaming: true, uuid })
@@ -1242,62 +1311,56 @@ describe('createSender', () => {
     await sender.retry('cid_1')
     expect(store.getState().messages[0]).toMatchObject({ id: 'u1', status: 'sent' })
     const keys = authorizedFetch.mock.calls.map((c) => new Headers(c[1]?.headers).get('Idempotency-Key'))
-    expect(keys.every((k) => k === 'cid_1')).toBe(true) // same key across attempts
+    expect(keys.every((k) => k === 'cid_1')).toBe(true)
   })
 
-  it('non-streaming send acks from the JSON body and does not set state from the response', async () => {
+  it('non-streaming send acks from the body and NEVER sets state from the response', async () => {
     n = 0
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     const authorizedFetch = vi.fn(async () => json({ turnId: 't1', userMessageId: 'u1', state: 'AGENT_ACTIVE' }))
     const sender = createSender({ client: { authorizedFetch }, store, streaming: false, uuid })
     await sender.send('Hola')
     expect(store.getState().messages[0]).toMatchObject({ id: 'u1', status: 'sent' })
-    expect(store.getState().conversationState).toBe('BOT_ACTIVE') // NOT taken from response
-    expect(String(authorizedFetch.mock.calls[0]![0])).toBe('/widget/v1/conversations/current/messages')
+    expect(store.getState().conversationState).toBeNull() // NOT taken from the response
   })
 
-  it('cancel aborts the stream and POSTs /turns/{turnId}/cancel once the turn is known', async () => {
+  it('cancel aborts the stream, POSTs /turns/{id}/cancel, and does NOT fail the message', async () => {
     n = 0
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
-    const cancelCalls: string[] = []
-    const authorizedFetch = vi.fn(async (path: string, init?: RequestInit) => {
-      if (path.endsWith('/cancel')) { cancelCalls.push(path); return json({ ok: true }, 202) }
-      // a stream that stays open until aborted
-      const body = new ReadableStream<Uint8Array>({
-        start(c) { c.enqueue(new TextEncoder().encode('event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n')) },
-      })
-      init?.signal?.addEventListener('abort', () => { try { /* controller closed by abort */ } catch { /* noop */ } })
-      return new Response(body, { status: 200 })
+    const cancels: string[] = []
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.endsWith('/cancel')) { cancels.push(path); return json({ ok: true }, 202) }
+      return openSse(['event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n']) // parks after accepted
     })
     const sender = createSender({ client: { authorizedFetch }, store, streaming: true, uuid })
     const p = sender.send('Hola')
     await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'u1')).toBe(true))
     sender.cancel()
-    await p.catch(() => { /* abort surfaces as rejection; ignore */ })
-    expect(cancelCalls).toEqual(['/widget/v1/turns/t1/cancel'])
+    await p
+    expect(cancels).toEqual(['/widget/v1/turns/t1/cancel'])
+    expect(store.getState().messages.find((m) => m.role === 'user')?.status).toBe('sent') // not failed
   })
 
-  it('notifies onConversationStarted on the first send only', async () => {
+  it('opens the conversation channel on accepted, not before', async () => {
     n = 0
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
-    const authorizedFetch = vi.fn(async () => json({ turnId: 't1', userMessageId: 'u1', state: 'BOT_ACTIVE' }))
     const started = vi.fn()
-    const sender = createSender({ client: { authorizedFetch }, store, streaming: false, uuid, onConversationStarted: started })
-    await sender.send('uno')
-    await sender.send('dos')
-    expect(started).toHaveBeenCalledTimes(1)
+    const authorizedFetch = vi.fn(async () => sse([
+      'event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n',
+      'event: done\ndata: {"turnId":"t1","messageId":"m1","eventId":"evt_v1_c_5"}\n\n',
+    ]))
+    const sender = createSender({ client: { authorizedFetch }, store, streaming: true, uuid, onConversationStarted: started })
+    const p = sender.send('Hola')
+    expect(started).not.toHaveBeenCalled() // not at send() entry
+    await p
+    expect(started).toHaveBeenCalledTimes(1) // fired on accepted
   })
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/transport/__tests__/send.test.ts` → FAIL (cannot resolve `../send`).
 
-Run: `npx vitest run src/transport/__tests__/send.test.ts`
-Expected: FAIL — cannot resolve `../send`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/transport/send.ts`:
+- [ ] **Step 3: Implement** — create `src/transport/send.ts`:
 
 ```typescript
 import type { SessionClient } from '../shell/session'
@@ -1318,6 +1381,9 @@ export interface Sender {
   cancel(): void
 }
 
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError'
+}
 function asRecord(data: string): Record<string, unknown> {
   try {
     const v: unknown = JSON.parse(data)
@@ -1329,7 +1395,7 @@ function asRecord(data: string): Record<string, unknown> {
 
 export function createSender(deps: SenderDeps): Sender {
   const uuid = deps.uuid ?? (() => crypto.randomUUID())
-  const texts = new Map<string, string>() // clientId → text (for retry)
+  const texts = new Map<string, string>()
   let useStreaming = deps.streaming
   let started = false
   let inFlight: AbortController | null = null
@@ -1345,18 +1411,25 @@ export function createSender(deps: SenderDeps): Sender {
     const ac = new AbortController()
     inFlight = ac
     currentTurnId = null
-    let beganTurn = false
+    let began = false
     const handlers: TurnHandlers = {
-      onAccepted: (turnId, userMessageId) => { currentTurnId = turnId; deps.store.ackOptimistic(clientId, userMessageId) },
+      onAccepted: (turnId, userMessageId) => {
+        currentTurnId = turnId
+        deps.store.ackOptimistic(clientId, userMessageId)
+        markStarted() // channel opens once the conversation exists
+      },
       onDelta: (turnId, delta) => {
-        if (!beganTurn) { deps.store.beginBotTurn(turnId); beganTurn = true }
+        if (!began) { deps.store.beginBotTurn(turnId); began = true }
         deps.store.appendBotDelta(turnId, delta)
       },
-      onDone: (turnId, messageId, eventId) => { deps.store.finishBotTurn(turnId, messageId, eventId) },
+      onDone: (turnId, messageId) => deps.store.finishBotTurn(turnId, messageId),
       onError: (_code) => { if (currentTurnId) deps.store.failBotTurn(currentTurnId) },
     }
     try {
       await runStreamingTurn(deps.client, clientId, text, handlers, ac.signal)
+    } catch (err) {
+      if (isAbortError(err)) { if (currentTurnId) deps.store.failBotTurn(currentTurnId); return }
+      throw err
     } finally {
       if (inFlight === ac) { inFlight = null; currentTurnId = null }
     }
@@ -1372,7 +1445,8 @@ export function createSender(deps: SenderDeps): Sender {
     const body = asRecord(await res.text())
     const userMessageId = typeof body['userMessageId'] === 'string' ? body['userMessageId'] : clientId
     deps.store.ackOptimistic(clientId, userMessageId)
-    // state and bot reply arrive via the events channel — never inferred here.
+    markStarted()
+    // state + bot reply arrive via the events channel — never inferred from the response.
   }
 
   const deliver = async (clientId: string, text: string): Promise<void> => {
@@ -1380,20 +1454,9 @@ export function createSender(deps: SenderDeps): Sender {
       if (useStreaming) await streamOnce(clientId, text)
       else await sendNonStreaming(clientId, text)
     } catch (err) {
-      if (useStreaming) {
-        // transport failure on the streaming path → degrade to non-streaming
-        // (spec §9) and retry this delivery once with the same idempotency key.
-        useStreaming = false
-        try {
-          await sendNonStreaming(clientId, text)
-          return
-        } catch {
-          deps.store.failOptimistic(clientId)
-          throw err
-        }
-      }
+      if (isAbortError(err)) return // cancel: never fail, never fall back
+      if (useStreaming) useStreaming = false // degrade SUBSEQUENT sends (not this one)
       deps.store.failOptimistic(clientId)
-      throw err
     }
   }
 
@@ -1402,7 +1465,6 @@ export function createSender(deps: SenderDeps): Sender {
       const clientId = uuid()
       texts.set(clientId, text)
       deps.store.addOptimistic(clientId, text)
-      markStarted()
       await deliver(clientId, text)
     },
     async retry(clientId: string): Promise<void> {
@@ -1412,32 +1474,27 @@ export function createSender(deps: SenderDeps): Sender {
       await deliver(clientId, text)
     },
     cancel(): void {
-      inFlight?.abort()
       const turnId = currentTurnId
-      if (turnId) {
-        void deps.client.authorizedFetch(`/widget/v1/turns/${turnId}/cancel`, { method: 'POST' })
-      }
+      inFlight?.abort()
+      if (turnId) void deps.client.authorizedFetch(`/widget/v1/turns/${turnId}/cancel`, { method: 'POST' })
     },
   }
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/transport/__tests__/send.test.ts`
-Expected: PASS (all 5 cases).
+- [ ] **Step 4: Run to verify it passes** — `npx vitest run src/transport/__tests__/send.test.ts` → PASS (all cases).
 
 - [ ] **Step 5: Typecheck + commit**
 
 ```bash
 npm run typecheck
 git add src/transport/send.ts src/transport/__tests__/send.test.ts
-git commit -m "feat(widget): sender optimista con idempotencia, reintento, cancelación y degradación"
+git commit -m "feat(widget): sender — idempotencia, sin reenvío automático del mensaje actual, degradación de posteriores, cancel sin fallback"
 ```
 
 ---
 
-## Task 8: Backoff + circuit breaker
+## Task 8: Backoff (capped exponential + jitter)
 
 **Files:**
 - Create: `src/transport/backoff.ts`
@@ -1446,19 +1503,13 @@ git commit -m "feat(widget): sender optimista con idempotencia, reintento, cance
 **Interfaces:**
 - Produces:
   ```typescript
-  interface BackoffOptions { baseMs?: number; maxMs?: number; factor?: number; jitter?: number; breakerThreshold?: number; rng?: () => number }
-  interface Backoff {
-    nextDelay(): number     // ms for the current attempt; advances the attempt counter
-    reset(): void           // back to attempt 0 (call on a successful connect)
-    isOpen(): boolean       // circuit breaker tripped (>= breakerThreshold failures)
-    attempts(): number
-  }
+  interface BackoffOptions { baseMs?: number; maxMs?: number; factor?: number; jitter?: number; rng?: () => number }
+  interface Backoff { nextDelay(): number; reset(): void }
   function createBackoff(opts?: BackoffOptions): Backoff
   ```
+- **Note (Codex #4):** there is no separate circuit-breaker object. The breaker behavior is realized by the cap (`maxMs`) + jitter here plus the polling fallback in Task 9.
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/transport/__tests__/backoff.test.ts`:
+- [ ] **Step 1: Write the failing test** — create `src/transport/__tests__/backoff.test.ts`:
 
 ```typescript
 import { describe, it, expect } from 'vitest'
@@ -1473,58 +1524,35 @@ describe('createBackoff', () => {
     expect(b.nextDelay()).toBe(800)
     expect(b.nextDelay()).toBe(800) // capped
   })
-
   it('applies bounded jitter using the injected rng', () => {
     const b = createBackoff({ baseMs: 100, factor: 2, maxMs: 10000, jitter: 0.5, rng: () => 1 })
-    // rng=1 → +50% of base delay: 100 * (1 + 0.5)
-    expect(b.nextDelay()).toBe(150)
+    expect(b.nextDelay()).toBe(150) // 100 * (1 + 0.5*1)
   })
-
-  it('reset returns to the first delay and clears the breaker', () => {
-    const b = createBackoff({ baseMs: 100, factor: 2, maxMs: 800, jitter: 0, breakerThreshold: 3 })
-    b.nextDelay(); b.nextDelay(); b.nextDelay()
-    expect(b.isOpen()).toBe(true)
+  it('reset returns to the first delay', () => {
+    const b = createBackoff({ baseMs: 100, factor: 2, maxMs: 800, jitter: 0 })
+    b.nextDelay(); b.nextDelay()
     b.reset()
-    expect(b.attempts()).toBe(0)
-    expect(b.isOpen()).toBe(false)
     expect(b.nextDelay()).toBe(100)
-  })
-
-  it('opens the breaker at or beyond the threshold', () => {
-    const b = createBackoff({ breakerThreshold: 2, jitter: 0 })
-    expect(b.isOpen()).toBe(false)
-    b.nextDelay()
-    expect(b.isOpen()).toBe(false)
-    b.nextDelay()
-    expect(b.isOpen()).toBe(true)
   })
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/transport/__tests__/backoff.test.ts` → FAIL (cannot resolve `../backoff`).
 
-Run: `npx vitest run src/transport/__tests__/backoff.test.ts`
-Expected: FAIL — cannot resolve `../backoff`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/transport/backoff.ts`:
+- [ ] **Step 3: Implement** — create `src/transport/backoff.ts`:
 
 ```typescript
 export interface BackoffOptions {
   baseMs?: number
   maxMs?: number
   factor?: number
-  jitter?: number // fraction of the base delay, e.g. 0.5 = ±50% (one-sided, additive)
-  breakerThreshold?: number
+  jitter?: number // fraction of the base delay added, one-sided (0.5 = up to +50%)
   rng?: () => number
 }
 
 export interface Backoff {
   nextDelay(): number
   reset(): void
-  isOpen(): boolean
-  attempts(): number
 }
 
 export function createBackoff(opts: BackoffOptions = {}): Backoff {
@@ -1532,176 +1560,169 @@ export function createBackoff(opts: BackoffOptions = {}): Backoff {
   const maxMs = opts.maxMs ?? 15000
   const factor = opts.factor ?? 2
   const jitter = opts.jitter ?? 0.3
-  const breakerThreshold = opts.breakerThreshold ?? 6
   const rng = opts.rng ?? Math.random
-
   let attempt = 0
 
   return {
     nextDelay(): number {
       const raw = Math.min(maxMs, baseMs * Math.pow(factor, attempt))
       attempt += 1
-      const extra = raw * jitter * rng()
-      return Math.round(Math.min(maxMs, raw + extra))
+      return Math.round(Math.min(maxMs, raw + raw * jitter * rng()))
     },
     reset(): void { attempt = 0 },
-    isOpen(): boolean { return attempt >= breakerThreshold },
-    attempts(): number { return attempt },
   }
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/transport/__tests__/backoff.test.ts`
-Expected: PASS.
+- [ ] **Step 4: Run to verify it passes** — `npx vitest run src/transport/__tests__/backoff.test.ts` → PASS.
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/transport/backoff.ts src/transport/__tests__/backoff.test.ts
-git commit -m "feat(widget): backoff exponencial con jitter y circuit breaker"
+git commit -m "feat(widget): backoff exponencial con tope y jitter"
 ```
 
 ---
 
-## Task 9: Events channel — reconcile, consume, dedup, cursor reset
+## Task 9: Events channel — generation-serialized loop (reconcile, dedup, reconnect, polling, offline, lifecycle)
 
 **Files:**
 - Create: `src/transport/events-channel.ts`
 - Test: `src/transport/__tests__/events-channel.test.ts`
 
 **Interfaces:**
-- Consumes: `MessageStore` (Tasks 4–5); `parseSSEStream` (Task 3); `SessionClient.authorizedFetch` (Plan 1); `WidgetEvent`, `MessagesSnapshot`, `EventsPollResponse` (Task 1).
-- Produces (Task 10 adds the resilience methods):
+- Consumes: `MessageStore` (Tasks 4–5); `parseSSEStream` (Task 3); `createBackoff`/`Backoff` (Task 8); `SessionClient.authorizedFetch` (Plan 1); `WidgetEvent`, `MessagesSnapshot`, `EventsPollResponse` (Task 1).
+- Produces:
   ```typescript
+  interface Scheduler { setTimeout(fn: () => void, ms: number): number; clearTimeout(id: number): void }
   interface EventsChannelDeps {
     client: Pick<SessionClient, 'authorizedFetch'>
     store: MessageStore
-    scheduler?: Scheduler          // injectable timers (Task 10 uses it; default = globalThis)
-    backoff?: Backoff              // Task 10
-    pollIntervalMs?: number        // Task 10
-    isOnline?: () => boolean       // Task 10
+    scheduler?: Scheduler
+    backoff?: Backoff
+    pollIntervalMs?: number
+    reconnectDelayMs?: number
+    isOnline?: () => boolean
   }
-  interface Scheduler { setTimeout(fn: () => void, ms: number): number; clearTimeout(id: number): void }
-  interface EventsChannel {
-    open(): void
-    close(): void
-    // Task 10 adds: suspend(), resume(), isActive()
-  }
+  interface EventsChannel { open(): void; close(): void; suspend(): void; resume(): void; isActive(): boolean }
   function createEventsChannel(deps: EventsChannelDeps): EventsChannel
   ```
 
-**Behavior (this task — happy path + cursor reset):**
-- `open()` runs `reconcile()`: GET `/messages` (head-first snapshot) → `store.applySnapshot` → open GET `/events?after={cursor}` and consume durable/ephemeral frames into the store. Idempotent: a second `open()` while active is a no-op.
-- A `409 {code:"CURSOR_RESET_REQUIRED"}` from `/events` (or a stale cursor) drops the cursor and re-reconciles from a fresh snapshot.
-- `close()` aborts the stream and marks the channel closed.
+**Design (addresses Codex #2/#3/#4/#7):**
+- **One loop** `runChannel(gen)`; a `running` guard means grouped `resume()`/`open()` never start a second loop. `open/close/suspend/resume` bump `generation`; every async continuation checks `isCurrent(gen)` before touching the store, so a stale snapshot/stream/poll from before a close/suspend never applies.
+- Each iteration: `reconcile` (snapshot → `applySnapshot`, or `replaceSnapshot` after a 409) → `connect` (parks on the live `/events` stream). On a clean close with **progress**, pause `reconnectDelayMs` then reconcile again.
+- **Failures reset only on progress:** `connect` resets the backoff and the failure counter only after the **first frame** (heartbeat counts). A 200 that opens then drops with zero frames counts as a failure — so 2 such failures reach the poll fallback.
+- **Fallback:** ≥2 consecutive failures → `connection='polling'`, one `pollOnce` (consuming `/events/poll` and advancing via the store's durable dedup), wait `pollIntervalMs`, then the loop retries `connect` — a working stream returns to `live`. A 409 on connect or poll triggers a hard `replaceSnapshot`.
+- **Offline:** loop top checks `isOnline()` → `connection='offline'` and exits; `suspend()` while offline also sets `offline`. `resume()` (online again) starts one fresh loop.
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/transport/__tests__/events-channel.test.ts`:
+- [ ] **Step 1: Write the core failing tests** — create `src/transport/__tests__/events-channel.test.ts`:
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest'
-import { createEventsChannel } from '../events-channel'
+import { createEventsChannel, type Scheduler } from '../events-channel'
+import { createBackoff } from '../backoff'
 import { createMessageStore } from '../../store/message-store'
 import type { MessagesSnapshot } from '../../contract/types'
 
 function jsonRes(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
-function sseRes(frames: string[], status = 200): Response {
+function sseOpen(frames: string[]): Response { // emits frames, stays open → connect parks live
   const enc = new TextEncoder()
-  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.close() } })
-  return new Response(body, { status, headers: { 'Content-Type': 'text/event-stream' } })
+  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)) } })
+  return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
 }
+function sseFail(): Response { return new Response(null, { status: 503 }) }
+const immediate = (): Scheduler => ({ setTimeout: (fn) => { queueMicrotask(fn); return 0 }, clearTimeout: () => {} })
+const fastBackoff = () => createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 })
+
 const SNAP: MessagesSnapshot = {
   messages: [{ messageId: 'm1', role: 'bot', text: 'Hola', createdAt: '2026-07-17T14:00:00Z' }],
   state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_1',
 }
+function ev(seq: number, id: string, text: string): string {
+  return `event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_${seq}","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:0${seq}:00Z","type":"message.created","payload":{"messageId":"${id}","role":"bot","text":"${text}"}}\n\n`
+}
 
-describe('events channel — reconcile + consume', () => {
-  it('open: snapshot then tail events, with ?after=snapshotCursor and dedup', async () => {
+describe('events channel — core', () => {
+  it('open: snapshot then tail events with ?after=snapshotCursor, dedup overlap, cursor advances', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     const calls: string[] = []
     const authorizedFetch = vi.fn(async (path: string) => {
       calls.push(path)
       if (path.includes('/messages')) return jsonRes(SNAP)
-      // /events?after=... : one overlapping replay (m1 again) + one new + a state change
-      return sseRes([
-        'event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_1","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:00:00Z","type":"message.created","payload":{"messageId":"m1","role":"bot","text":"Hola"}}\n\n',
-        'event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_2","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:05:00Z","type":"message.created","payload":{"messageId":"m2","role":"user","text":"Quiero cambiarla"}}\n\n',
+      return sseOpen([
+        ev(1, 'm1', 'Hola'), // overlaps the snapshot → deduped
+        ev(2, 'm2', 'Quiero cambiarla'),
         'event: conversation.state_changed\ndata: {"eventId":"evt_v1_conv_demo_01_3","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:06:00Z","type":"conversation.state_changed","payload":{"state":"ESCALATED_WAITING"}}\n\n',
       ])
     })
-    const ch = createEventsChannel({ client: { authorizedFetch }, store })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
     ch.open()
     await vi.waitFor(() => expect(store.getState().conversationState).toBe('ESCALATED_WAITING'))
-    expect(store.getState().messages.map((m) => m.id)).toEqual(['m1', 'm2']) // m1 deduped
+    expect(store.getState().messages.map((m) => m.id)).toEqual(['m1', 'm2'])
     expect(store.getState().cursor).toBe('evt_v1_conv_demo_01_3')
     expect(calls[0]).toContain('/widget/v1/conversations/current/messages')
     expect(calls[1]).toContain('/widget/v1/events?after=evt_v1_conv_demo_01_1')
+    ch.close()
   })
 
-  it('routes agent.typing (ephemeral) to the store without touching the cursor', async () => {
+  it('routes agent.typing (ephemeral) without moving the cursor', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     const authorizedFetch = vi.fn(async (path: string) => {
       if (path.includes('/messages')) return jsonRes(SNAP)
-      return sseRes(['event: agent.typing\ndata: {"isTyping":true}\n\n'])
+      return sseOpen(['event: agent.typing\ndata: {"isTyping":true}\n\n'])
     })
-    const ch = createEventsChannel({ client: { authorizedFetch }, store })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff() })
     ch.open()
     await vi.waitFor(() => expect(store.getState().agentTyping).toBe(true))
-    expect(store.getState().cursor).toBe('evt_v1_conv_demo_01_1') // unchanged by ephemeral
+    expect(store.getState().cursor).toBe('evt_v1_conv_demo_01_1')
+    ch.close()
   })
 
-  it('a 409 CURSOR_RESET_REQUIRED drops the cursor and re-reconciles from a fresh snapshot', async () => {
+  it('a 409 hard-resets via replaceSnapshot and reconnects', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     let eventsCall = 0
     const authorizedFetch = vi.fn(async (path: string) => {
       if (path.includes('/messages')) return jsonRes(SNAP)
       eventsCall += 1
       if (eventsCall === 1) return jsonRes({ code: 'CURSOR_RESET_REQUIRED' }, 409)
-      return sseRes(['event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_2","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:05:00Z","type":"message.created","payload":{"messageId":"m2","role":"bot","text":"reanudado"}}\n\n'])
+      return sseOpen([ev(2, 'm2', 'reanudado')])
     })
-    const ch = createEventsChannel({ client: { authorizedFetch }, store })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
     ch.open()
     await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
-    const messagesCalls = authorizedFetch.mock.calls.filter((c) => String(c[0]).includes('/messages')).length
-    expect(messagesCalls).toBe(2) // re-snapshotted after the 409
+    const snapshots = authorizedFetch.mock.calls.filter((c) => String(c[0]).includes('/messages')).length
+    expect(snapshots).toBe(2) // re-snapshotted after the 409
+    ch.close()
   })
 
-  it('close aborts the stream and open is idempotent while active', async () => {
+  it('open is idempotent and close stops the loop', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
-    let opens = 0
+    let snapshots = 0
     const authorizedFetch = vi.fn(async (path: string) => {
-      if (path.includes('/messages')) return jsonRes(SNAP)
-      opens += 1
-      return sseRes(['event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_2","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:05:00Z","type":"message.created","payload":{"messageId":"m2","role":"bot","text":"x"}}\n\n'])
+      if (path.includes('/messages')) { snapshots += 1; return jsonRes(SNAP) }
+      return sseOpen([ev(2, 'm2', 'x')])
     })
-    const ch = createEventsChannel({ client: { authorizedFetch }, store })
-    ch.open()
-    ch.open() // second call must not start a second reconcile
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff() })
+    ch.open(); ch.open()
     await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    expect(snapshots).toBe(1)
     ch.close()
-    expect(opens).toBe(1)
+    expect(store.getState().connection).toBe('idle')
   })
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/transport/__tests__/events-channel.test.ts` → FAIL (cannot resolve `../events-channel`).
 
-Run: `npx vitest run src/transport/__tests__/events-channel.test.ts`
-Expected: FAIL — cannot resolve `../events-channel`.
-
-- [ ] **Step 3: Write the implementation (core; resilience hooks stubbed for Task 10)**
-
-Create `src/transport/events-channel.ts`:
+- [ ] **Step 3: Implement** — create `src/transport/events-channel.ts`:
 
 ```typescript
 import type { SessionClient } from '../shell/session'
 import type { MessageStore } from '../store/message-store'
-import type { WidgetEvent, MessagesSnapshot } from '../contract/types'
+import type { WidgetEvent, MessagesSnapshot, EventsPollResponse } from '../contract/types'
 import { parseSSEStream } from './sse'
 import { createBackoff, type Backoff } from './backoff'
 
@@ -1716,6 +1737,7 @@ export interface EventsChannelDeps {
   scheduler?: Scheduler
   backoff?: Backoff
   pollIntervalMs?: number
+  reconnectDelayMs?: number
   isOnline?: () => boolean
 }
 
@@ -1729,7 +1751,9 @@ export interface EventsChannel {
 
 const DURABLE_TYPES = new Set(['message.created', 'conversation.state_changed', 'agent.joined'])
 
-function parseEvent(data: string): WidgetEvent | null {
+class CursorResetError extends Error {}
+
+function parseDurable(data: string): WidgetEvent | null {
   try {
     const v: unknown = JSON.parse(data)
     if (typeof v !== 'object' || v === null) return null
@@ -1748,427 +1772,283 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
   }
   const backoff = deps.backoff ?? createBackoff()
   const pollIntervalMs = deps.pollIntervalMs ?? 3000
+  const reconnectDelayMs = deps.reconnectDelayMs ?? 500
   const isOnline = deps.isOnline ?? (() => globalThis.navigator?.onLine ?? true)
 
   let active = false
   let suspended = false
+  let running = false
+  let generation = 0
   let streamAc: AbortController | null = null
   let timer: number | null = null
-  let polling = false
-  let consecutiveFailures = 0
-  let cursorReset = false
+  let pendingDelay: (() => void) | null = null
 
-  const clearTimer = (): void => {
+  const isCurrent = (gen: number): boolean => active && !suspended && gen === generation
+  const cancelDelay = (): void => {
     if (timer !== null) { scheduler.clearTimeout(timer); timer = null }
+    if (pendingDelay) { const r = pendingDelay; pendingDelay = null; r() }
   }
+  const delay = (ms: number): Promise<void> =>
+    new Promise((resolve) => {
+      pendingDelay = resolve
+      timer = scheduler.setTimeout(() => { timer = null; pendingDelay = null; resolve() }, ms)
+    })
 
   const routeFrame = (event: string, data: string): void => {
     if (DURABLE_TYPES.has(event)) {
-      const parsed = parseEvent(data)
+      const parsed = parseDurable(data)
       if (parsed) deps.store.applyDurableEvent(parsed)
     } else if (event === 'agent.typing') {
-      try {
-        const v = JSON.parse(data) as { isTyping?: unknown }
-        deps.store.setAgentTyping(v.isTyping === true)
-      } catch { /* ignore malformed ephemeral */ }
+      try { deps.store.setAgentTyping((JSON.parse(data) as { isTyping?: unknown }).isTyping === true) }
+      catch { /* ignore malformed ephemeral */ }
     }
-    // presence / heartbeat: ignored (forward-compat)
+    // presence / heartbeat: ignored (heartbeat still counts as progress in connect())
   }
 
-  const consumeStream = async (body: ReadableStream<Uint8Array>, signal: AbortSignal): Promise<void> => {
-    for await (const ev of parseSSEStream(body, signal)) {
-      routeFrame(ev.event, ev.data)
-    }
+  const snapshot = async (gen: number): Promise<MessagesSnapshot | null> => {
+    const res = await deps.client.authorizedFetch('/widget/v1/conversations/current/messages?limit=50')
+    if (!isCurrent(gen)) return null
+    if (res.status === 409) throw new CursorResetError('snapshot_cursor_reset')
+    if (!res.ok) throw new Error(`snapshot_http:${res.status}`)
+    return (await res.json()) as MessagesSnapshot
   }
 
-  const connectStream = async (): Promise<void> => {
+  // Parks on the live stream. Returns when the server closes it cleanly WITH
+  // progress; throws on transport error or a 0-frame close; throws
+  // CursorResetError on a 409.
+  const connect = async (gen: number): Promise<void> => {
     const after = deps.store.getState().cursor ?? ''
     const ac = new AbortController()
     streamAc = ac
-    const res = await deps.client.authorizedFetch(
-      `/widget/v1/events?after=${encodeURIComponent(after)}`,
-      { signal: ac.signal },
-    )
-    if (res.status === 409) {
-      cursorReset = true
-      throw new Error('cursor_reset')
-    }
+    const res = await deps.client.authorizedFetch(`/widget/v1/events?after=${encodeURIComponent(after)}`, { signal: ac.signal })
+    if (!isCurrent(gen)) { ac.abort(); return }
+    if (res.status === 409) throw new CursorResetError('events_cursor_reset')
     if (!res.ok || !res.body) throw new Error(`events_http:${res.status}`)
     deps.store.setConnection('live')
-    backoff.reset()
-    consecutiveFailures = 0
-    await consumeStream(res.body, ac.signal)
-    // stream ended cleanly (server closed) → treat as a disconnect to reconnect.
-    throw new Error('events_closed')
+    let progressed = false
+    for await (const frame of parseSSEStream(res.body, ac.signal)) {
+      if (!isCurrent(gen)) { ac.abort(); return }
+      if (!progressed) { progressed = true; backoff.reset() } // liveness → reset failure state
+      routeFrame(frame.event, frame.data)
+    }
+    if (!progressed) throw new Error('events_closed_no_progress')
   }
 
-  // reconcile() and the failure/reconnect/poll machinery are completed in Task 10.
-  // Task 9 provides a straight-line version: snapshot → connect → (on 409) retry once.
-  const snapshot = async (): Promise<void> => {
-    const res = await deps.client.authorizedFetch('/widget/v1/conversations/current/messages?limit=50')
-    if (!res.ok) throw new Error(`snapshot_http:${res.status}`)
-    const snap = (await res.json()) as MessagesSnapshot
-    deps.store.applySnapshot(snap)
+  const pollOnce = async (gen: number): Promise<void> => {
+    const after = deps.store.getState().cursor ?? ''
+    const res = await deps.client.authorizedFetch(`/widget/v1/events/poll?after=${encodeURIComponent(after)}`)
+    if (!isCurrent(gen)) return
+    if (res.status === 409) throw new CursorResetError('poll_cursor_reset')
+    if (!res.ok) throw new Error(`poll_http:${res.status}`)
+    const body = (await res.json()) as EventsPollResponse
+    if (!isCurrent(gen)) return
+    for (const e of body.events) deps.store.applyDurableEvent(e) // cursor advances via durable dedup
   }
 
-  const runCore = async (): Promise<void> => {
-    await snapshot()
+  const reconcile = async (gen: number, hard: boolean): Promise<void> => {
+    const snap = await snapshot(gen)
+    if (snap === null || !isCurrent(gen)) return
+    if (hard) deps.store.replaceSnapshot(snap)
+    else deps.store.applySnapshot(snap)
+  }
+
+  const runChannel = async (gen: number): Promise<void> => {
+    running = true
+    let failures = 0
+    let hard = false
     try {
-      await connectStream()
-    } catch (err) {
-      if (cursorReset) {
-        cursorReset = false
-        // drop cursor by re-snapshotting from scratch, then reconnect once.
-        await snapshot()
-        await connectStream().catch(() => onFailure())
-        return
+      while (isCurrent(gen)) {
+        if (!isOnline()) { deps.store.setConnection('offline'); return }
+        try {
+          await reconcile(gen, hard)
+          hard = false
+          if (!isCurrent(gen)) return
+          await connect(gen)          // parks while live
+          if (!isCurrent(gen)) return
+          failures = 0
+          await delay(reconnectDelayMs) // clean close → brief pause, then reconcile
+        } catch (err) {
+          if (!isCurrent(gen)) return
+          if (err instanceof CursorResetError) { hard = true; failures = 0; continue }
+          failures += 1
+          if (failures >= 2) {
+            deps.store.setConnection('polling')
+            try { await pollOnce(gen) } catch (e) { if (e instanceof CursorResetError) hard = true }
+            if (!isCurrent(gen)) return
+            await delay(pollIntervalMs)
+          } else {
+            deps.store.setConnection('reconnecting')
+            await delay(backoff.nextDelay())
+          }
+        }
       }
-      onFailure()
+    } finally {
+      if (gen === generation) running = false
     }
   }
 
-  // onFailure is filled in by Task 10 (reconnect/poll). Task 9 keeps it minimal.
-  let onFailure = (): void => {
-    deps.store.setConnection('reconnecting')
+  const start = (): void => {
+    if (running) return
+    generation += 1
+    const gen = generation
+    void runChannel(gen)
   }
-  // Exposed for Task 10 to replace with the full resilience policy.
-  const internals = { get onFailure() { return onFailure }, set onFailure(fn: () => void) { onFailure = fn } }
-  void internals
-  void backoff; void pollIntervalMs; void isOnline; void polling; void consecutiveFailures; void clearTimer; void suspended
 
   return {
     open(): void {
       if (active) return
       active = true
       suspended = false
-      void runCore()
+      backoff.reset()
+      start()
     },
     close(): void {
       active = false
-      streamAc?.abort()
-      streamAc = null
-      clearTimer()
+      suspended = false
+      generation += 1
+      running = false
+      streamAc?.abort(); streamAc = null
+      cancelDelay()
       deps.store.setConnection('idle')
     },
-    suspend(): void { /* completed in Task 10 */ },
-    resume(): void { /* completed in Task 10 */ },
+    suspend(): void {
+      if (!active) return
+      suspended = true
+      generation += 1
+      running = false
+      streamAc?.abort(); streamAc = null
+      cancelDelay()
+      if (!isOnline()) deps.store.setConnection('offline')
+    },
+    resume(): void {
+      if (!active) return
+      suspended = false
+      start()
+    },
     isActive(): boolean { return active },
   }
 }
 ```
 
-> Note: Task 9 leaves `suspend`/`resume`/reconnect/poll deliberately minimal (the tests above don't exercise them). Task 10 rewrites `onFailure`, `suspend`, `resume`, and adds the poll loop against the SAME file. The `void ...` lines silence `noUnusedLocals` for bindings Task 10 will use; remove them in Task 10 as each is wired.
+- [ ] **Step 4: Run the core tests** — `npx vitest run src/transport/__tests__/events-channel.test.ts` → PASS (4 cases).
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/transport/__tests__/events-channel.test.ts`
-Expected: PASS (4 cases).
-
-- [ ] **Step 5: Typecheck + commit**
-
-```bash
-npm run typecheck
-git add src/transport/events-channel.ts src/transport/__tests__/events-channel.test.ts
-git commit -m "feat(widget): canal de eventos — reconciliación head-first, consumo, dedup, cursor reset"
-```
-
----
-
-## Task 10: Events channel — reconnect backoff, polling fallback, lifecycle
-
-**Files:**
-- Modify: `src/transport/events-channel.ts`
-- Test: `src/transport/__tests__/events-channel-resilience.test.ts`
-
-**Interfaces:**
-- Consumes: everything from Task 9 (same file); `createBackoff` (Task 8); `EventsPollResponse` (Task 1).
-- Produces: completes `suspend()`, `resume()`; adds reconnect-with-backoff and the `/events/poll` fallback (2 consecutive stream failures → poll every `pollIntervalMs`, retry stream after a poll cycle); sets `connection` to `reconnecting`/`polling`/`offline`/`live` accordingly.
-
-**Behavior:**
-- On a stream failure that is **not** a cursor reset: increment `consecutiveFailures`, set `connection = 'reconnecting'`, and after `backoff.nextDelay()` re-run `reconcile()` (snapshot → connect). Reconciliation on every reconnect keeps the store gap-free (dedup absorbs the overlap).
-- After **2** consecutive failures: switch to polling. `connection = 'polling'`. Every `pollIntervalMs`, GET `/events/poll?after={cursor}` → apply all durables. A `409` on poll re-snapshots. After each successful poll cycle, attempt `connectStream()` again; on success, stop polling (`backoff.reset()`, `connection = 'live'`).
-- `isOnline()` false → `connection = 'offline'`, stop timers; `resume()` (called by lifecycle on `online`) re-reconciles.
-- `suspend()` aborts the stream, keeps the cursor, clears timers, does not go offline. `resume()` re-reconciles from the retained cursor if active.
-
-- [ ] **Step 1: Write the failing test**
-
-Create `src/transport/__tests__/events-channel-resilience.test.ts`:
+- [ ] **Step 5: Add the resilience + lifecycle tests** — append to the same test file:
 
 ```typescript
-import { describe, it, expect, vi } from 'vitest'
-import { createEventsChannel, type Scheduler } from '../events-channel'
-import { createBackoff } from '../backoff'
-import { createMessageStore } from '../../store/message-store'
-import type { MessagesSnapshot, EventsPollResponse } from '../../contract/types'
+function durableEvent(seq: number, id: string, text: string) {
+  return {
+    eventId: `evt_v1_conv_demo_01_${seq}`, schemaVersion: 1 as const, conversationId: 'conv_demo_01',
+    occurredAt: `2026-07-17T14:0${seq}:00Z`, type: 'message.created' as const,
+    payload: { messageId: id, role: 'bot' as const, text },
+  }
+}
+const EMPTY: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_0' }
 
-function jsonRes(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
-}
-function sseRes(frames: string[], status = 200): Response {
-  const enc = new TextEncoder()
-  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.close() } })
-  return new Response(body, { status, headers: { 'Content-Type': 'text/event-stream' } })
-}
-const SNAP: MessagesSnapshot = {
-  messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_1',
-}
-function eventFrame(seq: number, id: string, text: string): string {
-  return `event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_${seq}","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:0${seq}:00Z","type":"message.created","payload":{"messageId":"${id}","role":"bot","text":"${text}"}}\n\n`
-}
-
-// A scheduler that runs every scheduled callback immediately (drains delays).
-function immediateScheduler(): Scheduler {
-  return { setTimeout: (fn) => { queueMicrotask(fn); return 0 }, clearTimeout: () => {} }
-}
-
-describe('events channel — resilience', () => {
+describe('events channel — resilience & lifecycle', () => {
   it('falls back to polling after 2 consecutive stream failures and applies polled durables', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     let streamAttempts = 0
-    let polled = false
-    const poll: EventsPollResponse = { events: [], cursor: 'evt_v1_conv_demo_01_2' }
     const authorizedFetch = vi.fn(async (path: string) => {
-      if (path.includes('/messages')) return jsonRes(SNAP)
-      if (path.includes('/events/poll')) {
-        polled = true
-        return jsonRes({
-          events: [JSON.parse(eventFrame(2, 'mp', 'desde-poll').replace(/^event: .*\ndata: /, '').trim())],
-          cursor: poll.cursor,
-        })
-      }
-      if (path.includes('/events?')) { streamAttempts += 1; return sseRes([], 503) } // always fail the stream
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      if (path.includes('/events/poll')) return jsonRes({ events: [durableEvent(2, 'mp', 'desde-poll')], cursor: 'evt_v1_conv_demo_01_2' })
+      if (path.includes('/events?')) { streamAttempts += 1; return sseFail() }
       return jsonRes({})
     })
-    const ch = createEventsChannel({
-      client: { authorizedFetch }, store,
-      scheduler: immediateScheduler(),
-      backoff: createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 }),
-      pollIntervalMs: 1,
-    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), pollIntervalMs: 1, reconnectDelayMs: 1 })
     ch.open()
-    await vi.waitFor(() => expect(polled).toBe(true))
     await vi.waitFor(() => expect(store.getState().connection).toBe('polling'))
     expect(streamAttempts).toBeGreaterThanOrEqual(2)
     await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'mp')).toBe(true))
     ch.close()
   })
 
-  it('recovers to live: after a polled cycle a working stream stops polling', async () => {
+  it('recovers to live: after polling, a working stream returns the channel to live', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     let streamAttempts = 0
     const authorizedFetch = vi.fn(async (path: string) => {
-      if (path.includes('/messages')) return jsonRes(SNAP)
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
       if (path.includes('/events/poll')) return jsonRes({ events: [], cursor: null })
       if (path.includes('/events?')) {
         streamAttempts += 1
-        if (streamAttempts <= 2) return sseRes([], 503)          // fail twice → poll
-        return sseRes([eventFrame(3, 'mlive', 'en-vivo')])        // then a good stream
+        if (streamAttempts <= 2) return sseFail()
+        return sseOpen([ev(3, 'mlive', 'en-vivo')]) // stays open → parks live
       }
       return jsonRes({})
     })
-    const ch = createEventsChannel({
-      client: { authorizedFetch }, store,
-      scheduler: immediateScheduler(),
-      backoff: createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 }),
-      pollIntervalMs: 1,
-    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), pollIntervalMs: 1, reconnectDelayMs: 1 })
     ch.open()
     await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'mlive')).toBe(true))
     await vi.waitFor(() => expect(store.getState().connection).toBe('live'))
     ch.close()
   })
 
-  it('offline stops the channel; resume re-reconciles', async () => {
+  it('offline sets connection=offline and stops; resume re-reconciles when online', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     let online = false
     const authorizedFetch = vi.fn(async (path: string) => {
-      if (path.includes('/messages')) return jsonRes(SNAP)
-      return sseRes([eventFrame(2, 'm2', 'hola')])
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      return sseOpen([ev(2, 'm2', 'hola')])
     })
-    const ch = createEventsChannel({
-      client: { authorizedFetch }, store,
-      scheduler: immediateScheduler(),
-      backoff: createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 }),
-      isOnline: () => online,
-    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), isOnline: () => online, reconnectDelayMs: 1 })
     ch.open()
     await vi.waitFor(() => expect(store.getState().connection).toBe('offline'))
     online = true
     ch.resume()
     await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    await vi.waitFor(() => expect(store.getState().connection).toBe('live'))
     ch.close()
   })
 
-  it('suspend aborts the stream but keeps the cursor; resume reconnects from it', async () => {
+  it('suspend keeps the cursor; resume reconnects from it', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
-    const seenAfter: string[] = []
+    const afters: string[] = []
     const authorizedFetch = vi.fn(async (path: string) => {
-      if (path.includes('/messages')) return jsonRes(SNAP)
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
       const m = /after=([^&]*)/.exec(path)
-      if (m) seenAfter.push(decodeURIComponent(m[1]!))
-      return sseRes([eventFrame(2, 'm2', 'x')])
+      if (m) afters.push(decodeURIComponent(m[1]!))
+      return sseOpen([ev(2, 'm2', 'x')])
     })
-    const ch = createEventsChannel({
-      client: { authorizedFetch }, store,
-      scheduler: immediateScheduler(),
-      backoff: createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 }),
-    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
     ch.open()
     await vi.waitFor(() => expect(store.getState().cursor).toBe('evt_v1_conv_demo_01_2'))
     ch.suspend()
     ch.resume()
-    await vi.waitFor(() => expect(seenAfter.length).toBeGreaterThanOrEqual(2))
-    expect(seenAfter.at(-1)).toBe('evt_v1_conv_demo_01_2') // reconnected from the retained cursor
+    await vi.waitFor(() => expect(afters.length).toBeGreaterThanOrEqual(2))
+    expect(afters.at(-1)).toBe('evt_v1_conv_demo_01_2') // reconnected from the retained cursor
+    ch.close()
+  })
+
+  it('grouped resume() calls while live do not start concurrent reconciliations', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let snapshots = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) { snapshots += 1; return jsonRes(EMPTY) }
+      return sseOpen([ev(2, 'm2', 'x')])
+    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(store.getState().connection).toBe('live'))
+    const before = snapshots
+    ch.resume(); ch.resume(); ch.resume() // loop already running (live) → all no-ops
+    await new Promise((r) => queueMicrotask(() => r(null)))
+    expect(snapshots).toBe(before)
     ch.close()
   })
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 6: Run the whole channel suite + typecheck** — `npx vitest run src/transport/__tests__/events-channel.test.ts && npm run typecheck` → PASS (9 cases), no type errors.
 
-Run: `npx vitest run src/transport/__tests__/events-channel-resilience.test.ts`
-Expected: FAIL — `suspend`/`resume` are no-ops and there is no poll loop.
-
-- [ ] **Step 3: Rewrite the resilience machinery in `src/transport/events-channel.ts`**
-
-Add the `EventsPollResponse` import to the existing type import:
-
-```typescript
-import type { WidgetEvent, MessagesSnapshot, EventsPollResponse } from '../contract/types'
-```
-
-Replace everything from the `runCore` definition down to the `return { ... }` block (i.e. from `const runCore = async` through the end of `createEventsChannel`) with the full policy:
-
-```typescript
-  const startPolling = (): void => {
-    if (!active || suspended) return
-    polling = true
-    deps.store.setConnection('polling')
-    const tick = async (): Promise<void> => {
-      if (!active || suspended || !polling) return
-      if (!isOnline()) { goOffline(); return }
-      try {
-        const after = deps.store.getState().cursor ?? ''
-        const res = await deps.client.authorizedFetch(`/widget/v1/events/poll?after=${encodeURIComponent(after)}`)
-        if (res.status === 409) { await reconcile(); return }
-        if (res.ok) {
-          const body = (await res.json()) as EventsPollResponse
-          for (const e of body.events) deps.store.applyDurableEvent(e)
-        }
-      } catch { /* keep polling; the stream retry below may recover */ }
-      // after a poll cycle, try to re-establish the live stream
-      try {
-        await connectStream()
-        polling = false // connectStream throws on close/failure; reaching here won't happen,
-      } catch (err) {
-        if (cursorReset) { cursorReset = false; await reconcile(); return }
-        if (!active || suspended) return
-        // stream still down → schedule the next poll tick
-        timer = scheduler.setTimeout(() => { void tick() }, pollIntervalMs)
-      }
-    }
-    timer = scheduler.setTimeout(() => { void tick() }, pollIntervalMs)
-  }
-
-  const goOffline = (): void => {
-    clearTimer()
-    polling = false
-    streamAc?.abort()
-    streamAc = null
-    deps.store.setConnection('offline')
-  }
-
-  onFailure = (): void => {
-    if (!active || suspended) return
-    if (!isOnline()) { goOffline(); return }
-    consecutiveFailures += 1
-    if (consecutiveFailures >= 2) { startPolling(); return }
-    deps.store.setConnection('reconnecting')
-    timer = scheduler.setTimeout(() => { void reconcile() }, backoff.nextDelay())
-  }
-
-  async function reconcile(): Promise<void> {
-    if (!active || suspended) return
-    if (!isOnline()) { goOffline(); return }
-    clearTimer()
-    try {
-      await snapshot()
-    } catch { onFailure(); return }
-    try {
-      await connectStream()
-    } catch (err) {
-      if (cursorReset) {
-        cursorReset = false
-        try { await snapshot() } catch { onFailure(); return }
-        try { await connectStream() } catch { onFailure() }
-        return
-      }
-      onFailure()
-    }
-  }
-
-  return {
-    open(): void {
-      if (active) return
-      active = true
-      suspended = false
-      consecutiveFailures = 0
-      polling = false
-      backoff.reset()
-      void reconcile()
-    },
-    close(): void {
-      active = false
-      suspended = false
-      polling = false
-      streamAc?.abort()
-      streamAc = null
-      clearTimer()
-      deps.store.setConnection('idle')
-    },
-    suspend(): void {
-      if (!active) return
-      suspended = true
-      polling = false
-      streamAc?.abort()
-      streamAc = null
-      clearTimer()
-    },
-    resume(): void {
-      if (!active) return
-      suspended = false
-      consecutiveFailures = 0
-      backoff.reset()
-      void reconcile()
-    },
-    isActive(): boolean { return active },
-  }
-```
-
-Then delete the now-obsolete Task 9 stubs from the file: the straight-line `runCore`, the `let onFailure = ...` minimal assignment (keep a forward declaration `let onFailure: () => void = () => {}` near the other `let` bindings so `connectStream`/`startPolling` can reference it before assignment), the `internals` shim, and every `void ...;` guard line. `connectStream`, `snapshot`, `routeFrame`, `consumeStream`, `parseEvent`, and the top `let` state remain as written in Task 9.
-
-> Wiring note: `onFailure` and `reconcile` are mutually recursive with `connectStream`/`startPolling`. Declare `let onFailure: () => void = () => {}` and `function reconcile()` (hoisted) so ordering type-checks. `startPolling` calls `connectStream`; on its throw the `catch` reschedules — a successful stream never returns (it ends by throwing `events_closed`, which routes back through `onFailure` → reconnect), so the `polling = false` line after `connectStream()` is unreachable-by-design but kept for clarity; guard it as shown.
-
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/transport/__tests__/events-channel-resilience.test.ts`
-Expected: PASS (4 cases).
-
-- [ ] **Step 5: Re-run the Task 9 suite (no regressions) + typecheck**
-
-Run: `npx vitest run src/transport/__tests__/events-channel.test.ts src/transport/__tests__/events-channel-resilience.test.ts && npm run typecheck`
-Expected: PASS, no type errors.
-
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add src/transport/events-channel.ts src/transport/__tests__/events-channel-resilience.test.ts
-git commit -m "feat(widget): canal de eventos — reconexión con backoff, fallback a polling y ciclo suspend/resume"
+git add src/transport/events-channel.ts src/transport/__tests__/events-channel.test.ts
+git commit -m "feat(widget): canal de eventos — bucle único serializado por generación (reconciliación, dedup, 409 hard reset, reconexión, polling, offline, suspend/resume)"
 ```
 
 ---
 
-## Task 11: Page lifecycle binding
+## Task 10: Page lifecycle binding
 
 **Files:**
 - Create: `src/shell/lifecycle.ts`
@@ -2178,20 +2058,18 @@ git commit -m "feat(widget): canal de eventos — reconexión con backoff, fallb
 - Produces:
   ```typescript
   interface LifecycleHandlers { onSuspend(): void; onResume(): void }
-  function bindPageLifecycle(target: Window, handlers: LifecycleHandlers): () => void  // returns unbind
+  function bindPageLifecycle(target: Window, handlers: LifecycleHandlers): () => void // returns unbind
   ```
-- Behavior: `freeze` + `visibilitychange→hidden` + `offline` → `onSuspend`; `resume` + `pageshow` + `visibilitychange→visible` + `online` → `onResume`. Nothing depends on `unload` (spec §9). The returned function removes every listener.
+- Behavior: `freeze` + `offline` + `visibilitychange→hidden` → `onSuspend`; `resume` + `pageshow` + `online` + `visibilitychange→visible` → `onResume`. Nothing depends on `unload` (spec §9). Idempotency of resume and offline's `connection` update are the channel's responsibility (Task 9); `bindPageLifecycle` just translates DOM events. The returned function removes every listener.
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/shell/__tests__/lifecycle.test.ts`:
+- [ ] **Step 1: Write the failing test** — create `src/shell/__tests__/lifecycle.test.ts`:
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest'
 import { bindPageLifecycle } from '../lifecycle'
 
 describe('bindPageLifecycle', () => {
-  it('maps freeze/offline/hidden to onSuspend and resume/pageshow/online/visible to onResume', () => {
+  it('maps freeze/offline/hidden → onSuspend and resume/pageshow/online/visible → onResume', () => {
     const onSuspend = vi.fn()
     const onResume = vi.fn()
     const unbind = bindPageLifecycle(window, { onSuspend, onResume })
@@ -2208,7 +2086,7 @@ describe('bindPageLifecycle', () => {
     unbind()
     window.dispatchEvent(new Event('freeze'))
     window.dispatchEvent(new Event('online'))
-    expect(onSuspend).toHaveBeenCalledTimes(2) // no more after unbind
+    expect(onSuspend).toHaveBeenCalledTimes(2)
     expect(onResume).toHaveBeenCalledTimes(3)
   })
 
@@ -2232,14 +2110,9 @@ describe('bindPageLifecycle', () => {
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/shell/__tests__/lifecycle.test.ts` → FAIL (cannot resolve `../lifecycle`).
 
-Run: `npx vitest run src/shell/__tests__/lifecycle.test.ts`
-Expected: FAIL — cannot resolve `../lifecycle`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/shell/lifecycle.ts`:
+- [ ] **Step 3: Implement** — create `src/shell/lifecycle.ts`:
 
 ```typescript
 export interface LifecycleHandlers {
@@ -2276,38 +2149,31 @@ export function bindPageLifecycle(target: Window, handlers: LifecycleHandlers): 
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/shell/__tests__/lifecycle.test.ts`
-Expected: PASS.
+- [ ] **Step 4: Run to verify it passes** — `npx vitest run src/shell/__tests__/lifecycle.test.ts` → PASS.
 
 - [ ] **Step 5: Typecheck + commit**
 
 ```bash
 npm run typecheck
 git add src/shell/lifecycle.ts src/shell/__tests__/lifecycle.test.ts
-git commit -m "feat(widget): binding de ciclo de vida de página (freeze/resume/online/visibilidad)"
+git commit -m "feat(widget): binding de ciclo de vida de página (freeze/resume/online/visibilidad → suspend/resume)"
 ```
 
 ---
 
-## Task 12: Transport facade + end-to-end integration
+## Task 11: Transport facade + end-to-end integration
 
 **Files:**
 - Create: `src/transport/index.ts`
 - Test: `src/transport/__tests__/transport.test.ts`
 
 **Interfaces:**
-- Consumes: `createMessageStore` (4–5), `createSender` (7), `createEventsChannel` (9–10), `bindPageLifecycle` (11), `SessionClient` (Plan 1).
+- Consumes: `createMessageStore` (4–5), `createSender` (7), `createEventsChannel`/`Scheduler` (9), `bindPageLifecycle` (10), `Backoff` (8), `SessionClient` (Plan 1).
 - Produces:
   ```typescript
   interface TransportOptions {
-    window?: Window
-    scheduler?: Scheduler
-    backoff?: Backoff
-    pollIntervalMs?: number
-    uuid?: () => string
-    now?: () => string
+    window?: Window; scheduler?: Scheduler; backoff?: Backoff
+    pollIntervalMs?: number; reconnectDelayMs?: number; uuid?: () => string; now?: () => string
   }
   interface Transport {
     store: MessageStore
@@ -2320,11 +2186,9 @@ git commit -m "feat(widget): binding de ciclo de vida de página (freeze/resume/
   }
   function createTransport(client: SessionClient, opts?: TransportOptions): Transport
   ```
-- Wiring: the store is built with `opts.now`; the sender uses `client.getConfig().features.handoff` **is not** the streaming signal — streaming is always attempted first (degrades per Task 7). The sender's `onConversationStarted` calls `channel.open()` (opening the durable channel when the conversation becomes active, spec §4.3 lifecycle). `bindPageLifecycle` maps to `channel.suspend`/`channel.resume`. `destroy()` closes the channel and unbinds lifecycle.
+- Wiring: streaming is always attempted first (the sender degrades per Task 7). The sender's `onConversationStarted` → `channel.open()` (channel opens once the server accepts the first message — Codex #6). `bindPageLifecycle` maps to `channel.suspend`/`channel.resume`. `destroy()` unbinds lifecycle and closes the channel. All optional deps are passed with conditional spreads to satisfy `exactOptionalPropertyTypes`.
 
-- [ ] **Step 1: Write the failing test**
-
-Create `src/transport/__tests__/transport.test.ts`:
+- [ ] **Step 1: Write the failing test** — create `src/transport/__tests__/transport.test.ts`:
 
 ```typescript
 import { describe, it, expect, vi } from 'vitest'
@@ -2338,41 +2202,45 @@ import type { MessagesSnapshot } from '../../contract/types'
 function jsonRes(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
-function sseRes(frames: string[], status = 200): Response {
+function sse(frames: string[]): Response { // closes after frames
   const enc = new TextEncoder()
   const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.close() } })
-  return new Response(body, { status, headers: { 'Content-Type': 'text/event-stream' } })
+  return new Response(body, { status: 200 })
+}
+function sseOpen(frames: string[]): Response { // parks open
+  const enc = new TextEncoder()
+  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)) } })
+  return new Response(body, { status: 200 })
 }
 const immediate: Scheduler = { setTimeout: (fn) => { queueMicrotask(fn); return 0 }, clearTimeout: () => {} }
-const EMPTY_SNAP: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_0' }
-
+const EMPTY: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_0' }
+function botEvt(seq: number, id: string, text: string): string {
+  return `event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_${seq}","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:0${seq}:00Z","type":"message.created","payload":{"messageId":"${id}","role":"bot","text":"${text}"}}\n\n`
+}
 function fakeClient(authorizedFetch: SessionClient['authorizedFetch']): SessionClient {
   return { getConfig: () => fixtureConfig(), authorizedFetch, destroy: vi.fn() }
 }
 let n = 0
 const uuid = () => `cid_${++n}`
+const opts = () => ({ scheduler: immediate, backoff: createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 }), reconnectDelayMs: 1, uuid, now: () => '2026-07-17T15:00:00Z' })
 
 describe('createTransport (integration)', () => {
-  it('send → optimistic → streamed bot reply; durable replay dedups against the streamed bubble', async () => {
+  it('send → optimistic → streamed reply; the durable replay dedups against the streamed bubble; channel opened on accepted', async () => {
     n = 0
     const authorizedFetch = vi.fn(async (path: string) => {
-      if (path.includes('/messages') && path.includes('?')) return jsonRes(EMPTY_SNAP)          // snapshot
-      if (path.includes('/stream')) return sseRes([
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)  // snapshot
+      if (path.includes('/stream')) return sse([
         'event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n',
         'event: delta\ndata: {"turnId":"t1","delta":"Sí 🙌"}\n\n',
         'event: done\ndata: {"turnId":"t1","messageId":"mbot","eventId":"evt_v1_conv_demo_01_5"}\n\n',
       ])
-      if (path.includes('/events?')) return sseRes([
-        // durable replay of the same bot message the stream already showed
-        'event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_5","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:05:00Z","type":"message.created","payload":{"messageId":"mbot","role":"bot","text":"Sí 🙌"}}\n\n',
-      ])
+      if (path.includes('/events?')) return sseOpen([botEvt(5, 'mbot', 'Sí 🙌')]) // durable replay of the bot msg
       return jsonRes({})
     })
-    const t = createTransport(fakeClient(authorizedFetch), { scheduler: immediate, backoff: createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 }), uuid, now: () => '2026-07-17T15:00:00Z' })
+    const t = createTransport(fakeClient(authorizedFetch), opts())
     await t.send('¿Puedo cambiar mi entrada?')
     await vi.waitFor(() => expect(t.store.getState().messages.some((m) => m.id === 'mbot')).toBe(true))
-    // sending opened the channel (conversation active); the replay must not duplicate the bot bubble
-    expect(t.store.getState().messages.filter((m) => m.role === 'bot')).toHaveLength(1)
+    expect(t.store.getState().messages.filter((m) => m.role === 'bot')).toHaveLength(1) // no duplicate
     expect(t.store.getState().messages.find((m) => m.role === 'user')).toMatchObject({ id: 'u1', status: 'sent' })
     t.destroy()
   })
@@ -2380,53 +2248,48 @@ describe('createTransport (integration)', () => {
   it('a server state_changed on the channel drives the client state machine', async () => {
     n = 0
     const authorizedFetch = vi.fn(async (path: string) => {
-      if (path.includes('/messages') && path.includes('?')) return jsonRes(EMPTY_SNAP)
-      if (path.includes('/events?')) return sseRes([
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      if (path.includes('/events?')) return sseOpen([
         'event: conversation.state_changed\ndata: {"eventId":"evt_v1_conv_demo_01_2","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:06:00Z","type":"conversation.state_changed","payload":{"state":"AGENT_ACTIVE"}}\n\n',
         'event: agent.joined\ndata: {"eventId":"evt_v1_conv_demo_01_3","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:07:00Z","type":"agent.joined","payload":{"agentName":"Laura","agentAvatarUrl":null}}\n\n',
       ])
       return jsonRes({})
     })
-    const t = createTransport(fakeClient(authorizedFetch), { scheduler: immediate, backoff: createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 }), uuid, now: () => '2026-07-17T15:00:00Z' })
+    const t = createTransport(fakeClient(authorizedFetch), opts())
     t.openChannel()
     await vi.waitFor(() => expect(t.store.getState().conversationState).toBe('AGENT_ACTIVE'))
     expect(t.store.getState().agentName).toBe('Laura')
     t.destroy()
   })
 
-  it('stream drop mid-channel triggers reconcile (re-snapshot) and stays gap-free', async () => {
+  it('a stream that drops AFTER delivering an event reconciles and dedups the overlap (gap-free)', async () => {
     n = 0
     let eventsCall = 0
     const authorizedFetch = vi.fn(async (path: string) => {
-      if (path.includes('/messages') && path.includes('?')) {
-        // second snapshot includes the message that the dropped stream missed
+      if (path.includes('/messages') && path.includes('limit')) {
         return jsonRes(eventsCall >= 1
-          ? { messages: [{ messageId: 'mgap', role: 'bot', text: 'recuperado', createdAt: '2026-07-17T14:08:00Z' }], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_4' }
-          : EMPTY_SNAP)
+          ? { messages: [{ messageId: 'm2', role: 'bot', text: 'primero', createdAt: '2026-07-17T14:02:00Z' }, { messageId: 'm3', role: 'bot', text: 'segundo', createdAt: '2026-07-17T14:03:00Z' }], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_3' }
+          : EMPTY)
       }
       if (path.includes('/events?')) {
         eventsCall += 1
-        if (eventsCall === 1) return sseRes([], 503) // drop immediately
-        return sseRes([]) // subsequent stream stays quiet
+        if (eventsCall === 1) return sse([botEvt(2, 'm2', 'primero')]) // delivers m2 then closes (drop)
+        return sseOpen([]) // subsequent stream parks quietly
       }
       return jsonRes({})
     })
-    const t = createTransport(fakeClient(authorizedFetch), { scheduler: immediate, backoff: createBackoff({ baseMs: 1, maxMs: 1, jitter: 0 }), uuid, now: () => '2026-07-17T15:00:00Z' })
+    const t = createTransport(fakeClient(authorizedFetch), opts())
     t.openChannel()
-    await vi.waitFor(() => expect(t.store.getState().messages.some((m) => m.id === 'mgap')).toBe(true))
+    await vi.waitFor(() => expect(t.store.getState().messages.some((m) => m.id === 'm3')).toBe(true))
+    expect(t.store.getState().messages.filter((m) => m.id === 'm2')).toHaveLength(1) // overlap deduped
     t.destroy()
   })
 })
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [ ] **Step 2: Run to verify it fails** — `npx vitest run src/transport/__tests__/transport.test.ts` → FAIL (cannot resolve `../index`).
 
-Run: `npx vitest run src/transport/__tests__/transport.test.ts`
-Expected: FAIL — cannot resolve `../index`.
-
-- [ ] **Step 3: Write the implementation**
-
-Create `src/transport/index.ts`:
+- [ ] **Step 3: Implement** — create `src/transport/index.ts`:
 
 ```typescript
 import type { SessionClient } from '../shell/session'
@@ -2441,6 +2304,7 @@ export interface TransportOptions {
   scheduler?: Scheduler
   backoff?: Backoff
   pollIntervalMs?: number
+  reconnectDelayMs?: number
   uuid?: () => string
   now?: () => string
 }
@@ -2458,21 +2322,21 @@ export interface Transport {
 export function createTransport(client: SessionClient, opts: TransportOptions = {}): Transport {
   const store = opts.now ? createMessageStore(opts.now) : createMessageStore()
 
-  const channelDeps = {
+  const channel = createEventsChannel({
     client,
     store,
     ...(opts.scheduler ? { scheduler: opts.scheduler } : {}),
     ...(opts.backoff ? { backoff: opts.backoff } : {}),
     ...(opts.pollIntervalMs !== undefined ? { pollIntervalMs: opts.pollIntervalMs } : {}),
-  }
-  const channel = createEventsChannel(channelDeps)
+    ...(opts.reconnectDelayMs !== undefined ? { reconnectDelayMs: opts.reconnectDelayMs } : {}),
+  })
 
   const sender = createSender({
     client,
     store,
-    streaming: true, // always attempt streaming; Task 7 degrades to non-streaming on transport failure
+    streaming: true, // always attempt streaming; the sender degrades on transport failure (Task 7)
     ...(opts.uuid ? { uuid: opts.uuid } : {}),
-    onConversationStarted: () => channel.open(), // open the durable channel once the conversation is active
+    onConversationStarted: () => channel.open(), // open once the server accepts the first message
   })
 
   const win = opts.window ?? (typeof window !== 'undefined' ? window : undefined)
@@ -2487,25 +2351,14 @@ export function createTransport(client: SessionClient, opts: TransportOptions = 
     cancel: () => sender.cancel(),
     openChannel: () => channel.open(),
     closeChannel: () => channel.close(),
-    destroy: () => {
-      unbindLifecycle()
-      channel.close()
-    },
+    destroy: () => { unbindLifecycle(); channel.close() },
   }
 }
 ```
 
-> `exactOptionalPropertyTypes` note: build `channelDeps` and the sender options with conditional spreads (`...(x ? { k: x } : {})`) so optional keys are **omitted** when unset rather than set to `undefined`.
+- [ ] **Step 4: Run to verify it passes** — `npx vitest run src/transport/__tests__/transport.test.ts` → PASS (3 integration cases).
 
-- [ ] **Step 4: Run test to verify it passes**
-
-Run: `npx vitest run src/transport/__tests__/transport.test.ts`
-Expected: PASS (3 integration cases).
-
-- [ ] **Step 5: Run the FULL widget suite + typecheck**
-
-Run: `npx vitest run && npm run typecheck`
-Expected: every test (Plan 1 + Plan 2) green; no type errors.
+- [ ] **Step 5: Run the FULL widget suite + typecheck** — `npx vitest run && npm run typecheck` → every test (Plan 1 + Plan 2) green; no type errors.
 
 - [ ] **Step 6: Commit**
 
@@ -2518,39 +2371,43 @@ git commit -m "feat(widget): fachada de transporte (store + sender + canal + cic
 
 ## Self-Review
 
-**1. Spec coverage (this slice: widget-rewrite §4.2, §4.3, §5, §9; backend contract §4.2, §4.3):**
+**1. Spec coverage (widget §4.2/4.3/5/9 + backend §4.2/4.3):**
 
 | Requirement | Task |
 |---|---|
-| Message store, single source of truth, observable | 4, 5 |
+| Immutable observable store, single source of truth | 4, 5 |
 | Dedup by messageId/eventId; order by seq | 2, 4 |
-| Send with Idempotency-Key (UUID/send); optimistic pending/sent/failed + retry | 5, 7 |
-| Bot turn SSE: accepted→delta→DONE\|ERROR; fetch-based (no EventSource) | 3, 6 |
-| Cancel via AbortController + POST /turns/{id}/cancel | 7 |
-| Inbound durable channel: GET /events?after=cursor (fetch SSE); agent.joined/state_changed/typing | 9 |
-| Reconnect with backoff+jitter (+circuit breaker) | 8, 10 |
-| Channel open only when conversation active (opened on first send) | 12 |
-| Reconciliation: snapshot (head-first cursor) → events?after=snapshotCursor; no gaps | 9, 12 |
-| Fallback: 2 consecutive stream failures → poll /events/poll (2–5s, backoff) | 10 |
-| State machine BOT_ACTIVE→ESCALATED_WAITING→AGENT_ACTIVE→RESOLVED, server-dictated only | 4, 12 |
-| Page lifecycle: freeze/resume/pageshow/online/visibilitychange → suspend/reconcile | 11, 12 |
-| Cursor protocol: 409 CURSOR_RESET_REQUIRED → fresh snapshot | 9, 10 |
-| Reuse SessionClient.authorizedFetch; reuse WidgetEvent types (extend + note) | all; 1 |
-| Partial-chunk SSE parse; heartbeats; CRLF | 3 |
+| Server-only state, null until first snapshot/event, no revert on old replay | 4 |
+| Optimistic send + Idempotency-Key; pending/sent/failed + retry (same key) | 5, 7 |
+| Bot turn SSE accepted→delta→DONE\|ERROR; throw on incomplete drop | 3, 6 |
+| Cancel = AbortController + POST /turns/{id}/cancel, no fallback | 6, 7 |
+| Inbound durable channel GET /events?after=cursor (fetch SSE); agent.typing | 9 |
+| Reconnect jittered/capped backoff; breaker realized via cap+jitter+poll | 8, 9 |
+| Channel opens only when conversation active (on accepted/2xx) | 7, 11 |
+| Reconciliation snapshot(head-first)→events?after=cursor; no gaps | 9, 11 |
+| Fallback: 2 consecutive stream failures → poll /events/poll | 9 |
+| `finishBotTurn` never advances the cursor (skip-prevention) | 5 |
+| Cursor 409 → hard replaceSnapshot | 4, 9 |
+| Generation-serialized reconciliations; no stale apply after close/suspend | 9 |
+| Page lifecycle freeze/resume/pageshow/online/visibilitychange | 10, 11 |
+| Reuse authorizedFetch; reuse/extend WidgetEvent types | all; 1 |
+| SSE partial chunks; abort unblocks blocked read; decoder flush; CRLF; heartbeat | 3 |
 
-Deferred (declared out of scope): visual panel/10 states (Plan 3), theming, rich content schema rendering + upload + feedback wire calls (Plan 4), i18n (Plan 4), bootstrap/session (Plan 1). Ephemeral `presence` is parsed-but-ignored (forward-compat) since no v1 state consumes it; heartbeat is absorbed at the SSE layer.
+Deferred (out of scope, declared): visual panel/10 states (Plan 3); theming; rich content/upload/feedback (Plan 4); i18n (Plan 4); bootstrap/session (Plan 1). Ephemeral `presence` parsed-but-ignored (forward-compat); heartbeat absorbed by the SSE layer but still counts as connection liveness in `connect()`.
 
-**2. Placeholder scan:** No `TODO`/`TBD`/"add error handling"/"similar to Task N"/"write tests for the above". Every code step contains complete code; every test step contains real assertions. The two `console.error`/comment-only spots inherited from Plan 1 are untouched.
+**2. Codex rev.1 blockers — each closed:** (1) Task 6 throws `stream_incomplete`; Task 3 abort-unblock + decoder flush. (2) Task 5 `finishBotTurn` no-cursor; Task 4 `replaceSnapshot`; Task 9 generation guard. (3) Task 4 seq-guarded state/agent + immutable; Task 5 both race orders. (4) Task 9 progress-only failure reset + single loop + poll cursor; Task 8 breaker removed. (5) Task 4 `ConversationState | null`. (6) Task 7 no auto-resend, degrade-subsequent, `AbortError` no-fallback, open-on-accepted. (7) Task 9 `running` guard + offline connection; every channel test `close()`s.
 
-**3. Type/signature consistency:**
-- `SessionClient.authorizedFetch(path, init?)` — used identically in Tasks 6, 7, 9, 10; each passes `path` starting `/widget/v1/...` (matches Plan 1's `${base}${path}`).
-- `MessageStore` surface defined in Task 4, extended in Task 5; every consumer (7, 9, 10, 12) calls only methods declared there: `applySnapshot`, `applyDurableEvent`, `addOptimistic`, `ackOptimistic`, `failOptimistic`, `retryOptimistic`, `beginBotTurn`, `appendBotDelta`, `finishBotTurn(turnId, messageId, eventId)`, `failBotTurn`, `setAgentTyping`, `setConnection`, `getState`, `subscribe`. Consistent.
-- `WidgetEvent` shape (`eventId`, `schemaVersion`, `conversationId`, `occurredAt`, `type`, `payload`) — the fixtures/tests construct exactly this; `parseEvent` narrows on `type`.
-- `TurnStreamFrame.done` carries `turnId` + `messageId` + `eventId`; `runStreamingTurn.onDone(turnId, messageId, eventId)` and `store.finishBotTurn(turnId, messageId, eventId)` agree.
-- `Scheduler`/`Backoff` injected consistently across Tasks 9, 10, 12; `createBackoff` signature matches its callers.
-- `cursorSeq`/`isNewerCursor` from Task 2 used by the store (Task 4) and the eventId parsing — consistent.
+**3. Placeholder scan:** no `TODO`/`TBD`/"add error handling"/"similar to Task N". Every code step ships complete code; every test step ships real assertions.
 
-Fixed inline during review: unified `finishBotTurn` to a 3-arg form everywhere; made channel option passing use conditional spreads to satisfy `exactOptionalPropertyTypes`; declared `let onFailure` as a forward reference in Task 10 to resolve the mutual recursion with `connectStream`/`reconcile`.
+**4. Type/signature consistency:**
+- `finishBotTurn(turnId, messageId)` — 2 args everywhere (store Task 4/5, `onDone` Task 6, sender Task 7).
+- `TurnHandlers.onDone(turnId, messageId)` matches the sender's handler and the store call.
+- `MessageStore` surface (Task 4 + Task 5 additions) — every consumer (7, 9, 11) calls only declared methods; `StoreState.conversationState` is `ConversationState | null` and consumers treat null.
+- `EventsChannelDeps`/`Scheduler`/`Backoff` consistent across Tasks 9 and 11; `createBackoff` signature (Task 8, no breaker) matches all callers.
+- `WidgetEvent` shape constructed identically in every fixture/test; `parseDurable` narrows on `type`.
+- Facade passes optional deps via conditional spreads (`exactOptionalPropertyTypes`-safe).
+
+Fixed inline during review: dropped `eventId` from `onDone`/`finishBotTurn`; removed the circuit-breaker object from `backoff` and its usage; unified the single-loop channel (no mutually-recursive `onFailure`); `conversationState` null-init threaded through store, sender and integration tests.
 
 ---
 
@@ -2558,5 +2415,5 @@ Fixed inline during review: unified `finishBotTurn` to a 3-arg form everywhere; 
 
 Plan complete and saved to `docs/superpowers/plans/2026-07-18-widget-transport.md`. Two execution options:
 
-1. **Subagent-Driven (recommended)** — dispatch a fresh subagent per task, review between tasks, fast iteration (REQUIRED SUB-SKILL: superpowers:subagent-driven-development).
+1. **Subagent-Driven (recommended)** — dispatch a fresh subagent per task, review between tasks (REQUIRED SUB-SKILL: superpowers:subagent-driven-development).
 2. **Inline Execution** — execute tasks in-session with checkpoints (REQUIRED SUB-SKILL: superpowers:executing-plans).
