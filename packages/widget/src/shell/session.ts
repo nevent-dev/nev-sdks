@@ -1,4 +1,5 @@
 import type { WidgetConfig, WidgetSession } from '../contract/types'
+import { normalizeWelcome } from '../contract/normalize-welcome'
 
 export interface SessionClient {
   getConfig(): WidgetConfig
@@ -20,7 +21,10 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
 
   const configRes = await fetchFn(`${installationBase}/config`)
   if (!configRes.ok) throw new Error(`config_failed:${configRes.status}`)
-  const config = (await configRes.json()) as WidgetConfig
+  const rawConfig = (await configRes.json()) as Record<string, unknown>
+  const { welcome: _rawWelcome, ...rawConfigWithoutWelcome } = rawConfig
+  const welcome = normalizeWelcome(rawConfig['welcome'])
+  const config: WidgetConfig = { ...(rawConfigWithoutWelcome as unknown as WidgetConfig), ...(welcome ? { welcome } : {}) }
 
   const sessionRes = await fetchFn(`${installationBase}/sessions`, {
     method: 'POST',

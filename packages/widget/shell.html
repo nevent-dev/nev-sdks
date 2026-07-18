@@ -2,6 +2,19 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
+  <!-- Critical #4: default-src 'none' + allowlist explícita. img-src 'self'
+       queda para compatibilidad futura (logo propio/proxy) — HOY ningún
+       componente de este plan pinta un <img>, todo avatar es de iniciales
+       (spec §8). connect-src apunta al origen de producción; para dev local
+       contra el mock-api o nev-api local hay que editar TAMBIÉN esta línea
+       en el dist/shell.html generado, igual que ya se hace con la meta
+       nevw-api (ver examples/README.md, Step 2 de esta tarea). frame-ancestors
+       NO se puede fijar aquí — los navegadores ignoran esa directiva en un
+       <meta> (solo aplica vía cabecera HTTP); el aislamiento de qué
+       orígenes pueden embeber el widget lo hace el servidor validando
+       embeddingOrigin contra la allowlist de la instalación (spec §4.1),
+       no esta CSP. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self' https://api.nevent.es; base-uri 'none'; object-src 'none';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="nevw-api" content="https://api.nevent.es">
   <title>Chat de ayuda</title>

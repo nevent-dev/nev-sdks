@@ -1,7 +1,16 @@
+import '@fontsource/poppins/500.css'
+import '@fontsource/poppins/600.css'
+import '@fontsource/poppins/700.css'
+import '@fontsource/inter/400.css'
+import '@fontsource/inter/500.css'
+import '@fontsource/inter/600.css'
+import '../panel/tokens.css'
+import '../panel/panel.css'
 import { render } from 'preact'
 import { App, type ShellBus } from './app'
 import { open as openEnvelope, seal, isCommand, LOADER_TO_SHELL } from '../protocol/envelope'
 import { createSessionClient as realCreateSessionClient } from './session'
+import { applyTheme } from '../panel/theme'
 
 interface ShellOptions {
   apiBase: string
@@ -37,6 +46,7 @@ export function startShell(w: Window, opts: ShellOptions): void {
       parent = { post: (e) => source.postMessage(e, origin), origin, source }
       void createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin })
         .then((client) => {
+          applyTheme(document.documentElement, client.getConfig().theme)
           const root = w.document.getElementById('root')
           if (root) render(<App config={client.getConfig()} bus={bus} />, root)
         })
