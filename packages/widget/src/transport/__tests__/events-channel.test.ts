@@ -112,6 +112,59 @@ describe('events channel — core', () => {
     ch.close()
     expect(store.getState().connection).toBe('idle')
   })
+
+  // Real-browser E2E finding: a FRESH session (no conversation created yet)
+  // gets a real snapshotCursor from the backend for an EXISTING-but-empty
+  // conversation (see SNAP/EMPTY above), but a genuinely conversation-less
+  // session gets an EMPTY cursor — and the backend then unconditionally 409s
+  // both /events and /events/poll for it. Opening the channel on panel-open
+  // (before any message is ever sent) drove exactly this: snapshot succeeds,
+  // connect() 409s, hard-reconcile still finds no conversation, connect()
+  // 409s again — forever, at zero delay (nothing in the existing 409 backoff
+  // resets only on a REPEATED failure of the same call; it resets on every
+  // successful reconcile, so a connect-only 409 loop never engages it).
+  it('a session with no conversation yet (empty cursor after reconcile) never attempts connect/poll — idles instead of looping', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const NO_CONVERSATION: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: '' }
+    let snapshotCalls = 0
+    let eventsCalls = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages')) { snapshotCalls += 1; return jsonRes(NO_CONVERSATION) }
+      eventsCalls += 1 // /events or /events/poll — would only be hit by a pointless attempt
+      return sseFail()
+    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
+    ch.open()
+    // NOTE: connection starts 'idle' by default (before open() does anything),
+    // so waiting on connection alone would resolve trivially — wait on
+    // isActive() flipping back to false instead, which only happens once the
+    // no-cursor guard has actually run.
+    await vi.waitFor(() => expect(ch.isActive()).toBe(false))
+    expect(store.getState().connection).toBe('idle')
+    expect(snapshotCalls).toBe(1)
+    expect(eventsCalls).toBe(0) // never attempted — the backend guarantees a 409 for these
+    ch.close()
+  })
+
+  it('after idling on no-conversation, a later open() (onConversationStarted firing on accepted) reconciles for real once a conversation exists', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const NO_CONVERSATION: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: '' }
+    let snapshotCalls = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages')) {
+        snapshotCalls += 1
+        return snapshotCalls === 1 ? jsonRes(NO_CONVERSATION) : jsonRes(SNAP)
+      }
+      return sseOpen([ev(2, 'm2', 'x')])
+    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(ch.isActive()).toBe(false)) // idled on the empty cursor
+    ch.open() // same call the sender's onConversationStarted hook makes on accepted
+    await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    expect(snapshotCalls).toBe(2)
+    ch.close()
+  })
 })
 
 function durableEvent(seq: number, id: string, text: string) {

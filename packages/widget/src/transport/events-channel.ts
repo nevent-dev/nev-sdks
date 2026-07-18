@@ -95,14 +95,23 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
     return (await res.json()) as MessagesSnapshot
   }
 
+  // Never send `after=` empty: an absent cursor means "build the URL with no
+  // query at all", not `after=` with nothing after it. In practice the
+  // no-cursor guard below (in runChannel) means connect()/pollOnce() are never
+  // even called without a cursor — this is defense in depth, not the primary
+  // fix, kept because a future caller of these internals should not have to
+  // rediscover the same footgun.
+  const eventsUrl = (base: string, after: string | null): string =>
+    after ? `${base}?after=${encodeURIComponent(after)}` : base
+
   // Parks on the live stream. Returns when the server closes it cleanly WITH
   // progress; throws on transport error or a 0-frame close; throws
   // CursorResetError on a 409. On the FIRST frame it resets BOTH the backoff and
   // the failure counter (Codex #4) — a stream that opens then drops without a
   // single frame still counts as a failure, so 2 such drops reach the fallback.
   const connect = async (gen: number, signal: AbortSignal): Promise<void> => {
-    const after = deps.store.getState().cursor ?? ''
-    const res = await deps.client.authorizedFetch(`/widget/v1/events?after=${encodeURIComponent(after)}`, { signal })
+    const after = deps.store.getState().cursor
+    const res = await deps.client.authorizedFetch(eventsUrl('/widget/v1/events', after), { signal })
     if (!isCurrent(gen)) return
     if (res.status === 409) throw new CursorResetError('events_cursor_reset')
     if (!res.ok || !res.body) throw new Error(`events_http:${res.status}`)
@@ -118,8 +127,8 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
   }
 
   const pollOnce = async (gen: number, signal: AbortSignal): Promise<void> => {
-    const after = deps.store.getState().cursor ?? ''
-    const res = await deps.client.authorizedFetch(`/widget/v1/events/poll?after=${encodeURIComponent(after)}`, { signal })
+    const after = deps.store.getState().cursor
+    const res = await deps.client.authorizedFetch(eventsUrl('/widget/v1/events/poll', after), { signal })
     if (!isCurrent(gen)) return
     if (res.status === 409) throw new CursorResetError('poll_cursor_reset')
     if (!res.ok) throw new Error(`poll_http:${res.status}`)
@@ -150,6 +159,21 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
           hard = false
           hardResetStreak = 0
           if (!isCurrent(gen)) return
+          // Backend semantics: a session with NO conversation returns
+          // CURSOR_RESET_REQUIRED (409) unconditionally from both /events and
+          // /events/poll — connecting is guaranteed to fail before it's even
+          // tried. An empty cursor straight out of reconcile() IS that signal:
+          // there is nothing to listen to yet (as opposed to a real conversation
+          // with zero messages so far, whose snapshot still carries a real
+          // cursor). Idle instead of burning a request and instead of looping:
+          // deactivate so a later open() is NOT a no-op — `onConversationStarted`
+          // (the sender's accepted hook, see transport/index.ts) calls it for
+          // real once a conversation actually exists.
+          if (!deps.store.getState().cursor) {
+            deps.store.setConnection('idle')
+            active = false
+            return
+          }
           await connect(gen, ac.signal)  // parks while live
           if (!isCurrent(gen)) return
           await delay(reconnectDelayMs)  // clean close → brief pause, then reconcile
