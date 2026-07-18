@@ -143,3 +143,37 @@
 .conn .spin { width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .conn .spin { animation: none !important; } }
+
+/* ===== Rich content: carrusel de cards ===== */
+.cards { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 6px; scroll-snap-type: x mandatory; max-width: 100%; scrollbar-width: none; }
+.cards::-webkit-scrollbar { display: none; }
+.card { scroll-snap-align: start; flex: 0 0 200px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.card .img { height: 78px; background: var(--brand-grad); position: relative; }
+.card .img.sun { background: linear-gradient(135deg, var(--accent-sun-a), var(--accent-sun-b)); }
+.card .img .price { position: absolute; right: 8px; bottom: 8px; background: rgba(12, 13, 16, .75); color: #fff; font: 600 11.5px var(--font-body); padding: 3px 8px; border-radius: 99px; }
+.card .bd { padding: 10px 12px 12px; }
+.card .bd .t { font: 600 13px var(--font-display); color: var(--ink); }
+.card .bd .d { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.card .bd .act {
+  margin-top: 9px; display: block; width: 100%; text-align: center; font: 600 12px var(--font-body);
+  color: var(--brand-a); background: transparent; border: 1px solid color-mix(in srgb, var(--brand-a) 35%, transparent);
+  border-radius: 8px; padding: 6px 0; cursor: pointer;
+}
+.card .bd .act:hover { background: var(--brand-soft); }
+.card .bd .act:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+
+/* ===== Adjuntos / upload =====
+   Variante por CLASE PROPIA (`.file-user`, fijada por el componente vía la
+   prop `variant`) — no por selector dependiente de un padre `.m.user` (el
+   mock lo hacía así, pero FileBubble no vive anidado en una burbuja real en
+   este plan; era CSS muerto — Important #8, ronda 2). */
+.file { display: flex; align-items: center; gap: 9px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; min-width: 210px; }
+.file-meta { flex: 1; }
+.file-user { background: color-mix(in srgb, #fff 14%, var(--brand-a)); border-color: transparent; color: var(--brand-ink); }
+.file .fi { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-soft); color: var(--brand-a); display: grid; place-items: center; flex-shrink: 0; }
+.file-user .fi { background: rgba(255, 255, 255, .2); color: #fff; }
+.file .fi svg { width: 15px; height: 15px; }
+.file .fn { font: 500 12.5px var(--font-body); color: inherit; }
+.file .fs { font-size: 11px; opacity: .72; margin-top: 1px; font-variant-numeric: tabular-nums; }
+.file .bar { height: 3px; border-radius: 2px; background: rgba(255, 255, 255, .28); margin-top: 5px; overflow: hidden; }
+.file .bar i { display: block; height: 100%; width: var(--progress, 0%); background: #fff; border-radius: 2px; transition: width .2s; }
