@@ -83,7 +83,8 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     assignMessages(next)
     notify()
   }
-  const advanceCursor = (eventId: string): void => {
+  const advanceCursor = (eventId: string | null): void => {
+    if (eventId === null) return // sesión sin conversación: no hay cursor que avanzar
     if (cursor === null || cursorSeq(eventId) > cursorSeq(cursor)) cursor = eventId
   }
   const indexOf = (pred: (m: StoredMessage) => boolean): number => messages.findIndex(pred)

@@ -138,3 +138,25 @@ describe('message store — durable core', () => {
     expect(listener).toHaveBeenCalledTimes(1)
   })
 })
+
+// Drift cazado en la integración E2E real (2026-07-18): una sesión SIN
+// conversación devuelve snapshotCursor:null — el shape literal del backend.
+// Antes: cursorSeq(null) lanzaba TypeError dentro de reconcile(), el catch del
+// canal lo silenciaba y el bucle reintentaba para siempre ("Reconectando…").
+describe('snapshot sin conversación (snapshotCursor null, backend real)', () => {
+  const emptySnap = { messages: [], state: 'BOT_ACTIVE' as const, snapshotCursor: null }
+
+  it('applySnapshot no lanza y deja cursor en null', () => {
+    const s = createMessageStore()
+    expect(() => s.applySnapshot(emptySnap)).not.toThrow()
+    expect(s.getState().cursor).toBeNull()
+    expect(s.getState().conversationState).toBe('BOT_ACTIVE')
+  })
+
+  it('replaceSnapshot (hard reset) tampoco lanza y deja cursor en null', () => {
+    const s = createMessageStore()
+    s.applySnapshot(fixtureSnapshot())
+    expect(() => s.replaceSnapshot(emptySnap)).not.toThrow()
+    expect(s.getState().cursor).toBeNull()
+  })
+})

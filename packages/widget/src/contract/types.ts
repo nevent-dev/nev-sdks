@@ -69,7 +69,8 @@ export interface WidgetMessage {
 export interface MessagesSnapshot {
   messages: WidgetMessage[]
   state: ConversationState
-  snapshotCursor: string
+  /** null cuando la sesión aún no tiene conversación (drift cazado en la integración E2E real). */
+  snapshotCursor: string | null
 }
 
 // GET /widget/v1/events/poll?after={cursor} — ALL durables after the cursor.
