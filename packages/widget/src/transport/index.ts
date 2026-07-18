@@ -57,6 +57,6 @@ export function createTransport(client: SessionClient, opts: TransportOptions = 
     cancel: () => sender.cancel(),
     openChannel: () => channel.open(),
     closeChannel: () => channel.close(),
-    destroy: () => { unbindLifecycle(); channel.close() },
+    destroy: () => { unbindLifecycle(); sender.teardown(); channel.close() },
   }
 }

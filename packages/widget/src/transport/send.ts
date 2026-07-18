@@ -14,6 +14,7 @@ export interface Sender {
   send(text: string): Promise<void>
   retry(clientId: string): Promise<void>
   cancel(): void
+  teardown(): void
 }
 
 function isAbortError(err: unknown): boolean {
@@ -121,6 +122,12 @@ export function createSender(deps: SenderDeps): Sender {
       const turnId = currentTurnId
       inFlight?.abort()
       if (turnId) void deps.client.authorizedFetch(`/widget/v1/turns/${turnId}/cancel`, { method: 'POST' })
+    },
+    teardown(): void {
+      // Local-only abort: unlike cancel(), never POSTs /turns/{id}/cancel — the
+      // caller (facade destroy()) is tearing down the widget, not asking the
+      // server to abort a turn that should keep persisting server-side.
+      inFlight?.abort()
     },
   }
 }

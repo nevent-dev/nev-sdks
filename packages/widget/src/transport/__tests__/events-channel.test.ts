@@ -84,6 +84,20 @@ describe('events channel — core', () => {
     ch.close()
   })
 
+  it('durable event-name matching is case-insensitive (backend casing drift does not silently drop events)', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages')) return jsonRes(SNAP)
+      return sseOpen([
+        `event: Message.Created\ndata: {"eventId":"evt_v1_conv_demo_01_2","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:02:00Z","type":"message.created","payload":{"messageId":"m2","role":"bot","text":"hola"}}\n\n`,
+      ])
+    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    ch.close()
+  })
+
   it('open is idempotent and close stops the loop', async () => {
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
     let snapshots = 0
@@ -243,6 +257,29 @@ describe('events channel — resilience & lifecycle', () => {
     const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), pollIntervalMs: 1, reconnectDelayMs: 1 })
     ch.open()
     await vi.waitFor(() => expect(store.getState().cursor).toBe('evt_v1_conv_demo_01_7'))
+    ch.close()
+  })
+
+  it('a pathological repeated snapshot-409 backs off before retrying the hard reconcile (no hot loop)', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let snapshotCalls = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) {
+        snapshotCalls += 1
+        if (snapshotCalls <= 2) return jsonRes({ code: 'CURSOR_RESET_REQUIRED' }, 409) // 409s TWICE in a row
+        return jsonRes(EMPTY)
+      }
+      return sseOpen([ev(2, 'm2', 'ok')])
+    })
+    const nextDelay = vi.fn(() => 1)
+    const backoff = { nextDelay, reset: vi.fn() }
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff, reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    // the FIRST 409 retries immediately (unchanged intent); the SECOND (repeated)
+    // 409 must back off via the injected backoff before hammering snapshot() again
+    expect(nextDelay).toHaveBeenCalledTimes(1)
+    expect(snapshotCalls).toBe(3)
     ch.close()
   })
 

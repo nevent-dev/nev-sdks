@@ -184,6 +184,27 @@ describe('createSender', () => {
     expect(store.getState().messages.find((m) => m.role === 'bot')).toMatchObject({ text: 'Hola ', streaming: false })
   })
 
+  it('degraded non-streaming ack (server body has NO userMessageId) resolves to sent, not stuck pending, and a later durable twin does not duplicate', async () => {
+    n = 0
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async () => json({ state: 'BOT_ACTIVE' })) // no userMessageId in the body
+    const sender = createSender({ client: { authorizedFetch }, store, streaming: false, uuid })
+    await sender.send('Hola')
+    const user = store.getState().messages.find((m) => m.role === 'user')
+    expect(user).toMatchObject({ status: 'sent' }) // NOT stuck pending
+    // the durable message.created for this same send arrives later, carrying the
+    // REAL server-assigned id the degraded HTTP response never gave us.
+    const durableTwin: WidgetEvent = {
+      eventId: 'evt_v1_c_9', schemaVersion: 1, conversationId: 'conv_demo_01',
+      occurredAt: '2026-07-17T15:00:01Z', type: 'message.created',
+      payload: { messageId: 'msg_srv_real', role: 'user', text: 'Hola' },
+    }
+    store.applyDurableEvent(durableTwin)
+    const users = store.getState().messages.filter((m) => m.role === 'user')
+    expect(users).toHaveLength(1) // no duplicate bubble
+    expect(users[0]).toMatchObject({ id: 'msg_srv_real', status: 'sent', seq: 9 })
+  })
+
   it('opens the conversation channel on accepted, not before', async () => {
     n = 0
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')

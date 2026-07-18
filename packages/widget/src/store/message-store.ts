@@ -124,10 +124,25 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
         next[i] = { ...next[i]!, text: event.payload.text, seq, status: 'sent', streaming: false, turnId: null }
         setMessages(next)
       } else {
-        setMessages([...messages, {
-          id: event.payload.messageId, role: event.payload.role, text: event.payload.text,
-          status: 'sent', seq, streaming: false, createdAt: event.occurredAt, clientId: null, turnId: null,
-        }])
+        // No exact id match. A degraded non-streaming ack (server response had no
+        // userMessageId) leaves its optimistic placeholder's id equal to its own
+        // clientId — unresolved, since the client never learned the real server
+        // id. Reconcile THIS durable event against that placeholder (by role +
+        // timestamp, same heuristic as supersededByDurable) instead of appending
+        // a duplicate bubble; works whichever arrives first.
+        const pi = indexOf((m) =>
+          m.clientId !== null && m.id === m.clientId && m.status !== 'failed' &&
+          m.role === event.payload.role && Date.parse(event.occurredAt) >= Date.parse(m.createdAt))
+        const next = messages.slice()
+        if (pi !== -1) {
+          next[pi] = { ...next[pi]!, id: event.payload.messageId, text: event.payload.text, seq, status: 'sent', streaming: false, turnId: null }
+        } else {
+          next.push({
+            id: event.payload.messageId, role: event.payload.role, text: event.payload.text,
+            status: 'sent', seq, streaming: false, createdAt: event.occurredAt, clientId: null, turnId: null,
+          })
+        }
+        setMessages(next)
       }
     } else if (event.type === 'conversation.state_changed') {
       if (seq > lastStateSeq) { conversationState = event.payload.state; lastStateSeq = seq; notify() }
@@ -185,14 +200,28 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     }])
   }
   const ackOptimistic = (clientId: string, messageId: string): void => {
-    const oi = indexOf((m) => m.clientId === clientId && m.id !== messageId)
-    if (oi === -1) return // already acked (idempotent)
-    const durableI = indexOf((m) => m.id === messageId)
+    // Matched by clientId + still-pending status, NOT by "id !== messageId":
+    // a degraded ack (see below) never rewrites `id`, so that comparison would
+    // never hold and the placeholder would hang pending forever. Status-based
+    // matching is equally idempotent (a second ack call finds nothing 'pending').
+    const oi = indexOf((m) => m.clientId === clientId && m.status === 'pending')
+    if (oi === -1) return // already acked / reconciled by a durable twin (idempotent)
     const next = messages.slice()
-    if (durableI !== -1 && durableI !== oi) {
-      next.splice(oi, 1) // durable arrived first: keep it, drop the placeholder
+    if (messageId !== clientId) {
+      // normal ack: the server told us the real id.
+      const durableI = indexOf((m) => m.id === messageId)
+      if (durableI !== -1 && durableI !== oi) {
+        next.splice(oi, 1) // durable arrived first: keep it, drop the placeholder
+      } else {
+        next[oi] = { ...next[oi]!, id: messageId, status: 'sent' }
+      }
     } else {
-      next[oi] = { ...next[oi]!, id: messageId, status: 'sent' }
+      // Degraded ack: the server response carried no userMessageId, so the
+      // caller fell back to clientId. There is no real id to rewrite to — flip
+      // to 'sent' and leave `id` as clientId; applyDurableEvent's role/timestamp
+      // fallback reconciles it against the durable message.created when it
+      // arrives, instead of leaving it stuck pending or duplicated.
+      next[oi] = { ...next[oi]!, status: 'sent' }
     }
     setMessages(next)
   }
@@ -200,6 +229,12 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     const oi = indexOf((m) => m.clientId === clientId)
     if (oi === -1) return
     const placeholder = messages[oi]!
+    // Already durably confirmed — e.g. a degraded ack's placeholder that
+    // applyDurableEvent already reconciled IN PLACE (same object, seq set).
+    // supersededByDurable looks for a SEPARATE durable entry, so it would
+    // never match itself here; guard explicitly instead of failing/dropping
+    // an already-sent message.
+    if (placeholder.seq !== null) return
     const next = messages.slice()
     if (supersededByDurable(placeholder, 'user')) next.splice(oi, 1) // durable twin arrived: send actually succeeded
     else next[oi] = { ...placeholder, status: 'failed' }

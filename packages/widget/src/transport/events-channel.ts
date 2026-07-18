@@ -76,10 +76,11 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
     })
 
   const routeFrame = (event: string, data: string): void => {
-    if (DURABLE_TYPES.has(event)) {
+    const name = event.toLowerCase() // tolerate backend casing drift (matches turn.ts)
+    if (DURABLE_TYPES.has(name)) {
       const parsed = parseDurable(data)
       if (parsed) deps.store.applyDurableEvent(parsed)
-    } else if (event === 'agent.typing') {
+    } else if (name === 'agent.typing') {
       try { deps.store.setAgentTyping((JSON.parse(data) as { isTyping?: unknown }).isTyping === true) }
       catch { /* ignore malformed ephemeral */ }
     }
@@ -140,19 +141,30 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
     runAc = ac
     consecutiveFailures = 0
     let hard = false
+    let hardResetStreak = 0 // consecutive CURSOR_RESET_REQUIREDs, to back off a pathological 409 loop
     try {
       while (isCurrent(gen)) {
         if (!isOnline()) { deps.store.setConnection('offline'); return }
         try {
           await reconcile(gen, hard, ac.signal)
           hard = false
+          hardResetStreak = 0
           if (!isCurrent(gen)) return
           await connect(gen, ac.signal)  // parks while live
           if (!isCurrent(gen)) return
           await delay(reconnectDelayMs)  // clean close → brief pause, then reconcile
         } catch (err) {
           if (!isCurrent(gen)) return
-          if (err instanceof CursorResetError) { hard = true; consecutiveFailures = 0; continue }
+          if (err instanceof CursorResetError) {
+            hard = true
+            consecutiveFailures = 0
+            hardResetStreak += 1
+            // First 409 → immediate hard re-reconcile (unchanged intent). A REPEATED
+            // 409 means the hard reconcile itself keeps failing — back off instead of
+            // busy-looping snapshot() at zero delay.
+            if (hardResetStreak > 1) await delay(backoff.nextDelay())
+            continue
+          }
           consecutiveFailures += 1
           if (consecutiveFailures >= 2) {
             deps.store.setConnection('polling')

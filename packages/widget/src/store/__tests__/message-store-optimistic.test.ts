@@ -28,6 +28,31 @@ describe('message store — optimistic + streaming', () => {
     expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', seq: 2 })
   })
 
+  it('degraded ack (messageId falls back to clientId, e.g. non-streaming response with no userMessageId) resolves to sent, not stuck pending', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.ackOptimistic('cid_1', 'cid_1') // degraded: server response carried no real id
+    expect(s.getState().messages[0]).toMatchObject({ id: 'cid_1', status: 'sent', clientId: 'cid_1' })
+  })
+
+  it('degraded ack then a later durable twin reconciles to the real id (no duplicate)', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.ackOptimistic('cid_1', 'cid_1') // degraded ack: stuck on the provisional clientId
+    s.applyDurableEvent(msgEvent(2, 'msg_srv', 'user', 'Hola')) // durable carries the real id
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', status: 'sent', seq: 2 })
+  })
+
+  it('durable twin before the degraded ack (reverse order) also reconciles, no duplicate', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.applyDurableEvent(msgEvent(2, 'msg_srv', 'user', 'Hola')) // durable wins the race
+    s.ackOptimistic('cid_1', 'cid_1') // degraded ack arrives after: already reconciled, no-op
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', status: 'sent', seq: 2 })
+  })
+
   it('failOptimistic then retryOptimistic flips failed → pending', () => {
     const s = createMessageStore(clock)
     s.addOptimistic('cid_1', 'Hola')

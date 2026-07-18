@@ -70,6 +70,33 @@ describe('createTransport (integration)', () => {
     t.destroy()
   })
 
+  it('destroy() while a bot turn streams tears down the sender locally, WITHOUT posting /turns/{id}/cancel', async () => {
+    n = 0
+    let streamSignal: AbortSignal | undefined
+    const cancels: string[] = []
+    const authorizedFetch = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY) // snapshot
+      if (path.endsWith('/cancel')) { cancels.push(path); return jsonRes({ ok: true }, 202) }
+      if (path.includes('/stream')) {
+        streamSignal = init?.signal ?? undefined
+        return sseOpen([
+          'event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n',
+          'event: delta\ndata: {"turnId":"t1","delta":"Sí"}\n\n',
+        ]) // parks mid-turn, never emits done/error
+      }
+      if (path.includes('/events?')) return sseOpen([]) // durable channel parks quietly
+      return jsonRes({})
+    })
+    const t = createTransport(fakeClient(authorizedFetch), opts())
+    const p = t.send('¿Puedo cambiar mi entrada?')
+    await vi.waitFor(() => expect(t.store.getState().messages.some((m) => m.role === 'bot')).toBe(true))
+    expect(streamSignal?.aborted).not.toBe(true) // sanity: still in flight before destroy
+    t.destroy()
+    expect(streamSignal?.aborted).toBe(true) // the sender's in-flight controller was aborted locally
+    expect(cancels).toEqual([]) // no server-cancel POST — the turn should keep persisting server-side
+    await p
+  })
+
   it('a server state_changed on the channel drives the client state machine', async () => {
     n = 0
     const authorizedFetch = vi.fn(async (path: string) => {
