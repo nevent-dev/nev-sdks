@@ -11,7 +11,7 @@ interface ShellOptions {
 export function startShell(w: Window, opts: ShellOptions): void {
   const instanceId = w.location.hash.slice(1)
   const createClient = opts.createClient ?? realCreateSessionClient
-  let parent: { post: (env: unknown) => void; origin: string } | null = null
+  let parent: { post: (env: unknown) => void; origin: string; source: Window } | null = null
   let commandCb: ((type: string, payload: unknown) => void) | null = null
 
   const bus: ShellBus = {
@@ -26,15 +26,35 @@ export function startShell(w: Window, opts: ShellOptions): void {
       if (parent) return
       const source = ev.source as Window | null
       if (!source) return
+      const payload = env.payload as Record<string, unknown> | null | undefined
+      const installationId = payload?.['installationId']
+      // Validar ANTES de fijar `parent`: un init con envelope válido pero
+      // payload basura no debe comprometer el guard `if (parent) return` de
+      // arriba, o un init real posterior del anfitrión quedaría bloqueado
+      // para siempre (brick/DoS).
+      if (typeof installationId !== 'string' || installationId.length === 0) return
       const origin = ev.origin // SIEMPRE del evento, nunca del payload (spec §4.1)
-      parent = { post: (e) => source.postMessage(e, origin), origin }
-      const { installationId } = env.payload as { installationId: string }
-      void createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin }).then((client) => {
-        const root = w.document.getElementById('root')
-        if (root) render(<App config={client.getConfig()} bus={bus} />, root)
-      })
+      parent = { post: (e) => source.postMessage(e, origin), origin, source }
+      void createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin })
+        .then((client) => {
+          const root = w.document.getElementById('root')
+          if (root) render(<App config={client.getConfig()} bus={bus} />, root)
+        })
+        .catch((err: unknown) => {
+          // TODO(plan de theming): reenviar al parent vía bus.emit('error', ...)
+          // para que el anfitrión pueda reaccionar (p.ej. 403 por embeddingOrigin
+          // no permitido). Por ahora, al menos no morir en silencio.
+          console.error('[nevent-widget] fallo al arrancar la sesión', err)
+        })
       return
     }
+    // Comandos post-init: exigir el MISMO source y el MISMO origin que el
+    // parent vinculado en init (spec §3.3), igual que hace el loader con el
+    // shell. El instanceId no es secreto (va en el hash del src del iframe,
+    // legible por cualquier script co-residente en la página), así que sin
+    // esta comprobación cualquier tercero en la página podría pilotar el
+    // widget suplantando al anfitrión real.
+    if (!parent || ev.source !== parent.source || ev.origin !== parent.origin) return
     commandCb?.(env.type, env.payload)
   })
 

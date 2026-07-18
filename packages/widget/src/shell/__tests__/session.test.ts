@@ -71,6 +71,20 @@ describe('session client', () => {
     expect(res.status).toBe(200)
     expect(body.auth).toBe('Bearer sess_jwt_renovado')
   })
+  it('dos authorizedFetch concurrentes que reciben 401 disparan un único POST a /sessions/refresh', async () => {
+    const { fetchFn } = mockApi({
+      onProtected: (auth, call) => (call <= 2 ? jsonResponse({ error: 'expired' }, 401) : jsonResponse({ ok: true, auth })),
+    })
+    const client = await createSessionClient({ ...OPTS, fetchFn })
+    const [resA, resB] = await Promise.all([
+      client.authorizedFetch('/widget/v1/conversations/current/messages'),
+      client.authorizedFetch('/widget/v1/conversations/current/messages'),
+    ])
+    expect(resA.status).toBe(200)
+    expect(resB.status).toBe(200)
+    const refreshCalls = fetchFn.mock.calls.filter(([u]) => String(u).endsWith('/sessions/refresh')).length
+    expect(refreshCalls).toBe(1)
+  })
   it('el token no se persiste en storage', async () => {
     const { fetchFn } = mockApi()
     await createSessionClient({ ...OPTS, fetchFn })
