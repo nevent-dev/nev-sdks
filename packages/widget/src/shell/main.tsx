@@ -44,11 +44,11 @@ export function startShell(w: Window, opts: ShellOptions): void {
 }
 
 // Autoarranque cuando shell.html se carga dentro del iframe real.
-// import.meta.env.VITEST es la señal oficial de Vitest (process.env.VITEST
-// también expuesto en import.meta.env) para no auto-arrancar bajo test.
-// Se lee vía cast: tsconfig.build.json (types: []) no trae los tipos
-// ambientales de vite/client que declaran ImportMeta.env.
-const viteEnv = (import.meta as unknown as { env?: Record<string, unknown> }).env
-if (typeof document !== 'undefined' && !viteEnv?.['VITEST'] && document.getElementById('root')) {
+// process.env.VITEST (no import.meta.env.VITEST) es la señal real: Vitest 3.x
+// fija process.env.VITEST pero no la inyecta en import.meta.env bajo jsdom.
+// declare local porque tsconfig.build.json (types: []) no trae @types/node.
+declare const process: { env?: Record<string, string | undefined> } | undefined
+const isVitest = typeof process !== 'undefined' && !!process.env?.['VITEST']
+if (typeof document !== 'undefined' && !isVitest && document.getElementById('root')) {
   startShell(window, { apiBase: (document.querySelector('meta[name="nevw-api"]') as HTMLMetaElement | null)?.content ?? 'https://api.nevent.es' })
 }

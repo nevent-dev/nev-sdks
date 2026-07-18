@@ -53,4 +53,14 @@ describe('shell', () => {
     await new Promise((r) => setTimeout(r, 20))
     expect(createClient).not.toHaveBeenCalled()
   })
+  it('no autoarranca al importar el módulo bajo test aunque exista #root (guard real es process.env.VITEST)', async () => {
+    // #root ya existe (a diferencia de la carga normal del bundle), así que
+    // si el guard fallase (como con el import.meta.env.VITEST anterior, que
+    // es un no-op bajo Vitest 3.x/jsdom) startShell se autoinvocaría aquí.
+    const readySpy = vi.spyOn(window.parent, 'postMessage')
+    vi.resetModules()
+    await import('../main')
+    expect(readySpy).not.toHaveBeenCalled()
+    readySpy.mockRestore()
+  })
 })
