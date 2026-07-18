@@ -9,13 +9,13 @@ export function fixtureConfig(): WidgetConfig {
     installationId: 'inst_demo_festival_01',
     assistantName: 'Asistente de DEMO FEST',
     locale: 'es',
-    theme: { primaryColor: '#6d4aff', position: 'right' },
+    theme: { primaryColor: '#6d4aff', position: 'right', mode: 'auto' },
     features: { upload: true, handoff: true },
   }
 }
 
 export function fixtureSession(): WidgetSession {
-  return { token: 'sess_jwt_fixture_0123456789abcdef', expiresInSeconds: 3600, guestHandle: 'guest_9f2c1a' }
+  return { token: 'sess_jwt_fixture_0123456789abcdef', expiresInSeconds: 3600, resumeSecret: 'resume_9f2c1a3e7b0d4f6a8c1e2b5d9f0a3c7e' }
 }
 
 export function fixtureEvents(): WidgetEvent[] {

@@ -7,7 +7,7 @@ describe('fixtures del contrato', () => {
     expect(c.schemaVersion).toBe(1)
     expect(c.installationId).toMatch(/^inst_/)
   })
-  it('sesión con token en memoria y guestHandle opaco', () => {
+  it('sesión con token en memoria y resumeSecret opaco', () => {
     const s = fixtureSession()
     expect(s.token.length).toBeGreaterThan(10)
     expect(s.expiresInSeconds).toBeGreaterThanOrEqual(1800)

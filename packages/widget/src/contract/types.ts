@@ -3,14 +3,14 @@ export interface WidgetConfig {
   installationId: string
   assistantName: string
   locale: 'es' | 'en' | 'ca' | 'pt'
-  theme: { primaryColor: string; position: 'right' | 'left' }
+  theme: { primaryColor: string; position: 'right' | 'left'; mode: 'light' | 'dark' | 'auto' }
   features: { upload: boolean; handoff: boolean }
 }
 
 export interface WidgetSession {
   token: string
   expiresInSeconds: number
-  guestHandle: string
+  resumeSecret: string
 }
 
 interface EventBase {
