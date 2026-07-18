@@ -20,7 +20,16 @@ Codex reviewed the rev.1 plan and returned NO-GO with 7 blockers (all correct). 
 | 4 | Polling never reached: a 200 that opens then drops resets `consecutiveFailures` | Task 9 (failures reset only on **progress** = first frame; single loop; poll consumes its own cursor; real reset on 409; circuit breaker realized as capped/jittered backoff + polling — separate breaker object removed, Task 8) |
 | 5 | Server-only state violated by defaulting to `BOT_ACTIVE` | Task 4 (`ConversationState \| null` until first snapshot/event; older snapshot/replay can't lower state) |
 | 6 | Plan auto-resends via `/messages` after a `/stream` drop but the test expects `failed`; cancel triggers fallback; channel opens before the conversation exists | Task 7 (no auto-resend of the **current** message; degrade only **subsequent** sends; `AbortError` never falls back; channel opens on `accepted`/2xx) |
-| 7 | `resume()` not idempotent; grouped lifecycle events cause concurrent reconciliations; offline doesn't set `connection='offline'`; tests leak channels/timers | Task 9 (`running` guard + generation; offline path sets `connection`) + Task 10 + every channel test calls `close()` and injects a scheduler |
+| 7 | `resume()` not idempotent; grouped lifecycle events cause concurrent reconciliations; offline doesn't set `connection='offline'`; tests leak channels/timers | Task 9 (chained single-loop + generation; offline path sets `connection`) + Task 10 + every channel test calls `close()` and injects a scheduler |
+
+## Codex rev.2 → rev.3 (4 remaining, finer)
+
+| # | Blocker | Resolved in |
+|---|---|---|
+| A | Immutability was shallow (`Object.freeze` only froze `StoreState`); `applySnapshot` notified before finishing its scalar mutations | Task 4 (`getState` deep-freezes the array + every `StoredMessage`; `applySnapshot`/`replaceSnapshot` mutate then publish **once** via `assignMessages` + a single `notify`) |
+| B | Hard reset kept `lastAgentSeq` + agent identity, so a valid lower-seq `agent.joined` after the reset would be dropped | Task 4 (`replaceSnapshot` resets agent identity **and** `lastAgentSeq = -1` so the replay re-applies) |
+| C | First frame reset backoff but not `failures`; `pollOnce` ignored `body.cursor`; a 409 from polling didn't hard-reconcile | Task 9 (`consecutiveFailures` hoisted to the closure and zeroed on first frame; `pollOnce` applies `body.cursor` monotonically via `store.advanceCursorTo`; 409 from poll → `failures=0` + immediate `replaceSnapshot`) + Task 4 (`advanceCursorTo`) |
+| D | `suspend()`/`close()` freed the loop slot before the prior loop unwound, so `resume()` could start a concurrent reconciliation; the drop test used a clean `close()` (EOF), not a real error | Task 9 (chained `launch()`: at most one loop; a `resume()` during an unwinding loop is deferred to its `finally`; one shared `AbortController` per run aborts in-flight snapshot/poll/stream) + Task 11 (drop test emits an event then `controller.error(...)`) |
 
 ## Global Constraints
 
@@ -466,6 +475,7 @@ git commit -m "feat(widget): parser SSE por fetch-streaming (chunks parciales, a
     applySnapshot(s: MessagesSnapshot): void
     replaceSnapshot(s: MessagesSnapshot): void
     applyDurableEvent(e: WidgetEvent): void
+    advanceCursorTo(eventId: string): void   // monotonic; used by the poll fallback
     // Task 5 adds: addOptimistic, ackOptimistic, failOptimistic, retryOptimistic,
     // beginBotTurn, appendBotDelta, finishBotTurn, failBotTurn, setAgentTyping, setConnection
   }
@@ -571,6 +581,35 @@ describe('message store — durable core', () => {
     expect(s.getState().messages.map((m) => m.id)).toEqual(['msg_0001']) // rebuilt from snapshot
   })
 
+  it('replaceSnapshot resets agent identity + watermark so a lower-seq agent.joined re-applies', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(agentJoined(8, 'Laura'))
+    expect(s.getState().agentName).toBe('Laura')
+    s.replaceSnapshot(fixtureSnapshot())          // hard reset drops the cursor to seq=1
+    expect(s.getState().agentName).toBeNull()     // identity cleared
+    s.applyDurableEvent(agentJoined(3, 'Laura'))  // valid replay with seq LOWER than the old 8
+    expect(s.getState().agentName).toBe('Laura')  // re-applied (watermark was reset to -1)
+  })
+
+  it('advanceCursorTo moves the cursor forward monotonically only', () => {
+    const s = createMessageStore()
+    s.advanceCursorTo('evt_v1_conv_demo_01_4')
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_4')
+    s.advanceCursorTo('evt_v1_conv_demo_01_2') // older → ignored
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_4')
+    s.advanceCursorTo('evt_v1_conv_demo_01_7')
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_7')
+  })
+
+  it('getState deep-freezes the snapshot, the array and every message', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(msgEvent(2, 'm2', 'bot', 'x'))
+    const st = s.getState()
+    expect(Object.isFrozen(st)).toBe(true)
+    expect(Object.isFrozen(st.messages)).toBe(true)
+    expect(Object.isFrozen(st.messages[0])).toBe(true)
+  })
+
   it('publishes a stable snapshot between changes and a NEW one after a change', () => {
     const s = createMessageStore()
     const listener = vi.fn()
@@ -627,6 +666,7 @@ export interface MessageStore {
   applySnapshot(snapshot: MessagesSnapshot): void
   replaceSnapshot(snapshot: MessagesSnapshot): void
   applyDurableEvent(event: WidgetEvent): void
+  advanceCursorTo(eventId: string): void
 }
 
 // Display order: durable events strictly by seq among themselves; anything
@@ -657,9 +697,14 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     published = null
     for (const l of listeners) l()
   }
-  const setMessages = (next: StoredMessage[]): void => {
+  // assignMessages sorts + replaces WITHOUT publishing; callers that also touch
+  // scalars call notify() once at the end so each mutation publishes atomically.
+  const assignMessages = (next: StoredMessage[]): void => {
     next.sort(compareMessages)
     messages = next
+  }
+  const setMessages = (next: StoredMessage[]): void => {
+    assignMessages(next)
     notify()
   }
   const advanceCursor = (eventId: string): void => {
@@ -704,8 +749,9 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   }
 
   const applySnapshot = (snap: MessagesSnapshot): void => {
+    // Mutate messages + scalars, THEN publish once (no intermediate notify).
     const snapSeq = cursorSeq(snap.snapshotCursor)
-    setMessages(mergeSnapshotMessages(messages.slice(), snap))
+    assignMessages(mergeSnapshotMessages(messages.slice(), snap))
     if (snapSeq >= lastStateSeq) { conversationState = snap.state; lastStateSeq = snapSeq }
     advanceCursor(snap.snapshotCursor)
     notify()
@@ -720,14 +766,34 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     const snapSeq = cursorSeq(snap.snapshotCursor)
     conversationState = snap.state
     lastStateSeq = snapSeq
-    setMessages(mergeSnapshotMessages(keep, snap))
+    // The snapshot carries state but NOT agent identity — reset it and its
+    // watermark so the agent.joined replay (arriving after the lowered cursor)
+    // re-applies even though its seq is below the pre-reset watermark.
+    agentName = null
+    agentAvatarUrl = null
+    lastAgentSeq = -1
+    assignMessages(mergeSnapshotMessages(keep, snap))
+    notify()
+  }
+
+  const advanceCursorTo = (eventId: string): void => {
+    if (cursor !== null && cursorSeq(eventId) <= cursorSeq(cursor)) return
+    cursor = eventId
+    notify()
   }
 
   return {
     getState(): StoreState {
-      published ??= Object.freeze({
-        messages, conversationState, cursor, agentName, agentAvatarUrl, agentTyping, connection,
-      })
+      if (published === null) {
+        // Deep freeze so consumers (and our own future mutations) can never
+        // mutate a snapshot that was already handed out. Copy-on-write means the
+        // NEXT mutation builds fresh objects, so freezing these is safe.
+        for (const m of messages) Object.freeze(m)
+        Object.freeze(messages)
+        published = Object.freeze({
+          messages, conversationState, cursor, agentName, agentAvatarUrl, agentTyping, connection,
+        })
+      }
       return published
     },
     subscribe(listener): () => void {
@@ -737,11 +803,12 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     applySnapshot,
     replaceSnapshot,
     applyDurableEvent,
+    advanceCursorTo,
   }
 }
 ```
 
-> Note for Task 5: `messages`, `appliedEventIds`, `now`, `indexOf`, `setMessages`, `notify`, `advanceCursor`, and the mutable scalars live in this closure. Task 5 adds mutators inside `createMessageStore` and to the returned object. Copy-on-write is mandatory: never mutate an existing `StoredMessage` — always spread into a new object and `setMessages(next)` with a fresh array.
+> Note for Task 5: `messages`, `appliedEventIds`, `now`, `indexOf`, `assignMessages`, `setMessages`, `notify`, `advanceCursor`, and the mutable scalars live in this closure. Task 5 adds mutators inside `createMessageStore` and to the returned object. Copy-on-write is mandatory: never mutate an existing `StoredMessage` (they are frozen once published) — always build a fresh non-frozen array (`slice`/spread/`filter`) and replace elements by spreading into new objects. A mutator that changes **only** messages uses `setMessages(next)` (assign + single notify); one that also touches scalars uses `assignMessages(next)` then a single `notify()` at the end, so each mutation publishes exactly one atomic snapshot.
 
 - [ ] **Step 4: Run to verify it passes** — `npx vitest run src/store/__tests__/message-store.test.ts` → PASS.
 
@@ -1610,11 +1677,11 @@ git commit -m "feat(widget): backoff exponencial con tope y jitter"
   ```
 
 **Design (addresses Codex #2/#3/#4/#7):**
-- **One loop** `runChannel(gen)`; a `running` guard means grouped `resume()`/`open()` never start a second loop. `open/close/suspend/resume` bump `generation`; every async continuation checks `isCurrent(gen)` before touching the store, so a stale snapshot/stream/poll from before a close/suspend never applies.
-- Each iteration: `reconcile` (snapshot → `applySnapshot`, or `replaceSnapshot` after a 409) → `connect` (parks on the live `/events` stream). On a clean close with **progress**, pause `reconnectDelayMs` then reconcile again.
-- **Failures reset only on progress:** `connect` resets the backoff and the failure counter only after the **first frame** (heartbeat counts). A 200 that opens then drops with zero frames counts as a failure — so 2 such failures reach the poll fallback.
-- **Fallback:** ≥2 consecutive failures → `connection='polling'`, one `pollOnce` (consuming `/events/poll` and advancing via the store's durable dedup), wait `pollIntervalMs`, then the loop retries `connect` — a working stream returns to `live`. A 409 on connect or poll triggers a hard `replaceSnapshot`.
-- **Offline:** loop top checks `isOnline()` → `connection='offline'` and exits; `suspend()` while offline also sets `offline`. `resume()` (online again) starts one fresh loop.
+- **One chained loop** `runChannel(gen)`. `launch()` guarantees at most one loop: if a loop is running and current it's a no-op; if a stale loop (post-suspend) is still unwinding, the restart is **deferred to its `finally`** — so `suspend()` then `resume()` never runs two reconciliations at once (Codex #7/D). `open/close/suspend/resume` bump `generation`; every async continuation checks `isCurrent(gen)` before touching the store, and `stopCurrent()` aborts the run's shared `AbortController` (snapshot + poll + stream) so nothing stale applies after a close/suspend.
+- Each iteration: `reconcile` (snapshot → `applySnapshot`, or `replaceSnapshot` after a 409) → `connect` (parks on the live `/events` stream). On a clean close pause `reconnectDelayMs`, then reconcile again.
+- **Failures reset only on progress:** `connect` resets **both** `backoff` **and** the closure-level `consecutiveFailures` on the **first frame** (heartbeat counts, Codex #4/C). A 200 that opens then drops with zero frames counts as a failure — 2 such drops reach the poll fallback.
+- **Fallback:** ≥2 consecutive failures → `connection='polling'`, one `pollOnce` (applies `/events/poll` durables **and** advances the cursor from `body.cursor` even with zero events), wait `pollIntervalMs`, then the loop retries `connect` — a working stream returns to `live`. A 409 on connect **or poll** resets `failures` and triggers a hard `replaceSnapshot`.
+- **Offline:** loop top checks `isOnline()` → `connection='offline'` and exits; `suspend()` while offline also sets `offline`. `resume()` (online again) launches one fresh loop.
 
 - [ ] **Step 1: Write the core failing tests** — create `src/transport/__tests__/events-channel.test.ts`:
 
@@ -1777,16 +1844,19 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
 
   let active = false
   let suspended = false
-  let running = false
   let generation = 0
-  let streamAc: AbortController | null = null
+  let consecutiveFailures = 0
+  let runAc: AbortController | null = null   // one AbortController per loop run (snapshot+poll+stream)
   let timer: number | null = null
   let pendingDelay: (() => void) | null = null
+  let loopPromise: Promise<void> | null = null
+  let loopGen = 0                            // generation of the loop currently running (0 = none)
+  let restartRequested = false
 
   const isCurrent = (gen: number): boolean => active && !suspended && gen === generation
   const cancelDelay = (): void => {
     if (timer !== null) { scheduler.clearTimeout(timer); timer = null }
-    if (pendingDelay) { const r = pendingDelay; pendingDelay = null; r() }
+    if (pendingDelay) { const r = pendingDelay; pendingDelay = null; r() } // let an awaiting loop unwind
   }
   const delay = (ms: number): Promise<void> =>
     new Promise((resolve) => {
@@ -1805,8 +1875,8 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
     // presence / heartbeat: ignored (heartbeat still counts as progress in connect())
   }
 
-  const snapshot = async (gen: number): Promise<MessagesSnapshot | null> => {
-    const res = await deps.client.authorizedFetch('/widget/v1/conversations/current/messages?limit=50')
+  const snapshot = async (gen: number, signal: AbortSignal): Promise<MessagesSnapshot | null> => {
+    const res = await deps.client.authorizedFetch('/widget/v1/conversations/current/messages?limit=50', { signal })
     if (!isCurrent(gen)) return null
     if (res.status === 409) throw new CursorResetError('snapshot_cursor_reset')
     if (!res.ok) throw new Error(`snapshot_http:${res.status}`)
@@ -1815,65 +1885,73 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
 
   // Parks on the live stream. Returns when the server closes it cleanly WITH
   // progress; throws on transport error or a 0-frame close; throws
-  // CursorResetError on a 409.
-  const connect = async (gen: number): Promise<void> => {
+  // CursorResetError on a 409. On the FIRST frame it resets BOTH the backoff and
+  // the failure counter (Codex #4) — a stream that opens then drops without a
+  // single frame still counts as a failure, so 2 such drops reach the fallback.
+  const connect = async (gen: number, signal: AbortSignal): Promise<void> => {
     const after = deps.store.getState().cursor ?? ''
-    const ac = new AbortController()
-    streamAc = ac
-    const res = await deps.client.authorizedFetch(`/widget/v1/events?after=${encodeURIComponent(after)}`, { signal: ac.signal })
-    if (!isCurrent(gen)) { ac.abort(); return }
+    const res = await deps.client.authorizedFetch(`/widget/v1/events?after=${encodeURIComponent(after)}`, { signal })
+    if (!isCurrent(gen)) return
     if (res.status === 409) throw new CursorResetError('events_cursor_reset')
     if (!res.ok || !res.body) throw new Error(`events_http:${res.status}`)
     deps.store.setConnection('live')
     let progressed = false
-    for await (const frame of parseSSEStream(res.body, ac.signal)) {
-      if (!isCurrent(gen)) { ac.abort(); return }
-      if (!progressed) { progressed = true; backoff.reset() } // liveness → reset failure state
+    for await (const frame of parseSSEStream(res.body, signal)) {
+      if (!isCurrent(gen)) return
+      if (!progressed) { progressed = true; consecutiveFailures = 0; backoff.reset() }
       routeFrame(frame.event, frame.data)
     }
+    if (!isCurrent(gen)) return
     if (!progressed) throw new Error('events_closed_no_progress')
   }
 
-  const pollOnce = async (gen: number): Promise<void> => {
+  const pollOnce = async (gen: number, signal: AbortSignal): Promise<void> => {
     const after = deps.store.getState().cursor ?? ''
-    const res = await deps.client.authorizedFetch(`/widget/v1/events/poll?after=${encodeURIComponent(after)}`)
+    const res = await deps.client.authorizedFetch(`/widget/v1/events/poll?after=${encodeURIComponent(after)}`, { signal })
     if (!isCurrent(gen)) return
     if (res.status === 409) throw new CursorResetError('poll_cursor_reset')
     if (!res.ok) throw new Error(`poll_http:${res.status}`)
     const body = (await res.json()) as EventsPollResponse
     if (!isCurrent(gen)) return
-    for (const e of body.events) deps.store.applyDurableEvent(e) // cursor advances via durable dedup
+    for (const e of body.events) deps.store.applyDurableEvent(e)
+    if (body.cursor !== null) deps.store.advanceCursorTo(body.cursor) // advance even with 0 events
   }
 
-  const reconcile = async (gen: number, hard: boolean): Promise<void> => {
-    const snap = await snapshot(gen)
+  const reconcile = async (gen: number, hard: boolean, signal: AbortSignal): Promise<void> => {
+    const snap = await snapshot(gen, signal)
     if (snap === null || !isCurrent(gen)) return
     if (hard) deps.store.replaceSnapshot(snap)
     else deps.store.applySnapshot(snap)
   }
 
   const runChannel = async (gen: number): Promise<void> => {
-    running = true
-    let failures = 0
+    const ac = new AbortController()
+    runAc = ac
+    consecutiveFailures = 0
     let hard = false
     try {
       while (isCurrent(gen)) {
         if (!isOnline()) { deps.store.setConnection('offline'); return }
         try {
-          await reconcile(gen, hard)
+          await reconcile(gen, hard, ac.signal)
           hard = false
           if (!isCurrent(gen)) return
-          await connect(gen)          // parks while live
+          await connect(gen, ac.signal)  // parks while live
           if (!isCurrent(gen)) return
-          failures = 0
-          await delay(reconnectDelayMs) // clean close → brief pause, then reconcile
+          await delay(reconnectDelayMs)  // clean close → brief pause, then reconcile
         } catch (err) {
           if (!isCurrent(gen)) return
-          if (err instanceof CursorResetError) { hard = true; failures = 0; continue }
-          failures += 1
-          if (failures >= 2) {
+          if (err instanceof CursorResetError) { hard = true; consecutiveFailures = 0; continue }
+          consecutiveFailures += 1
+          if (consecutiveFailures >= 2) {
             deps.store.setConnection('polling')
-            try { await pollOnce(gen) } catch (e) { if (e instanceof CursorResetError) hard = true }
+            try {
+              await pollOnce(gen, ac.signal)
+            } catch (e) {
+              if (e instanceof CursorResetError) { hard = true; consecutiveFailures = 0; continue } // 409 from poll → hard reconcile
+              if (!isCurrent(gen)) return
+              // other poll error: stay in polling and retry next tick
+            }
             if (!isCurrent(gen)) return
             await delay(pollIntervalMs)
           } else {
@@ -1883,15 +1961,33 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
         }
       }
     } finally {
-      if (gen === generation) running = false
+      if (runAc === ac) runAc = null
     }
   }
 
-  const start = (): void => {
-    if (running) return
+  // At most ONE loop runs at a time. A launch requested while a loop is still
+  // unwinding is deferred to that loop's `finally` (Codex #7) — so a suspend()
+  // immediately followed by resume() never yields two concurrent reconciliations.
+  // A launch while a CURRENT loop is live is a no-op (nothing to restart).
+  const launch = (): void => {
+    if (loopPromise && loopGen === generation) return // a live/current loop is already running
+    if (loopPromise) { restartRequested = true; return } // a stale loop is unwinding → chain
+    restartRequested = false
     generation += 1
+    loopGen = generation
     const gen = generation
-    void runChannel(gen)
+    loopPromise = runChannel(gen).finally(() => {
+      loopPromise = null
+      loopGen = 0
+      if (restartRequested && active && !suspended) { restartRequested = false; launch() }
+    })
+  }
+
+  const stopCurrent = (): void => {
+    generation += 1        // invalidate the running loop's gen (isCurrent → false)
+    runAc?.abort()         // abort in-flight snapshot / poll / stream so it unwinds now
+    runAc = null
+    cancelDelay()          // release any pending backoff/poll delay
   }
 
   return {
@@ -1899,31 +1995,27 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
       if (active) return
       active = true
       suspended = false
+      restartRequested = false
       backoff.reset()
-      start()
+      launch()
     },
     close(): void {
       active = false
       suspended = false
-      generation += 1
-      running = false
-      streamAc?.abort(); streamAc = null
-      cancelDelay()
+      restartRequested = false
+      stopCurrent()
       deps.store.setConnection('idle')
     },
     suspend(): void {
       if (!active) return
       suspended = true
-      generation += 1
-      running = false
-      streamAc?.abort(); streamAc = null
-      cancelDelay()
+      stopCurrent()
       if (!isOnline()) deps.store.setConnection('offline')
     },
     resume(): void {
       if (!active) return
       suspended = false
-      start()
+      launch()
     },
     isActive(): boolean { return active },
   }
@@ -1943,6 +2035,11 @@ function durableEvent(seq: number, id: string, text: string) {
   }
 }
 const EMPTY: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_0' }
+function sseThenError(frames: string[]): Response { // emits frames, then errors the body (a real drop)
+  const enc = new TextEncoder()
+  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.error(new Error('drop')) } })
+  return new Response(body, { status: 200 })
+}
 
 describe('events channel — resilience & lifecycle', () => {
   it('falls back to polling after 2 consecutive stream failures and applies polled durables', async () => {
@@ -2034,10 +2131,60 @@ describe('events channel — resilience & lifecycle', () => {
     expect(snapshots).toBe(before)
     ch.close()
   })
+
+  it('a stream that delivers a frame then errors resets failures (never falls to polling)', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let polled = false
+    let streamN = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      if (path.includes('/events/poll')) { polled = true; return jsonRes({ events: [], cursor: null }) }
+      streamN += 1
+      return sseThenError([ev(streamN + 1, `m${streamN}`, `t${streamN}`)]) // one frame, then drop
+    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), pollIntervalMs: 1, reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(store.getState().messages.length).toBeGreaterThanOrEqual(3))
+    expect(polled).toBe(false) // each stream progresses (resets failures) → never reaches 2
+    ch.close()
+  })
+
+  it('pollOnce advances the cursor from body.cursor even with no events', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      if (path.includes('/events/poll')) return jsonRes({ events: [], cursor: 'evt_v1_conv_demo_01_7' })
+      if (path.includes('/events?')) return sseFail() // force into polling
+      return jsonRes({})
+    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), pollIntervalMs: 1, reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(store.getState().cursor).toBe('evt_v1_conv_demo_01_7'))
+    ch.close()
+  })
+
+  it('a 409 from polling resets failures and hard-reconciles, then recovers to live', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let streamCall = 0
+    let pollCall = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      if (path.includes('/events/poll')) { pollCall += 1; return jsonRes({ code: 'CURSOR_RESET_REQUIRED' }, 409) }
+      streamCall += 1
+      if (streamCall <= 2) return sseFail()          // two failures → polling
+      return sseOpen([ev(2, 'mok', 'recuperado')])   // after the 409-driven hard reconcile
+    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), pollIntervalMs: 1, reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'mok')).toBe(true))
+    await vi.waitFor(() => expect(store.getState().connection).toBe('live'))
+    expect(pollCall).toBeGreaterThanOrEqual(1)
+    ch.close()
+  })
 })
 ```
 
-- [ ] **Step 6: Run the whole channel suite + typecheck** — `npx vitest run src/transport/__tests__/events-channel.test.ts && npm run typecheck` → PASS (9 cases), no type errors.
+- [ ] **Step 6: Run the whole channel suite + typecheck** — `npx vitest run src/transport/__tests__/events-channel.test.ts && npm run typecheck` → PASS (12 cases), no type errors.
 
 - [ ] **Step 7: Commit**
 
@@ -2212,6 +2359,11 @@ function sseOpen(frames: string[]): Response { // parks open
   const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)) } })
   return new Response(body, { status: 200 })
 }
+function sseErr(frames: string[]): Response { // emits frames, then a REAL error (network drop mid-stream)
+  const enc = new TextEncoder()
+  const body = new ReadableStream<Uint8Array>({ start(c) { for (const f of frames) c.enqueue(enc.encode(f)); c.error(new Error('drop')) } })
+  return new Response(body, { status: 200 })
+}
 const immediate: Scheduler = { setTimeout: (fn) => { queueMicrotask(fn); return 0 }, clearTimeout: () => {} }
 const EMPTY: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_0' }
 function botEvt(seq: number, id: string, text: string): string {
@@ -2262,18 +2414,19 @@ describe('createTransport (integration)', () => {
     t.destroy()
   })
 
-  it('a stream that drops AFTER delivering an event reconciles and dedups the overlap (gap-free)', async () => {
+  it('a stream that ERRORS after delivering an event reconciles and dedups the overlap (gap-free)', async () => {
     n = 0
     let eventsCall = 0
     const authorizedFetch = vi.fn(async (path: string) => {
       if (path.includes('/messages') && path.includes('limit')) {
+        // after the drop, the re-snapshot returns m2 (overlap) + the missed m3
         return jsonRes(eventsCall >= 1
           ? { messages: [{ messageId: 'm2', role: 'bot', text: 'primero', createdAt: '2026-07-17T14:02:00Z' }, { messageId: 'm3', role: 'bot', text: 'segundo', createdAt: '2026-07-17T14:03:00Z' }], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_3' }
           : EMPTY)
       }
       if (path.includes('/events?')) {
         eventsCall += 1
-        if (eventsCall === 1) return sse([botEvt(2, 'm2', 'primero')]) // delivers m2 then closes (drop)
+        if (eventsCall === 1) return sseErr([botEvt(2, 'm2', 'primero')]) // delivers m2, then a real error drop
         return sseOpen([]) // subsequent stream parks quietly
       }
       return jsonRes({})
@@ -2395,19 +2548,21 @@ git commit -m "feat(widget): fachada de transporte (store + sender + canal + cic
 
 Deferred (out of scope, declared): visual panel/10 states (Plan 3); theming; rich content/upload/feedback (Plan 4); i18n (Plan 4); bootstrap/session (Plan 1). Ephemeral `presence` parsed-but-ignored (forward-compat); heartbeat absorbed by the SSE layer but still counts as connection liveness in `connect()`.
 
-**2. Codex rev.1 blockers — each closed:** (1) Task 6 throws `stream_incomplete`; Task 3 abort-unblock + decoder flush. (2) Task 5 `finishBotTurn` no-cursor; Task 4 `replaceSnapshot`; Task 9 generation guard. (3) Task 4 seq-guarded state/agent + immutable; Task 5 both race orders. (4) Task 9 progress-only failure reset + single loop + poll cursor; Task 8 breaker removed. (5) Task 4 `ConversationState | null`. (6) Task 7 no auto-resend, degrade-subsequent, `AbortError` no-fallback, open-on-accepted. (7) Task 9 `running` guard + offline connection; every channel test `close()`s.
+**2. Codex rev.1 blockers — each closed:** (1) Task 6 throws `stream_incomplete`; Task 3 abort-unblock + decoder flush. (2) Task 5 `finishBotTurn` no-cursor; Task 4 `replaceSnapshot`; Task 9 generation guard. (3) Task 4 seq-guarded state/agent + immutable; Task 5 both race orders. (4) Task 9 progress-only failure reset + single loop + poll cursor; Task 8 breaker removed. (5) Task 4 `ConversationState | null`. (6) Task 7 no auto-resend, degrade-subsequent, `AbortError` no-fallback, open-on-accepted. (7) Task 9 chained single-loop + offline connection; every channel test `close()`s.
+
+**2b. Codex rev.2 blockers — each closed:** (A) Task 4 `getState` deep-freezes array + every message; `applySnapshot`/`replaceSnapshot` mutate then `notify()` once (atomic). (B) Task 4 `replaceSnapshot` resets agent identity **and** `lastAgentSeq=-1` so a valid lower-seq `agent.joined` re-applies (test added). (C) Task 9 `consecutiveFailures` hoisted + zeroed on first frame (test: frame-then-error never polls); `pollOnce` applies `body.cursor` monotonically via `advanceCursorTo` (test with 0 events); 409-from-poll resets failures + hard-reconciles (test). (D) Task 9 chained `launch()` + shared per-run `AbortController` (no concurrent reconciliation after suspend→resume); Task 11 drop test uses `controller.error(...)`, not a clean `close()`.
 
 **3. Placeholder scan:** no `TODO`/`TBD`/"add error handling"/"similar to Task N". Every code step ships complete code; every test step ships real assertions.
 
 **4. Type/signature consistency:**
 - `finishBotTurn(turnId, messageId)` — 2 args everywhere (store Task 4/5, `onDone` Task 6, sender Task 7).
 - `TurnHandlers.onDone(turnId, messageId)` matches the sender's handler and the store call.
-- `MessageStore` surface (Task 4 + Task 5 additions) — every consumer (7, 9, 11) calls only declared methods; `StoreState.conversationState` is `ConversationState | null` and consumers treat null.
-- `EventsChannelDeps`/`Scheduler`/`Backoff` consistent across Tasks 9 and 11; `createBackoff` signature (Task 8, no breaker) matches all callers.
+- `MessageStore` surface (Task 4 + Task 5 additions, incl. `advanceCursorTo`) — every consumer (7, 9, 11) calls only declared methods; `StoreState.conversationState` is `ConversationState | null` and consumers treat null.
+- `EventsChannelDeps`/`Scheduler`/`Backoff` consistent across Tasks 9 and 11; `createBackoff` signature (Task 8, no breaker) matches all callers. Task 9's `snapshot`/`connect`/`pollOnce` all take `(gen, signal)` and share the run's single `AbortController`.
 - `WidgetEvent` shape constructed identically in every fixture/test; `parseDurable` narrows on `type`.
 - Facade passes optional deps via conditional spreads (`exactOptionalPropertyTypes`-safe).
 
-Fixed inline during review: dropped `eventId` from `onDone`/`finishBotTurn`; removed the circuit-breaker object from `backoff` and its usage; unified the single-loop channel (no mutually-recursive `onFailure`); `conversationState` null-init threaded through store, sender and integration tests.
+Fixed inline during review: dropped `eventId` from `onDone`/`finishBotTurn`; removed the circuit-breaker object from `backoff`; unified the single-loop channel; `conversationState` null-init threaded through store, sender and integration tests. Rev.3: deep-freeze + atomic publish (`assignMessages`+single `notify`); `replaceSnapshot` resets agent watermark/identity; added `store.advanceCursorTo` and wired it into `pollOnce`; hoisted `consecutiveFailures` and reset it on first frame; chained `launch()`/`stopCurrent()` so at most one loop runs and in-flight snapshot/poll/stream are aborted on suspend/close.
 
 ---
 
