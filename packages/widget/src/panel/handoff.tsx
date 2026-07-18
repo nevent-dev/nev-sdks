@@ -61,8 +61,8 @@ export function ResolvedCard({ agentName, onFeedback }: ResolvedCardProps) {
       </div>
       {onFeedback && (
         <div class="feedback">
-          <button aria-label="Valorar positivamente" aria-pressed={selected === 'up'} onClick={() => handle('up')}>👍</button>
-          <button aria-label="Valorar negativamente" aria-pressed={selected === 'down'} onClick={() => handle('down')}>👎</button>
+          <button type="button" aria-label="Valorar positivamente" aria-pressed={selected === 'up'} onClick={() => handle('up')}>👍</button>
+          <button type="button" aria-label="Valorar negativamente" aria-pressed={selected === 'down'} onClick={() => handle('down')}>👎</button>
         </div>
       )}
     </div>
