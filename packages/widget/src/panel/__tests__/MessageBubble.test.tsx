@@ -42,11 +42,14 @@ describe('MessageBubble', () => {
     expect(root.querySelector('.bubble')).toBeNull()
   })
 
-  it('mensaje fallido: muestra "No enviado" y un enlace Reintentar que llama onRetry con el clientId', async () => {
+  it('mensaje fallido: muestra "No enviado" y un botón Reintentar que llama onRetry con el clientId', async () => {
     const onRetry = vi.fn()
     const root = await mount(<MessageBubble message={msg({ role: 'user', status: 'failed', clientId: 'c1' })} agentName={null} onRetry={onRetry} compact={false} />)
     expect(root.querySelector('.meta .fail')?.textContent).toBe('No enviado')
-    root.querySelector<HTMLElement>('.meta .retry')!.click()
+    const retry = root.querySelector<HTMLButtonElement>('button.retry')
+    expect(retry).not.toBeNull()
+    expect(retry?.textContent?.trim()).toBe('Reintentar')
+    retry!.click()
     expect(onRetry).toHaveBeenCalledWith('c1')
   })
 

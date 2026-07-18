@@ -52,11 +52,9 @@ export function MessageBubble({ message, agentName, onRetry, compact }: MessageB
             {message.status === 'failed' && message.clientId !== null && (
               <>
                 <span class="fail">No enviado</span>
-                <span class="retry" role="button" tabIndex={0}
-                  onClick={() => onRetry(message.clientId as string)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onRetry(message.clientId as string) }}>
+                <button type="button" class="retry" onClick={() => onRetry(message.clientId as string)}>
                   Reintentar
-                </span>
+                </button>
               </>
             )}
           </div>

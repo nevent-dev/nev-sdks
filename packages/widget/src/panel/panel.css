@@ -62,7 +62,7 @@
 .m.user .meta { justify-content: flex-end; }
 .meta svg { width: 12px; height: 12px; }
 .meta .fail { color: var(--danger); font-weight: 500; }
-.meta .retry { color: var(--brand-a); font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.meta .retry { background: none; border: none; padding: 0; margin: 0; font: inherit; color: var(--brand-a); font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 .meta .retry:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
 
 .stream-caret { display: inline-block; width: 7px; height: 14px; background: var(--brand-a); border-radius: 2px; vertical-align: -2px; animation: blink .9s steps(2) infinite; }
