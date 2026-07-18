@@ -7,7 +7,10 @@
 4. Servir el paquete: `cd packages/widget && python3 -m http.server 4311`
 5. Abrir `http://localhost:4311/examples/host-demo.html`
 
-Verificación esperada: aparece la burbuja del launcher; al pulsarla se abre el panel
-con la cabecera "Asistente de DEMO FEST" (config servida por el mock) y el botón ×
-lo cierra. En la pestaña Red: GET /config, POST /sessions con {"embeddingOrigin":
+Verificación esperada: el iframe del shell es 0×0 en Fundaciones (el protocolo de
+resize y el launcher visible/clicable llegan con el plan de theming), así que no hay
+nada que pulsar. El flujo de la demo es por API: en la consola del navegador, ejecutar
+`window.NeventWidget('open')` abre el panel con la cabecera "Asistente de DEMO FEST"
+(config servida por el mock) y el botón × lo cierra (o `window.NeventWidget('close')`).
+En la pestaña Red: GET /config, POST /sessions con {"embeddingOrigin":
 "http://localhost:4311"}.
