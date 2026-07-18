@@ -25,6 +25,11 @@ describe('AgentInitialsAvatar', () => {
     expect(root.querySelector('.initials-avatar')?.textContent).toBe('?')
   })
 
+  it('nombre undefined (drift de contrato, Task 17): cae a "?" en vez de lanzar en .trim()', async () => {
+    const root = await mount(<AgentInitialsAvatar name={undefined} />)
+    expect(root.querySelector('.initials-avatar')?.textContent).toBe('?')
+  })
+
   it('es decorativo para lectores de pantalla (aria-hidden): el nombre real ya lo anuncia el texto de la cabecera/sysline que lo acompaña', async () => {
     const root = await mount(<AgentInitialsAvatar name="Laura" />)
     expect(root.querySelector('.initials-avatar')?.getAttribute('aria-hidden')).toBe('true')

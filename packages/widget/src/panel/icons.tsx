@@ -13,7 +13,7 @@ export function BotIcon() {
 // revisión). `agentAvatarUrl` se sigue recibiendo y guardando en el store
 // (Plan 2) para cuando exista un proxy propio, pero ningún componente de
 // este plan lo pinta como <img>.
-export function AgentInitialsAvatar({ name }: { name: string }) {
-  const initial = name.trim().charAt(0).toUpperCase() || '?'
+export function AgentInitialsAvatar({ name }: { name: string | undefined }) {
+  const initial = (name ?? '').trim().charAt(0).toUpperCase() || '?'
   return <span class="initials-avatar" aria-hidden="true">{initial}</span>
 }

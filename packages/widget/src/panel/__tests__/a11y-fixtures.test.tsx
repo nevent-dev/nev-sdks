@@ -67,7 +67,7 @@ const demoCards: CardItem[] = [
 // construye la MISMA estructura a mano con los componentes reales.
 async function mountRichPreview(): Promise<HTMLElement> {
   const config = fixtureConfig()
-  const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, assistantName: config.assistantName, isStreaming: false })
+  const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, assistantName: config.assistantName ?? 'Asistente', isStreaming: false })
   return mount(
     <section class="panel" role="dialog" aria-label="Vista previa: contenido rico">
       <Header viewState={viewState} onMinimize={() => {}} onClose={() => {}} />
@@ -82,7 +82,7 @@ async function mountRichPreview(): Promise<HTMLElement> {
 
 async function mountUploadPreview(): Promise<HTMLElement> {
   const config = fixtureConfig()
-  const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, assistantName: config.assistantName, isStreaming: false })
+  const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, assistantName: config.assistantName ?? 'Asistente', isStreaming: false })
   return mount(
     <section class="panel" role="dialog" aria-label="Vista previa: subida de archivo">
       <Header viewState={viewState} onMinimize={() => {}} onClose={() => {}} />

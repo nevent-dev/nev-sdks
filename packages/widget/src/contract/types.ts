@@ -1,9 +1,20 @@
 export interface WidgetConfig {
   schemaVersion: 1
   installationId: string
-  assistantName: string
+  // Opcional: el backend real (GET /widget/v1/installations/{id}/config) NO
+  // siempre lo envía (drift de contrato cazado en integración E2E, Task 17 —
+  // fixtures/mocks previos siempre lo incluían). Normalizado con fallback
+  // 'Asistente' en runtime en shell/session.ts, igual que welcome.
+  assistantName?: string
   locale: 'es' | 'en' | 'ca' | 'pt'
-  theme: { primaryColor: string; position: 'right' | 'left'; mode: 'light' | 'dark' | 'auto' }
+  theme: {
+    // Opcional por el mismo motivo: el backend real puede omitirlo (drift
+    // cazado en integración E2E, Task 17). applyTheme (panel/theme.ts) trata
+    // su ausencia como config legítima, no como color inválido.
+    primaryColor?: string
+    position: 'right' | 'left'
+    mode: 'light' | 'dark' | 'auto'
+  }
   features: { upload: boolean; handoff: boolean }
   // Opcional: normalizado en runtime en shell/session.ts (Task 15) — nunca
   // se confía en el shape tal cual llega de red. Ver "Brechas de contrato" #6.

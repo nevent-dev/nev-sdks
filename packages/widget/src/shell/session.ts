@@ -24,7 +24,15 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
   const rawConfig = (await configRes.json()) as Record<string, unknown>
   const { welcome: _rawWelcome, ...rawConfigWithoutWelcome } = rawConfig
   const welcome = normalizeWelcome(rawConfig['welcome'])
-  const config: WidgetConfig = { ...(rawConfigWithoutWelcome as unknown as WidgetConfig), ...(welcome ? { welcome } : {}) }
+  // assistantName es otro campo NO CONFIABLE (drift de contrato cazado en
+  // integración E2E, Task 17: el backend real puede omitirlo por completo).
+  // A diferencia de welcome (que puede estar legítimamente ausente), todo
+  // consumidor aguas abajo (cabecera, aria-label) necesita SIEMPRE un nombre
+  // — se normaliza aquí, en la frontera, con el mismo fallback 'Asistente'
+  // que ya usa el resto del shell para "sin nombre de agente todavía".
+  const rawAssistantName = rawConfig['assistantName']
+  const assistantName = typeof rawAssistantName === 'string' && rawAssistantName.trim().length > 0 ? rawAssistantName : 'Asistente'
+  const config: WidgetConfig = { ...(rawConfigWithoutWelcome as unknown as WidgetConfig), assistantName, ...(welcome ? { welcome } : {}) }
 
   const sessionRes = await fetchFn(`${installationBase}/sessions`, {
     method: 'POST',

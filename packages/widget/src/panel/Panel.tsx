@@ -29,11 +29,16 @@ export interface PanelProps {
 export function Panel({ config, transport, onMinimize, onClose, onResize, viewportKind, viewportHeight }: PanelProps) {
   const state = useStoreState(transport.store)
   const isStreaming = state.messages.some((m) => m.streaming)
+  // session.ts ya normaliza assistantName con fallback 'Asistente' en la
+  // frontera de red — este `?? ` es el guard de TIPOS que exige el propio
+  // contrato (WidgetConfig.assistantName es opcional, Task 17), no una
+  // segunda normalización de datos.
+  const assistantName = config.assistantName ?? 'Asistente'
   const viewState = computeViewState({
     conversationState: state.conversationState,
     connection: state.connection,
     agentName: state.agentName,
-    assistantName: config.assistantName,
+    assistantName,
     isStreaming,
   })
 
@@ -58,7 +63,7 @@ export function Panel({ config, transport, onMinimize, onClose, onResize, viewpo
   )
 
   return (
-    <section class="panel" data-part="panel" role="dialog" aria-label={config.assistantName} tabIndex={-1} ref={containerRef}>
+    <section class="panel" data-part="panel" role="dialog" aria-label={assistantName} tabIndex={-1} ref={containerRef}>
       <Header viewState={viewState} onMinimize={onMinimize} onClose={onClose} />
       <ConnectionBanner kind={viewState.connectionBanner} />
       <MessageList

@@ -91,4 +91,53 @@ describe('session client', () => {
     expect(Object.keys(localStorage)).toHaveLength(0)
     expect(Object.keys(sessionStorage)).toHaveLength(0)
   })
+
+  // Fix integración (Task 17): el backend real (GET /widget/v1/installations/{id}/config)
+  // puede omitir assistantName por completo — drift cazado conduciendo el
+  // navegador real contra el nev-api real, no visible con las fixtures
+  // (que siempre lo incluían). Se normaliza en la frontera, igual que welcome.
+  it('config SIN assistantName: la config normalizada trae el fallback "Asistente"', async () => {
+    const { fetchFn } = mockApi()
+    fetchFn.mockImplementationOnce(async () => {
+      const { assistantName: _omit, ...rest } = fixtureConfig()
+      return jsonResponse(rest)
+    })
+    const client = await createSessionClient({ ...OPTS, fetchFn })
+    expect(client.getConfig().assistantName).toBe('Asistente')
+  })
+
+  it('config con theme SIN primaryColor: pasa a través sin lanzar, resto de theme intacto', async () => {
+    const { fetchFn } = mockApi()
+    fetchFn.mockImplementationOnce(async () => {
+      const full = fixtureConfig()
+      const { primaryColor: _omit, ...themeRest } = full.theme
+      return jsonResponse({ ...full, theme: themeRest })
+    })
+    const client = await createSessionClient({ ...OPTS, fetchFn })
+    const config = client.getConfig()
+    expect(config.theme.primaryColor).toBeUndefined()
+    expect(config.theme.position).toBe('right')
+    expect(config.theme.mode).toBe('auto')
+  })
+
+  // Boot-shaped: el JSON EXACTO devuelto por el backend real en la
+  // integración E2E (Task 17) — sin assistantName, theme sin primaryColor.
+  it('arranca sin lanzar con el JSON exacto del backend real (sin assistantName ni theme.primaryColor)', async () => {
+    const { fetchFn } = mockApi()
+    fetchFn.mockImplementationOnce(async () =>
+      jsonResponse({
+        schemaVersion: 1,
+        installationId: 'inst_demo_festival_01',
+        locale: 'es',
+        theme: { position: 'right', mode: 'light' },
+        features: { upload: false, handoff: true },
+      }),
+    )
+    const client = await createSessionClient({ ...OPTS, fetchFn })
+    const config = client.getConfig()
+    expect(config.assistantName).toBe('Asistente')
+    expect(config.theme.primaryColor).toBeUndefined()
+    expect(config.theme.position).toBe('right')
+    expect(config.theme.mode).toBe('light')
+  })
 })

@@ -126,4 +126,33 @@ describe('applyTheme', () => {
       mode: 'ignore-me' as unknown as 'auto',
     })).not.toThrow()
   })
+
+  // Fix integración (Task 17): el backend real omite primaryColor (y en
+  // teoría podría omitir el objeto theme entero) — ausencia es config
+  // LEGÍTIMA, no el caso de color inválido de los tests de arriba.
+  it('theme SIN primaryColor: no lanza, conserva --brand-a/--brand-ink por defecto (vacíos), sin console.warn', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(() => applyTheme(root, { position: 'right', mode: 'auto' } as WidgetConfig['theme'])).not.toThrow()
+    expect(root.style.getPropertyValue('--brand-a')).toBe('')
+    expect(root.style.getPropertyValue('--brand-ink')).toBe('')
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('theme undefined (objeto entero ausente): no lanza, fija data-position a right y borra data-theme', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(() => applyTheme(root, undefined)).not.toThrow()
+    expect(root.style.getPropertyValue('--brand-a')).toBe('')
+    expect(root.dataset['position']).toBe('right')
+    expect(root.dataset['theme']).toBeUndefined()
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('el payload REAL del backend (JSON exacto de la integración E2E, Task 17) — sin primaryColor — no lanza', () => {
+    const realBackendTheme = { position: 'right', mode: 'light' } as WidgetConfig['theme']
+    expect(() => applyTheme(root, realBackendTheme)).not.toThrow()
+    expect(root.dataset['position']).toBe('right')
+    expect(root.dataset['theme']).toBe('light')
+  })
 })

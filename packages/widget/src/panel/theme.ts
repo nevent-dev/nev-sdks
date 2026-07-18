@@ -86,24 +86,34 @@ export function deriveInkColor(primaryColorHex: string): string | null {
 // CSSStyleDeclaration.setProperty, JAMÁS interpolado en HTML/CSS. Se llama
 // desde main.tsx ANTES del primer render (Task 15), no desde un efecto de
 // Panel — así el launcher inicial también respeta el theme (Important #10).
-export function applyTheme(root: HTMLElement, theme: WidgetConfig['theme']): void {
-  if (isSafeColor(theme.primaryColor)) {
-    const normalized = normalizeHex(theme.primaryColor.trim())
-    const ink = deriveInkColor(normalized)
-    if (ink) {
-      root.style.setProperty('--brand-a', normalized)
-      root.style.setProperty('--brand-ink', ink)
-    } else {
-      // Ni blanco ni la tinta oscura alcanzan 4.5:1 real contra este color:
-      // en vez de aceptar un texto que no cumple AA, se ignora el override
-      // y se conserva el --brand-a por defecto del token set (que sí pasa —
-      // blanco sobre #6d4aff da ~5.15:1, ver el test de arriba).
-      console.warn(`[nevent-widget] primaryColor "${theme.primaryColor}" no alcanza 4.5:1 de contraste con ninguna tinta disponible — se ignora, se mantiene el color de marca por defecto`)
+//
+// `theme` (y `theme.primaryColor` dentro) son OPCIONALES: el backend real
+// (integración E2E, Task 17) puede omitir el objeto entero o solo
+// primaryColor — es config legítima, no el caso de color inválido. Ausencia
+// se ignora en silencio (se conservan los tokens de marca por defecto), sin
+// el console.warn reservado para un color sintácticamente presente pero que
+// no cumple 4.5:1.
+export function applyTheme(root: HTMLElement, theme: WidgetConfig['theme'] | undefined): void {
+  const primaryColor = theme?.primaryColor
+  if (primaryColor !== undefined) {
+    if (isSafeColor(primaryColor)) {
+      const normalized = normalizeHex(primaryColor.trim())
+      const ink = deriveInkColor(normalized)
+      if (ink) {
+        root.style.setProperty('--brand-a', normalized)
+        root.style.setProperty('--brand-ink', ink)
+      } else {
+        // Ni blanco ni la tinta oscura alcanzan 4.5:1 real contra este color:
+        // en vez de aceptar un texto que no cumple AA, se ignora el override
+        // y se conserva el --brand-a por defecto del token set (que sí pasa —
+        // blanco sobre #6d4aff da ~5.15:1, ver el test de arriba).
+        console.warn(`[nevent-widget] primaryColor "${primaryColor}" no alcanza 4.5:1 de contraste con ninguna tinta disponible — se ignora, se mantiene el color de marca por defecto`)
+      }
     }
   }
-  root.dataset['position'] = theme.position === 'left' ? 'left' : 'right'
+  root.dataset['position'] = theme?.position === 'left' ? 'left' : 'right'
 
-  if (theme.mode === 'light' || theme.mode === 'dark') {
+  if (theme?.mode === 'light' || theme?.mode === 'dark') {
     root.dataset['theme'] = theme.mode
   } else {
     delete root.dataset['theme']
