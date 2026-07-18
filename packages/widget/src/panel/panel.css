@@ -111,3 +111,35 @@
 .stopbtn i { width: 8px; height: 8px; background: currentColor; border-radius: 2px; display: block; }
 .powered { text-align: center; font-size: 10.5px; color: var(--faint); padding: 5px 0 3px; }
 .powered b { font-weight: 600; color: var(--muted); }
+
+/* ===== Divider y tarjetas de sistema (handoff) ===== */
+.sysline { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; }
+.sysline::before, .sysline::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.sysline .who { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.sysline .who .initials-avatar { width: 22px; height: 22px; font-size: 10px; }
+.sysline .who b { color: var(--ink); font-weight: 600; }
+.syscard { align-self: center; text-align: center; max-width: 270px; border-radius: 14px; padding: 14px 18px; margin: 10px auto; }
+.syscard.waiting { background: var(--wait-soft); }
+.syscard.waiting .ttl { color: var(--wait); }
+.syscard.resolved { background: var(--surface-2); }
+.syscard .ttl { font: 600 13px var(--font-display); color: var(--ink); }
+.syscard .dsc { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.feedback { display: flex; gap: 8px; justify-content: center; margin-top: 11px; }
+.feedback button { width: 38px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 15px; }
+.feedback button:hover { border-color: var(--brand-a); background: var(--brand-soft); }
+.feedback button[aria-pressed="true"] { border-color: var(--brand-a); background: var(--brand-soft); }
+
+.dots { display: inline-flex; gap: 4px; padding: 4px 0; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); animation: hop 1.2s ease-in-out infinite; }
+.dot:nth-child(2) { animation-delay: .15s; }
+.dot:nth-child(3) { animation-delay: .3s; }
+@keyframes hop { 30% { transform: translateY(-4px); opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
+
+/* ===== Banners de conexión ===== */
+.conn { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; padding: 7px; flex-shrink: 0; }
+.conn.reconnect { background: var(--wait-soft); color: var(--wait); }
+.conn.offline { background: var(--surface-3); color: var(--muted); }
+.conn .spin { width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .conn .spin { animation: none !important; } }
