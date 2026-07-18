@@ -42,3 +42,35 @@
   .state-ribbon[data-ribbon="bot-streaming"]::after,
   .state-ribbon[data-ribbon="waiting"] { animation: none !important; }
 }
+
+/* ===== Zona de mensajes ===== */
+.msgs { flex: 1; overflow-y: auto; padding: 18px 16px 8px; display: flex; flex-direction: column; gap: 3px; background: var(--surface); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.msgs::-webkit-scrollbar { width: 5px; }
+.msgs::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.day { align-self: center; font-size: 11px; color: var(--faint); margin: 2px 0 10px; }
+.m { display: flex; gap: 8px; max-width: 86%; }
+.m + .m { margin-top: 10px; }
+.m.compact { margin-top: 2px; }
+.m .b-avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--brand-grad); color: var(--brand-ink); display: grid; place-items: center; flex-shrink: 0; align-self: flex-end; }
+.m .b-avatar svg { width: 13px; height: 13px; }
+.m .b-avatar .initials-avatar { font-size: 11px; }
+.m .b-avatar.ghost { visibility: hidden; }
+.bubble { padding: 9px 13px; border-radius: var(--r-bubble); font-size: 13.8px; line-height: 1.5; color: var(--bubble-bot-ink); background: var(--bubble-bot); border-bottom-left-radius: 5px; white-space: pre-wrap; word-break: break-word; }
+.m.user { align-self: flex-end; flex-direction: row-reverse; }
+.m.user .bubble { background: var(--bubble-user); color: var(--bubble-user-ink); border-radius: var(--r-bubble); border-bottom-right-radius: 5px; }
+.meta { font-size: 10.5px; color: var(--faint); margin-top: 3px; display: flex; gap: 4px; align-items: center; font-variant-numeric: tabular-nums; }
+.m.user .meta { justify-content: flex-end; }
+.meta svg { width: 12px; height: 12px; }
+.meta .fail { color: var(--danger); font-weight: 500; }
+.meta .retry { color: var(--brand-a); font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.meta .retry:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+
+.stream-caret { display: inline-block; width: 7px; height: 14px; background: var(--brand-a); border-radius: 2px; vertical-align: -2px; animation: blink .9s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .stream-caret { animation: none !important; opacity: 1; } }
+
+.thinking { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); padding: 9px 13px; }
+.thinking .spark { width: 14px; height: 14px; animation: spin 2.4s linear infinite; }
+/* @keyframes spin: también la usa/declara Task 10 (ConnectionBanner) — CSS
+   resuelve @keyframes por nombre en toda la hoja sin importar el orden. */
+@media (prefers-reduced-motion: reduce) { .thinking .spark { animation: none !important; } }
