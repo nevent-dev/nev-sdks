@@ -63,7 +63,16 @@ export function createSender(deps: SenderDeps): Sender {
     try {
       await runStreamingTurn(deps.client, clientId, text, handlers, ac.signal)
     } catch (err) {
-      if (isAbortError(err)) { if (currentTurnId) deps.store.failBotTurn(currentTurnId); return }
+      if (isAbortError(err) && !currentTurnId) {
+        // cancelled before the turn was accepted: no bot placeholder exists yet,
+        // and nothing else will ever ack/fail this optimistic user message.
+        deps.store.failOptimistic(clientId)
+        return
+      }
+      // mirror the abort branch for non-abort mid-stream failures too, so a
+      // streaming placeholder is never left orphaned in `streaming: true`.
+      if (currentTurnId) deps.store.failBotTurn(currentTurnId)
+      if (isAbortError(err)) return
       throw err
     } finally {
       if (inFlight === ac) { inFlight = null; currentTurnId = null }
