@@ -22,5 +22,44 @@ interface EventBase {
 
 export type WidgetEvent =
   | (EventBase & { type: 'message.created'; payload: { messageId: string; role: 'bot' | 'agent' | 'user'; text: string } })
-  | (EventBase & { type: 'conversation.state_changed'; payload: { state: 'BOT_ACTIVE' | 'ESCALATED_WAITING' | 'AGENT_ACTIVE' | 'RESOLVED' } })
+  | (EventBase & { type: 'conversation.state_changed'; payload: { state: ConversationState } })
   | (EventBase & { type: 'agent.joined'; payload: { agentName: string; agentAvatarUrl: string | null } })
+
+export type ConversationState = 'BOT_ACTIVE' | 'ESCALATED_WAITING' | 'AGENT_ACTIVE' | 'RESOLVED'
+
+// Frames of the bot-turn stream (POST /widget/v1/conversations/current/stream).
+// Vocabulary per backend §4.2: accepted → delta(s) → DONE | ERROR. `done` still
+// carries eventId on the wire; the client does not use it to move the cursor
+// (the authoritative message.created arrives via the durable channel).
+export type TurnStreamFrame =
+  | { type: 'accepted'; turnId: string; userMessageId: string }
+  | { type: 'delta'; turnId: string; seq: number; delta: string }
+  | { type: 'done'; turnId: string; messageId: string; eventId: string }
+  | { type: 'error'; code: string }
+
+// Ephemeral inbound events (TTL, no cursor/replay) per backend §4.3.
+// presence is parsed for forward-compat but not yet surfaced by the store.
+export type WidgetEphemeralEvent =
+  | { type: 'agent.typing'; payload: { isTyping: boolean } }
+  | { type: 'presence'; payload: { agentOnline: boolean } }
+
+// A historical message as returned by GET /messages (snapshot).
+export interface WidgetMessage {
+  messageId: string
+  role: 'bot' | 'agent' | 'user'
+  text: string
+  createdAt: string
+}
+
+// GET /widget/v1/conversations/current/messages?limit=N
+export interface MessagesSnapshot {
+  messages: WidgetMessage[]
+  state: ConversationState
+  snapshotCursor: string
+}
+
+// GET /widget/v1/events/poll?after={cursor} — ALL durables after the cursor.
+export interface EventsPollResponse {
+  events: WidgetEvent[]
+  cursor: string | null
+}

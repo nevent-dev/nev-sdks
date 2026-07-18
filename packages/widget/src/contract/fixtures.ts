@@ -1,4 +1,7 @@
-import type { WidgetConfig, WidgetSession, WidgetEvent } from './types'
+import type {
+  WidgetConfig, WidgetSession, WidgetEvent,
+  MessagesSnapshot, TurnStreamFrame, EventsPollResponse,
+} from './types'
 
 export function fixtureConfig(): WidgetConfig {
   return {
@@ -22,4 +25,28 @@ export function fixtureEvents(): WidgetEvent[] {
     { ...base, eventId: 'evt_0002', occurredAt: '2026-07-17T14:06:00Z', type: 'conversation.state_changed', payload: { state: 'ESCALATED_WAITING' } },
     { ...base, eventId: 'evt_0003', occurredAt: '2026-07-17T14:09:00Z', type: 'agent.joined', payload: { agentName: 'Laura', agentAvatarUrl: null } },
   ]
+}
+
+export function fixtureSnapshot(): MessagesSnapshot {
+  return {
+    messages: [
+      { messageId: 'msg_0001', role: 'bot', text: 'Hola, ¿en qué te ayudamos?', createdAt: '2026-07-17T14:02:00Z' },
+    ],
+    state: 'BOT_ACTIVE',
+    snapshotCursor: 'evt_v1_conv_demo_01_1',
+  }
+}
+
+export function fixtureTurnFrames(): TurnStreamFrame[] {
+  return [
+    { type: 'accepted', turnId: 'turn_1', userMessageId: 'msg_user_1' },
+    { type: 'delta', turnId: 'turn_1', seq: 1, delta: 'Sí, ' },
+    { type: 'delta', turnId: 'turn_1', seq: 2, delta: 'puedes cambiarlo.' },
+    { type: 'done', turnId: 'turn_1', messageId: 'msg_bot_1', eventId: 'evt_v1_conv_demo_01_5' },
+  ]
+}
+
+export function fixturePollResponse(): EventsPollResponse {
+  const durables = fixtureEvents() as WidgetEvent[]
+  return { events: durables, cursor: 'evt_v1_conv_demo_01_3' }
 }
