@@ -60,6 +60,13 @@ describe('createTransport (integration)', () => {
     await vi.waitFor(() => expect(t.store.getState().messages.some((m) => m.id === 'mbot')).toBe(true))
     expect(t.store.getState().messages.filter((m) => m.role === 'bot')).toHaveLength(1) // no duplicate
     expect(t.store.getState().messages.find((m) => m.role === 'user')).toMatchObject({ id: 'u1', status: 'sent' })
+    // Durable-only signal: `seq` is set exclusively by applyDurableEvent's message.created
+    // branch (cursorSeq(eventId) === 5 here); the streaming-only path (finishBotTurn) leaves
+    // it null. A non-null seq of 5 proves the durable replay genuinely arrived and deduped
+    // against the streamed bubble — not merely that the streamed 'done' frame alone produced 'mbot'.
+    await vi.waitFor(() => expect(t.store.getState().messages.find((m) => m.id === 'mbot')).toMatchObject({ seq: 5 }))
+    // And that the durable channel actually opened and fetched (onConversationStarted → channel.open()).
+    expect(authorizedFetch.mock.calls.some(([path]) => typeof path === 'string' && path.includes('/events?'))).toBe(true)
     t.destroy()
   })
 
