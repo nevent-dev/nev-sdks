@@ -1,3 +1,48 @@
+/* ===== Estructura raíz del shell =====
+   El padding de "aire" respecto al borde de pantalla vive en [data-part="root"]
+   (el div que App.tsx renderiza), NUNCA en .launcher/.panel — así
+   useResizeReport (Step 3) puede medirlo con getBoundingClientRect() en un
+   único elemento, y el modo (launcher/panel) se decide declarativamente en
+   App.tsx (Task 17) sin necesitar un efecto en este componente. */
+html, body { margin: 0; }
+[data-part="root"] { display: inline-flex; padding: 24px; box-sizing: border-box; }
+
+/* ===== Launcher ===== */
+.launcher {
+  width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--brand-grad); box-shadow: var(--shadow-bubble); color: var(--brand-ink);
+  display: grid; place-items: center; transition: transform .18s ease; position: relative;
+}
+.launcher:hover { transform: scale(1.06); }
+.launcher:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+.launcher svg { width: 26px; height: 26px; }
+.launcher .badge {
+  position: absolute; top: -2px; right: -2px; min-width: 19px; height: 19px; padding: 0 5px;
+  border-radius: 99px; background: var(--danger); color: #fff; font: 600 11px/19px var(--font-body);
+  text-align: center; border: 2px solid var(--surface);
+}
+@media (prefers-reduced-motion: reduce) { .launcher { transition: none; } }
+
+/* ===== Panel =====
+   Alto fijo (640px) en desktop en vez de un min(640px, 100vh) real como el
+   mock: el iframe no puede leer el viewport del anfitrión de forma fiable
+   (cross-origin) sin ampliar el handshake INIT de Plan 1 — fuera de scope,
+   documentado como limitación conocida en el Self-Review. `box-sizing:
+   border-box` (Important safe-area, ronda 2) para que Task 14 pueda sumar
+   `padding-bottom: env(safe-area-inset-bottom)` en móvil SIN que la caja
+   exterior crezca por encima de `--viewport-h` — si creciera, el iframe
+   (dimensionado exactamente a esa altura por el loader) recortaría la
+   protección inferior justo donde más falta hace. */
+.panel {
+  width: 382px; height: 640px; background: var(--surface); border-radius: var(--r-panel);
+  box-shadow: var(--shadow-panel); display: flex; flex-direction: column; overflow: hidden;
+  box-sizing: border-box;
+  transform-origin: calc(100% - 28px) calc(100% - 28px);
+  animation: pop .28s cubic-bezier(.21, 1.02, .55, 1) both;
+}
+@keyframes pop { from { opacity: 0; transform: scale(.92) translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
+
 /* ===== Cabecera + cinta de estado (elemento firma, spec §6) ===== */
 .head { display: flex; align-items: center; gap: 11px; padding: 10px 12px 10px 16px; }
 .avatar { position: relative; width: 38px; height: 38px; border-radius: 50%; background: var(--brand-grad); color: var(--brand-ink); display: grid; place-items: center; flex-shrink: 0; }
