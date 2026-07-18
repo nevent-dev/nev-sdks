@@ -1,0 +1,44 @@
+/* ===== Cabecera + cinta de estado (elemento firma, spec §6) ===== */
+.head { display: flex; align-items: center; gap: 11px; padding: 10px 12px 10px 16px; }
+.avatar { position: relative; width: 38px; height: 38px; border-radius: 50%; background: var(--brand-grad); color: var(--brand-ink); display: grid; place-items: center; flex-shrink: 0; }
+.avatar svg { width: 19px; height: 19px; }
+.avatar .dot-live { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--live); border: 2px solid var(--surface); }
+
+/* Avatar de iniciales (spec §8: sin imágenes de terceros en v1). Fondo
+   --brand-a SÓLIDO, nunca --brand-grad (Important, ronda 3): esto pinta
+   TEXTO real (la inicial del agente) — el modelo de contraste de theme.ts
+   (Task 2) solo garantiza 4.5:1 real contra el color sólido, no contra el
+   degradado. .avatar (arriba) sí puede quedarse en --brand-grad porque ahí
+   dentro solo hay un icono SVG decorativo (BotIcon) cuando no hay iniciales
+   — WCAG 2.2 SC 1.4.11 le exige ≥3:1, no 4.5:1. */
+.initials-avatar { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; font: 600 14px var(--font-display); color: var(--brand-ink); background: var(--brand-a); }
+
+.head .id { flex: 1; min-width: 0; }
+.head .name { font: 600 14.5px/1.2 var(--font-display); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.head .state { font-size: 12px; color: var(--muted); margin-top: 1px; display: flex; align-items: center; gap: 5px; }
+.head .pulse { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.head .pulse-wait { background: var(--wait); }
+.head .pulse-live { background: var(--live); }
+.iconbtn { width: 32px; height: 32px; border-radius: 9px; border: none; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+.iconbtn:hover { background: var(--surface-2); color: var(--ink); }
+.iconbtn:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 1px; }
+.iconbtn svg { width: 17px; height: 17px; }
+
+.state-ribbon { height: 2px; flex-shrink: 0; background: var(--line); position: relative; overflow: hidden; }
+.state-ribbon[data-ribbon="idle"] { background: var(--brand-grad); }
+.state-ribbon[data-ribbon="bot-streaming"] { background: var(--brand-soft); }
+.state-ribbon[data-ribbon="bot-streaming"]::after {
+  content: ""; position: absolute; inset: 0; background: var(--brand-grad); animation: sweep 1.4s ease-in-out infinite;
+}
+@keyframes sweep { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(100%); } }
+.state-ribbon[data-ribbon="waiting"] { background: var(--wait); animation: breathe 2s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .35; } }
+.state-ribbon[data-ribbon="agent"] { background: var(--live); }
+.state-ribbon[data-ribbon="reconnect"] { background: repeating-linear-gradient(90deg, var(--faint) 0 8px, transparent 8px 16px); }
+.state-ribbon[data-ribbon="offline"] { background: var(--faint); }
+.state-ribbon[data-ribbon="resolved"] { background: var(--line); }
+
+@media (prefers-reduced-motion: reduce) {
+  .state-ribbon[data-ribbon="bot-streaming"]::after,
+  .state-ribbon[data-ribbon="waiting"] { animation: none !important; }
+}
