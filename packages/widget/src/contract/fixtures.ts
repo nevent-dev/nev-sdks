@@ -11,6 +11,11 @@ export function fixtureConfig(): WidgetConfig {
     locale: 'es',
     theme: { primaryColor: '#6d4aff', position: 'right', mode: 'auto' },
     features: { upload: true, handoff: true },
+    welcome: {
+      title: 'Hola 👋 ¿en qué te ayudamos?',
+      subtitle: 'Respondemos al momento sobre entradas, accesos y cualquier duda del festival.',
+      quickReplies: ['Cambiar el nombre de mi entrada', 'Horarios y artistas', 'Cómo llegar', 'No me llegó el email'],
+    },
   }
 }
 

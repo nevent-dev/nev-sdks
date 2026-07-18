@@ -5,6 +5,9 @@ export interface WidgetConfig {
   locale: 'es' | 'en' | 'ca' | 'pt'
   theme: { primaryColor: string; position: 'right' | 'left'; mode: 'light' | 'dark' | 'auto' }
   features: { upload: boolean; handoff: boolean }
+  // Opcional: normalizado en runtime en shell/session.ts (Task 15) — nunca
+  // se confía en el shape tal cual llega de red. Ver "Brechas de contrato" #6.
+  welcome?: { title: string; subtitle: string; quickReplies: string[] }
 }
 
 export interface WidgetSession {

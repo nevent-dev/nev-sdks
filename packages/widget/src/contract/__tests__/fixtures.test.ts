@@ -17,6 +17,11 @@ describe('fixtures del contrato', () => {
     expect(evs.map((e) => e.type)).toEqual(['message.created', 'conversation.state_changed', 'agent.joined'])
     expect(fixtureEvents()).not.toBe(evs)
   })
+  it('config incluye welcome opcional con quickReplies (spec §7 / gap #6)', () => {
+    const c = fixtureConfig()
+    expect(c.welcome?.title.length).toBeGreaterThan(0)
+    expect(Array.isArray(c.welcome?.quickReplies)).toBe(true)
+  })
 })
 
 describe('transport fixtures', () => {
