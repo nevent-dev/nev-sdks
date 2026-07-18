@@ -3,6 +3,8 @@ import { render } from 'preact'
 import { startShell } from '../main'
 import { seal } from '../../protocol/envelope'
 import { fixtureConfig } from '../../contract/fixtures'
+import * as themeModule from '../../panel/theme'
+import * as appModule from '../app'
 import type { SessionClient } from '../session'
 
 const PARENT_ORIGIN = 'https://demofest.example'
@@ -150,5 +152,43 @@ describe('shell', () => {
     // data-viewport refleja el ÚLTIMO mensaje latcheado (mobile), no el
     // fallback {kind:'desktop', height:0} inventado ni el primero de los dos.
     expect(document.querySelector('[data-part=root]')?.getAttribute('data-viewport')).toBe('mobile')
+  })
+
+  it('Regression (rev.1 #10) — applyTheme se ejecuta ANTES del primer render() de App, nunca después', async () => {
+    const order: string[] = []
+    // preact es un paquete externo pre-bundleado: su namespace ESM no admite
+    // vi.spyOn (Vitest lanza "Module namespace is not configurable"). En vez
+    // de espiar `render` de 'preact', se espía `App` (módulo propio del
+    // proyecto, sí espiable) — como startShell SOLO monta <App/> vía
+    // render(), que App() se invoque es un proxy fiel de "render() corrió".
+    const actualTheme = await vi.importActual<typeof import('../../panel/theme')>('../../panel/theme')
+    const applyThemeSpy = vi.spyOn(themeModule, 'applyTheme').mockImplementation((...args) => {
+      order.push('applyTheme')
+      return actualTheme.applyTheme(...args)
+    })
+    const actualApp = await vi.importActual<typeof import('../app')>('../app')
+    const appSpy = vi.spyOn(appModule, 'App').mockImplementation((...args) => {
+      order.push('render')
+      return actualApp.App(...args)
+    })
+    try {
+      // mismo patrón "bloqueado" que el test Critical de arriba: createClient()
+      // no resuelve hasta que el test lo decide, así se puede comprobar que
+      // NINGUNO de los dos (applyTheme ni App/render) corre mientras está pendiente.
+      let resolveClient!: (c: SessionClient) => void
+      const createClient = vi.fn(() => new Promise<SessionClient>((resolve) => { resolveClient = resolve }))
+      const parentSource = makeParentSource(vi.fn())
+      startShell(window, { apiBase: 'https://api.test', createClient })
+      sendInit('nevw_test1', parentSource)
+      await vi.waitFor(() => expect(createClient).toHaveBeenCalledTimes(1))
+      expect(order).toEqual([]) // createClient sigue pendiente: ni theme ni render deben haber corrido
+
+      resolveClient(fakeClient())
+      await vi.waitFor(() => expect(order).toContain('render'))
+      expect(order).toEqual(['applyTheme', 'render']) // orden estricto, no solo "ambos corrieron"
+    } finally {
+      applyThemeSpy.mockRestore()
+      appSpy.mockRestore()
+    }
   })
 })

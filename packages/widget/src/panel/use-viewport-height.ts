@@ -13,5 +13,9 @@ export function useViewportHeight(heightPx: number | null): void {
       return
     }
     document.documentElement.style.setProperty('--viewport-h', `${heightPx}px`)
+    // Unmount cleanup: without this, a Panel that unmounts while heightPx is
+    // still numeric leaves --viewport-h stuck on <html> for whatever renders
+    // next (e.g. the desktop launcher after the panel closes).
+    return () => document.documentElement.style.removeProperty('--viewport-h')
   }, [heightPx])
 }

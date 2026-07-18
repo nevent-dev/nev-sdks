@@ -25,6 +25,9 @@ import { mount, cleanupMounted } from './test-utils'
 // @vitest/expect y se reexporta plano desde 'vitest'). Sin esto,
 // `.toHaveNoViolations()` corre bien en runtime (transform de esbuild, sin
 // chequeo de tipos) pero `tsc --noEmit` lo marca como TS2339.
+// Nota de alcance: esta declaración de módulo se fusiona a nivel de PROGRAMA
+// (todo archivo que `tsc` incluya ve el `Assertion` ampliado), no solo en
+// este archivo — una vez que este test entra en el include de tsconfig.
 declare module 'vitest' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- debe coincidir
   // exactamente con los parámetros de tipo de Assertion<T = any> en @vitest/expect

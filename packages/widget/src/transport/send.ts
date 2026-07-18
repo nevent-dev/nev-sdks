@@ -59,7 +59,14 @@ export function createSender(deps: SenderDeps): Sender {
         deps.store.appendBotDelta(turnId, delta)
       },
       onDone: (turnId, messageId) => deps.store.finishBotTurn(turnId, messageId),
-      onError: (_code) => { if (currentTurnId) deps.store.failBotTurn(currentTurnId) },
+      onError: (_code) => {
+        // error frame before `accepted`: no bot placeholder was ever created,
+        // and nothing else will ever ack/fail this optimistic user message —
+        // mirror the abort-before-accepted branch below so it doesn't hang
+        // pending forever.
+        if (currentTurnId) deps.store.failBotTurn(currentTurnId)
+        else deps.store.failOptimistic(clientId)
+      },
     }
     try {
       await runStreamingTurn(deps.client, clientId, text, handlers, ac.signal)

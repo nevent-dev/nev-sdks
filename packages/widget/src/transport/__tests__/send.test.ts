@@ -205,6 +205,31 @@ describe('createSender', () => {
     expect(users[0]).toMatchObject({ id: 'msg_srv_real', status: 'sent', seq: 9 })
   })
 
+  it('an ERROR frame BEFORE `accepted` fails the optimistic message (retryable), not stuck pending forever', async () => {
+    n = 0
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async () => sse([
+      'event: error\ndata: {"code":"turn_rejected"}\n\n',
+    ]))
+    const sender = createSender({ client: { authorizedFetch }, store, streaming: true, uuid })
+    await sender.send('Hola')
+    expect(store.getState().messages[0]).toMatchObject({ status: 'failed' })
+  })
+
+  it('an ERROR frame AFTER `accepted` leaves the optimistic message sent (unchanged): only the bot turn path is failed', async () => {
+    n = 0
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async () => sse([
+      'event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n',
+      'event: error\ndata: {"code":"model_error"}\n\n',
+    ]))
+    const sender = createSender({ client: { authorizedFetch }, store, streaming: true, uuid })
+    await sender.send('Hola')
+    const msgs = store.getState().messages
+    expect(msgs.find((m) => m.role === 'user')).toMatchObject({ id: 'u1', status: 'sent' })
+    expect(msgs.find((m) => m.role === 'bot')).toBeUndefined() // no delta arrived: no dangling placeholder
+  })
+
   it('opens the conversation channel on accepted, not before', async () => {
     n = 0
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
