@@ -33,6 +33,16 @@ export interface MessageStore {
   replaceSnapshot(snapshot: MessagesSnapshot): void
   applyDurableEvent(event: WidgetEvent): void
   advanceCursorTo(eventId: string): void
+  addOptimistic(clientId: string, text: string): void
+  ackOptimistic(clientId: string, messageId: string): void
+  failOptimistic(clientId: string): void
+  retryOptimistic(clientId: string): void
+  beginBotTurn(turnId: string): void
+  appendBotDelta(turnId: string, delta: string): void
+  finishBotTurn(turnId: string, messageId: string): void
+  failBotTurn(turnId: string): void
+  setAgentTyping(isTyping: boolean): void
+  setConnection(status: ConnectionStatus): void
 }
 
 // Display order: durable events strictly by seq among themselves; anything
@@ -148,6 +158,80 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     notify()
   }
 
+  const setStatus = (clientId: string, status: MessageStatus): void => {
+    const i = indexOf((m) => m.clientId === clientId)
+    if (i === -1) return
+    const next = messages.slice()
+    next[i] = { ...next[i]!, status }
+    setMessages(next)
+  }
+
+  const addOptimistic = (clientId: string, text: string): void => {
+    setMessages([...messages, {
+      id: clientId, role: 'user', text, status: 'pending', seq: null,
+      streaming: false, createdAt: now(), clientId, turnId: null,
+    }])
+  }
+  const ackOptimistic = (clientId: string, messageId: string): void => {
+    const oi = indexOf((m) => m.clientId === clientId && m.id !== messageId)
+    if (oi === -1) return // already acked (idempotent)
+    const durableI = indexOf((m) => m.id === messageId)
+    const next = messages.slice()
+    if (durableI !== -1 && durableI !== oi) {
+      next.splice(oi, 1) // durable arrived first: keep it, drop the placeholder
+    } else {
+      next[oi] = { ...next[oi]!, id: messageId, status: 'sent' }
+    }
+    setMessages(next)
+  }
+  const failOptimistic = (clientId: string): void => setStatus(clientId, 'failed')
+  const retryOptimistic = (clientId: string): void => setStatus(clientId, 'pending')
+
+  const beginBotTurn = (turnId: string): void => {
+    setMessages([...messages, {
+      id: `turn:${turnId}`, role: 'bot', text: '', status: 'sent', seq: null,
+      streaming: true, createdAt: now(), clientId: null, turnId,
+    }])
+  }
+  const appendBotDelta = (turnId: string, delta: string): void => {
+    const i = indexOf((m) => m.turnId === turnId)
+    if (i === -1) return
+    const next = messages.slice()
+    next[i] = { ...next[i]!, text: next[i]!.text + delta }
+    setMessages(next)
+  }
+  const finishBotTurn = (turnId: string, messageId: string): void => {
+    const ti = indexOf((m) => m.turnId === turnId)
+    if (ti === -1) return
+    const durableI = indexOf((m) => m.id === messageId)
+    const next = messages.slice()
+    if (durableI !== -1 && durableI !== ti) {
+      next.splice(ti, 1) // durable already present: discard the streaming placeholder
+    } else {
+      next[ti] = { ...next[ti]!, id: messageId, streaming: false, turnId: null }
+    }
+    setMessages(next)
+    // Do NOT advance the cursor / mark eventId applied: the durable message.created
+    // for this messageId arrives via the channel with the authoritative seq.
+  }
+  const failBotTurn = (turnId: string): void => {
+    const i = indexOf((m) => m.turnId === turnId)
+    if (i === -1) return
+    const m = messages[i]!
+    const next = messages.slice()
+    if (m.text === '') next.splice(i, 1)
+    else next[i] = { ...m, streaming: false, turnId: null }
+    setMessages(next)
+  }
+  const setAgentTyping = (isTyping: boolean): void => {
+    if (agentTyping === isTyping) return
+    agentTyping = isTyping; notify()
+  }
+  const setConnection = (status: ConnectionStatus): void => {
+    if (connection === status) return
+    connection = status; notify()
+  }
+
   return {
     getState(): StoreState {
       if (published === null) {
@@ -170,5 +254,15 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     replaceSnapshot,
     applyDurableEvent,
     advanceCursorTo,
+    addOptimistic,
+    ackOptimistic,
+    failOptimistic,
+    retryOptimistic,
+    beginBotTurn,
+    appendBotDelta,
+    finishBotTurn,
+    failBotTurn,
+    setAgentTyping,
+    setConnection,
   }
 }
