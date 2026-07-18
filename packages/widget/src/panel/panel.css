@@ -74,3 +74,23 @@
 /* @keyframes spin: también la usa/declara Task 10 (ConnectionBanner) — CSS
    resuelve @keyframes por nombre en toda la hoja sin importar el orden. */
 @media (prefers-reduced-motion: reduce) { .thinking .spark { animation: none !important; } }
+
+.msgs-inner { display: flex; flex-direction: column; gap: 3px; }
+
+/* ===== Bienvenida + quick replies ===== */
+.welcome { padding: 6px 4px 14px; }
+.welcome h3 { font: 600 19px/1.25 var(--font-display); color: var(--ink); letter-spacing: -.01em; }
+.welcome p { font-size: 13.5px; color: var(--muted); margin-top: 5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.chip {
+  font: 500 12.5px var(--font-body); color: var(--brand-a); background: transparent;
+  border: 1px solid color-mix(in srgb, var(--brand-a) 35%, transparent);
+  padding: 7px 13px; border-radius: 99px; cursor: pointer; transition: background .15s;
+}
+.chip:hover { background: var(--brand-soft); }
+.chip:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
