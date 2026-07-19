@@ -46,7 +46,7 @@ Iframe con `sandbox="allow-scripts allow-same-origin"` (+`allow-popups` solo par
 
 `window.NeventWidget(...)` con cola pre-carga (funciona antes de cargar el bundle):
 `boot(installationId, opts)`, `open`, `close`, `toggle`, `update(opts)`, `identify(signedToken)` *(reservada)*, `reset()` *(reservada)*, `on/off(evento, cb)`, `consent()`, `destroy()`.
-Todas idempotentes; a prueba de doble inclusión del script y de navegación SPA. Eventos públicos: `ready`, `opened`, `closed`, `unread_changed` (solo puede dispararse con el panel abierto o en la reconciliación al reabrir — coherente con D7: no hay canal en background), `error({code})` con códigos `FRAME_BLOCKED`, `SESSION_EXPIRED`, `RATE_LIMITED`, `NETWORK`.
+Todas idempotentes; a prueba de doble inclusión del script y de navegación SPA. Eventos públicos: `ready`, `opened`, `closed`, `unread_changed` (se dispara también con el panel cerrado mientras exista conversación activa — coherente con D7: canal en background con conversación), `error({code})` con códigos `FRAME_BLOCKED`, `SESSION_EXPIRED`, `RATE_LIMITED`, `NETWORK`.
 
 ### 3.3 Protocolo postMessage
 
@@ -167,13 +167,13 @@ Pipeline de implementación (norma de Martín): subagentes Sonnet para implement
 | D4 | Inbound por fetch-streaming SSE + cursor durable | EventSource nativo; WebSocket unificado | EventSource no admite Authorization; WS suma fricción en proxies corporativos sin necesidad bidireccional |
 | D5 | Tokens 30-60 min + refresh | Bearer 24h del backend actual | Menos ventana de replay; renovación transparente |
 | D6 | Sin transcript en storage local | Persistencia local del v0.2 | Servidor = fuente de verdad; elimina hallazgo de privacidad y desincronización |
-| D7 | Canal cerrado con panel cerrado | Badge con canal en background | Coste de conexiones; v1.1 si hay demanda |
+| D7 | Canal en background mientras exista conversación (badge de no-leídos activo) | Canal cerrado con panel cerrado | Revisada 2026-07-19 en pruebas reales: sin canal, el visitante no se entera de la respuesta del agente; patrón estándar del sector (Chatwoot/Intercom). Sin conversación no se abre conexión |
 | D8 | Uploads activos para guests | Deshabilitarlos hasta identity verification | Utilidad de soporte real; mitigado por límites por sesión + rate limiting backend |
 | D9 | Nombres neutros anti-adblock como higiene | Estrategia anti-adblock activa | Carrera perdida; solución enterprise real = CNAME (futuro) |
 
 ## 15. Riesgos aceptados
 
 - Continuidad de conversación entre visitas depende del storage particionado del iframe (Safari puede borrarlo) → degradación a conversación nueva, historial recuperable si el guest se identifica en el futuro.
-- Sin notificación con panel cerrado (D7): un agente puede responder y el visitante no enterarse hasta reabrir. Mitigación UX: el banner de espera fija expectativas; captura de contacto como evolución.
+- Notificación con panel cerrado limitada a la pestaña abierta (D7): el badge de no-leídos requiere la página cargada; si el visitante cierra la pestaña no hay aviso. Mitigación futura: email de continuidad estilo Chatwoot (requiere captura de contacto).
 - Anfitriones con CSP estricta requerirán tocar su CSP (documentado + diagnóstico + `error({code:"FRAME_BLOCKED"})`).
 - El widget v1 no cubre áreas autenticadas del cliente (sin identity verification): se comunica como "para webs públicas" hasta v1.1.
