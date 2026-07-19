@@ -2,15 +2,23 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act } from 'preact/test-utils'
 import { App, type ShellBus } from '../app'
 import * as transportModule from '../../transport'
-import type { Transport } from '../../transport'
+import type { Transport, TransportOptions } from '../../transport'
 import { createMessageStore, type MessageStore } from '../../store/message-store'
-import { fixtureConfig } from '../../contract/fixtures'
+import { fixtureConfig, fixtureSession } from '../../contract/fixtures'
 import type { SessionClient } from '../session'
 import type { WidgetEvent } from '../../contract/types'
 import { mount, cleanupMounted } from '../../panel/__tests__/test-utils'
 
-function fakeClient(): SessionClient {
-  return { getConfig: () => fixtureConfig(), authorizedFetch: vi.fn(), destroy: vi.fn() } as unknown as SessionClient
+function fakeClient(overrides: Partial<SessionClient> = {}): SessionClient {
+  return {
+    getConfig: () => fixtureConfig(),
+    getSession: () => fixtureSession(),
+    wasResumed: () => false,
+    authorizedFetch: vi.fn(),
+    onSessionDead: () => () => {},
+    destroy: vi.fn(),
+    ...overrides,
+  } as unknown as SessionClient
 }
 
 // El store es real (createMessageStore) — solo el transporte se dobla, así
@@ -157,5 +165,194 @@ describe('App — Task W3: resumedSession fuerza un primer snapshot', () => {
     await mount(<App client={fakeClient()} bus={bus} resumedSession={false} />)
 
     expect(openChannel).not.toHaveBeenCalled()
+  })
+})
+
+// Task W4 — recuperación de sesión muerta a mitad de vida (Zendesk-style
+// silent refresh, Chatwoot-style fresh-conversation fallback). El mock de
+// createTransport de este bloque, a diferencia del de arriba, SÍ respeta
+// opts.store — así una regresión que rompiera la continuidad de historial
+// (App#storeRef, ver transport/index.ts Task W4) haría fallar estos tests de
+// verdad, en vez de estar enmascarada por un mock que ignora sus argumentos.
+describe('App — Task W4: recuperación de sesión muerta a mitad de vida', () => {
+  interface RecordedCall { client: SessionClient; opts: TransportOptions | undefined; openChannel: ReturnType<typeof vi.fn>; closeChannel: ReturnType<typeof vi.fn>; store: MessageStore }
+
+  function mockCreateTransport(): { calls: RecordedCall[] } {
+    const calls: RecordedCall[] = []
+    vi.spyOn(transportModule, 'createTransport').mockImplementation((client: SessionClient, opts?: TransportOptions) => {
+      const store = opts?.store ?? createMessageStore(() => '2026-07-19T10:00:00.000Z')
+      const { transport, openChannel, closeChannel } = fakeTransport(store)
+      calls.push({ client, opts, openChannel, closeChannel, store })
+      return transport
+    })
+    return { calls }
+  }
+
+  // deathClient: un fakeClient cuyo onSessionDead captura el callback en la
+  // variable expuesta `cb` — el test lo invoca a mano para simular la señal
+  // typed que emitiría shell/session.ts en real (Task W4, ver session.test.ts).
+  function deathClient(overrides: Partial<SessionClient> = {}): { client: SessionClient; kill: () => void } {
+    let cb: (() => void) | null = null
+    const client = fakeClient({ onSessionDead: (fn) => { cb = fn; return () => { cb = null } }, ...overrides })
+    return { client, kill: () => cb?.() }
+  }
+
+  it('al morir la sesión, reconstruye llamando a createSession con el resumeSecret de la sesión ACTUAL', async () => {
+    const { calls } = mockCreateTransport()
+    const { client: oldClient, kill } = deathClient({ getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_actual' }) })
+    const newClient = fakeClient()
+    const createSession = vi.fn(async (_secret: string | null) => newClient)
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+
+    kill()
+
+    await vi.waitFor(() => expect(createSession).toHaveBeenCalledWith('resume_actual'))
+    // El segundo createTransport (post-swap) se llama con el cliente NUEVO.
+    await vi.waitFor(() => expect(calls).toHaveLength(2))
+    expect(calls[1]!.client).toBe(newClient)
+  })
+
+  it('tras reconstruir, persiste la sesión nueva vía bus.emit(session_persist) con SU resumeSecret', async () => {
+    mockCreateTransport()
+    const { client: oldClient, kill } = deathClient()
+    const newClient = fakeClient({ getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_reconstruido' }) })
+    const createSession = vi.fn(async () => newClient)
+    const emit = vi.fn()
+    const bus: ShellBus = { onCommand: () => {}, emit, getLatchedViewport: () => null }
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+
+    kill()
+
+    await vi.waitFor(() => expect(emit).toHaveBeenCalledWith('session_persist', { resumeSecret: 'resume_reconstruido' }))
+  })
+
+  it('destruye el cliente ANTERIOR una vez completado el swap', async () => {
+    mockCreateTransport()
+    const destroyOld = vi.fn()
+    const { client: oldClient, kill } = deathClient({ destroy: destroyOld })
+    const createSession = vi.fn(async () => fakeClient())
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+
+    kill()
+
+    await vi.waitFor(() => expect(destroyOld).toHaveBeenCalledTimes(1))
+  })
+
+  it('reutiliza el MISMO store a través del swap (continuidad de historial) y abre el canal del transport NUEVO', async () => {
+    const { calls } = mockCreateTransport()
+    const { client: oldClient, kill } = deathClient()
+    const newClient = fakeClient({ wasResumed: () => true }) // resume genuino: no se toca el store
+    const createSession = vi.fn(async () => newClient)
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+    const firstStore = calls[0]!.store
+    firstStore.applyDurableEvent({
+      eventId: 'evt_v1_conv_demo_01_1', schemaVersion: 1, conversationId: 'conv_demo_01',
+      occurredAt: '2026-07-19T10:00:00.000Z', type: 'message.created', payload: { messageId: 'm1', role: 'bot', text: 'hola' },
+    })
+
+    kill()
+
+    await vi.waitFor(() => expect(calls).toHaveLength(2))
+    expect(calls[1]!.store).toBe(firstStore) // MISMO store, no uno nuevo vacío
+    expect(calls[1]!.store.getState().messages.some((m) => m.id === 'm1')).toBe(true)
+    await vi.waitFor(() => expect(calls[1]!.openChannel).toHaveBeenCalled()) // reconcilia tras el rebuild
+  })
+
+  it('resume genuino (wasResumed=true): NO se activa newConversationNotice, el store no se resetea', async () => {
+    const { calls } = mockCreateTransport()
+    const { client: oldClient, kill } = deathClient()
+    const newClient = fakeClient({ wasResumed: () => true })
+    const createSession = vi.fn(async () => newClient)
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+    calls[0]!.store.applyDurableEvent({
+      eventId: 'evt_v1_conv_demo_01_9', schemaVersion: 1, conversationId: 'conv_demo_01',
+      occurredAt: '2026-07-19T10:00:00.000Z', type: 'message.created', payload: { messageId: 'm9', role: 'bot', text: 'previo' },
+    })
+    const cursorBefore = calls[0]!.store.getState().cursor
+
+    kill()
+
+    await vi.waitFor(() => expect(calls).toHaveLength(2))
+    expect(calls[1]!.store.getState().newConversationNotice).toBe(false)
+    expect(calls[1]!.store.getState().cursor).toBe(cursorBefore) // sin resetForNewConversation
+    expect(calls[1]!.store.getState().messages.some((m) => m.id === 'm9')).toBe(true)
+  })
+
+  it('sesión fresca (wasResumed=false) CON historial previo: activa newConversationNotice (la tarjeta "Conversación nueva")', async () => {
+    const { calls } = mockCreateTransport()
+    const { client: oldClient, kill } = deathClient()
+    const newClient = fakeClient({ wasResumed: () => false })
+    const createSession = vi.fn(async () => newClient)
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+    calls[0]!.store.applyDurableEvent({
+      eventId: 'evt_v1_conv_demo_01_3', schemaVersion: 1, conversationId: 'conv_demo_01',
+      occurredAt: '2026-07-19T10:00:00.000Z', type: 'message.created', payload: { messageId: 'm3', role: 'user', text: 'hola' },
+    })
+
+    kill()
+
+    await vi.waitFor(() => expect(calls).toHaveLength(2))
+    expect(calls[1]!.store.getState().newConversationNotice).toBe(true)
+    expect(calls[1]!.store.getState().cursor).toBeNull() // se olvidó la conversación anterior
+  })
+
+  it('sesión fresca (wasResumed=false) SIN historial previo: NO activa newConversationNotice (nada que perder)', async () => {
+    const { calls } = mockCreateTransport()
+    const { client: oldClient, kill } = deathClient()
+    const newClient = fakeClient({ wasResumed: () => false })
+    const createSession = vi.fn(async () => newClient)
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+    // sin mensajes previos en calls[0].store
+
+    kill()
+
+    await vi.waitFor(() => expect(calls).toHaveLength(2))
+    expect(calls[1]!.store.getState().newConversationNotice).toBe(false)
+  })
+
+  it('single-flight: dos disparos casi simultáneos de la misma muerte solo reconstruyen una vez', async () => {
+    mockCreateTransport()
+    const { client: oldClient, kill } = deathClient()
+    const createSession = vi.fn(async () => fakeClient())
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+
+    kill() // sender
+    kill() // canal — mismo latch, pero por si acaso: dos triggers casi a la vez
+
+    await vi.waitFor(() => expect(createSession).toHaveBeenCalled())
+    await new Promise((r) => setTimeout(r, 10))
+    expect(createSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('rate limit: la sesión NUEVA muriendo casi al instante no dispara un segundo rebuild automático', async () => {
+    mockCreateTransport()
+    const { client: oldClient, kill: killOld } = deathClient()
+    const { client: newClient, kill: killNew } = deathClient()
+    const createSession = vi.fn(async () => newClient)
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+
+    killOld()
+    await vi.waitFor(() => expect(createSession).toHaveBeenCalledTimes(1))
+
+    killNew() // la sesión reconstruida muere de inmediato
+    await new Promise((r) => setTimeout(r, 10))
+    expect(createSession).toHaveBeenCalledTimes(1) // el cooldown bloqueó el segundo intento automático
+  })
+
+  it('sin createSession (prop omitida): la muerte de sesión no revienta y no intenta reconstruir nada', async () => {
+    mockCreateTransport()
+    const { client: oldClient, kill } = deathClient()
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} />)
+
+    expect(() => kill()).not.toThrow()
   })
 })

@@ -196,4 +196,96 @@ describe('session client', () => {
       expect(client.getSession().resumeSecret).toBe(fixtureSession().resumeSecret)
     })
   })
+
+  // Task W4 — recuperación de sesión muerta a mitad de vida: authorizedFetch ya
+  // maneja UN ciclo 401→refresh→retry; lo que falta es una señal TIPADA (no un
+  // string lanzado que el llamante tendría que parsear) para que capas
+  // superiores (shell/app.tsx, events-channel.ts) sepan que la sesión
+  // server-side ya no es recuperable con ESTE cliente y reaccionen (re-bootstrap
+  // silencioso) en vez de reintentar en bucle contra un 401 permanente.
+  describe('muerte de sesión a mitad de vida (Task W4)', () => {
+    it('el refresh() lanza: onSessionDead se dispara exactamente una vez', async () => {
+      const { fetchFn } = mockApi({
+        onProtected: () => jsonResponse({ error: 'expired' }, 401),
+        refreshThrowsOnCall: 1,
+      })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      const dead = vi.fn()
+      client.onSessionDead(dead)
+      await expect(client.authorizedFetch('/widget/v1/conversations/current/messages')).rejects.toThrow('refresh_network_error')
+      expect(dead).toHaveBeenCalledTimes(1)
+    })
+
+    it('el reintento post-refresh sigue en 401 (refresh "funciona" pero no resucita la sesión): onSessionDead se dispara', async () => {
+      const { fetchFn } = mockApi({ onProtected: () => jsonResponse({ error: 'expired' }, 401) })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      const dead = vi.fn()
+      client.onSessionDead(dead)
+      const res = await client.authorizedFetch('/widget/v1/conversations/current/messages')
+      expect(res.status).toBe(401)
+      expect(dead).toHaveBeenCalledTimes(1)
+    })
+
+    it('una llamada que SÍ se recupera (401 único, refresh ok, reintento ok) nunca dispara onSessionDead', async () => {
+      const { fetchFn } = mockApi({
+        onProtected: (auth, call) => (call === 1 ? jsonResponse({ error: 'expired' }, 401) : jsonResponse({ ok: true, auth })),
+      })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      const dead = vi.fn()
+      client.onSessionDead(dead)
+      const res = await client.authorizedFetch('/widget/v1/conversations/current/messages')
+      expect(res.status).toBe(200)
+      expect(dead).not.toHaveBeenCalled()
+    })
+
+    it('latch: dos authorizedFetch consecutivos que terminan en 401 solo disparan onSessionDead una vez', async () => {
+      const { fetchFn } = mockApi({ onProtected: () => jsonResponse({ error: 'expired' }, 401) })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      const dead = vi.fn()
+      client.onSessionDead(dead)
+      await client.authorizedFetch('/widget/v1/conversations/current/messages')
+      await client.authorizedFetch('/widget/v1/conversations/current/messages')
+      expect(dead).toHaveBeenCalledTimes(1)
+    })
+
+    it('single-flight: dos authorizedFetch CONCURRENTES que ambos terminan en 401 solo disparan onSessionDead una vez', async () => {
+      const { fetchFn } = mockApi({ onProtected: () => jsonResponse({ error: 'expired' }, 401) })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      const dead = vi.fn()
+      client.onSessionDead(dead)
+      await Promise.all([
+        client.authorizedFetch('/widget/v1/conversations/current/messages'),
+        client.authorizedFetch('/widget/v1/conversations/current/messages'),
+      ])
+      expect(dead).toHaveBeenCalledTimes(1)
+    })
+
+    it('suscriptor tardío (se suscribe DESPUÉS de que la sesión ya murió): se notifica igualmente, una vez', async () => {
+      const { fetchFn } = mockApi({ onProtected: () => jsonResponse({ error: 'expired' }, 401) })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      await client.authorizedFetch('/widget/v1/conversations/current/messages')
+      const lateDead = vi.fn()
+      client.onSessionDead(lateDead)
+      expect(lateDead).toHaveBeenCalledTimes(1)
+    })
+
+    it('onSessionDead devuelve una función de desuscripción que detiene notificaciones futuras a ESE listener', async () => {
+      const { fetchFn } = mockApi({ onProtected: () => jsonResponse({ error: 'expired' }, 401) })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      const dead = vi.fn()
+      const unsubscribe = client.onSessionDead(dead)
+      unsubscribe()
+      await client.authorizedFetch('/widget/v1/conversations/current/messages')
+      expect(dead).not.toHaveBeenCalled()
+    })
+
+    it('un fetch protegido que nunca ve un 401 (todo sano) nunca dispara onSessionDead', async () => {
+      const { fetchFn } = mockApi()
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      const dead = vi.fn()
+      client.onSessionDead(dead)
+      await client.authorizedFetch('/widget/v1/conversations/current/messages')
+      expect(dead).not.toHaveBeenCalled()
+    })
+  })
 })

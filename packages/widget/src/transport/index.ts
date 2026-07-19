@@ -13,6 +13,12 @@ export interface TransportOptions {
   reconnectDelayMs?: number
   uuid?: () => string
   now?: () => string
+  // Task W4: reutiliza un MessageStore EXISTENTE en vez de fabricar uno
+  // nuevo — necesario cuando shell/app.tsx reconstruye el transport sobre un
+  // cliente NUEVO tras un re-bootstrap de sesión (sesión muerta a mitad de
+  // vida): sin esto, el historial ya mostrado en pantalla se perdería en
+  // cada swap de cliente aunque la sesión se hubiera resumido de verdad.
+  store?: MessageStore
 }
 
 export interface Transport {
@@ -26,7 +32,7 @@ export interface Transport {
 }
 
 export function createTransport(client: SessionClient, opts: TransportOptions = {}): Transport {
-  const store = opts.now ? createMessageStore(opts.now) : createMessageStore()
+  const store = opts.store ?? (opts.now ? createMessageStore(opts.now) : createMessageStore())
 
   const channel = createEventsChannel({
     client,

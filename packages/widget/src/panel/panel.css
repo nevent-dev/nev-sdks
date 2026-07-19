@@ -169,6 +169,7 @@ button, input, textarea, select { font-family: inherit; }
 .syscard.waiting { background: var(--wait-soft); }
 .syscard.waiting .ttl { color: var(--wait); }
 .syscard.resolved { background: var(--surface-2); }
+.syscard.new-conversation { background: var(--surface-2); }
 .syscard .ttl { font: 600 13px var(--font-display); color: var(--ink); }
 .syscard .dsc { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
 .feedback { display: flex; gap: 8px; justify-content: center; margin-top: 11px; }

@@ -13,6 +13,15 @@ export interface SessionClient {
   // en nev-api) — el contrato no trae un campo "resumed" explícito.
   wasResumed(): boolean
   authorizedFetch(path: string, init?: RequestInit): Promise<Response>
+  // Task W4: se dispara UNA vez (latch) cuando authorizedFetch agota su único
+  // ciclo 401→refresh→retry sin recuperar la sesión — el refresh() lanza, o el
+  // reintento post-refresh vuelve a devolver 401 — la señal de que la sesión
+  // server-side ya no existe / no es recuperable con ESTE cliente. Nunca un
+  // string lanzado que el llamante tendría que parsear (spec del report W4).
+  // Un suscriptor tardío (llama DESPUÉS de que ya ocurriera) se notifica
+  // igual, una vez, para que un efecto que se re-suscribe tras un re-render
+  // nunca se pierda una muerte ya latcheada.
+  onSessionDead(cb: () => void): () => void
   destroy(): void
 }
 
@@ -63,6 +72,19 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
   let refreshing: Promise<void> | null = null
   let destroyed = false
 
+  // Task W4: latch de muerte de sesión — `dead` nunca vuelve a `false` (una
+  // sesión no resucita; la recuperación real es un re-bootstrap con un
+  // cliente NUEVO, no reactivar este). `deadListeners` no se vacía al
+  // disparar: un suscriptor tardío debe seguir viendo `dead === true` y
+  // notificarse al instante (ver onSessionDead más abajo).
+  let dead = false
+  const deadListeners = new Set<() => void>()
+  const markDead = (): void => {
+    if (dead) return
+    dead = true
+    for (const l of deadListeners) l()
+  }
+
   const refresh = (): Promise<void> => {
     refreshing ??= (async () => {
       try {
@@ -84,8 +106,20 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
       fetchFn(`${base}${path}`, { ...init, headers: { ...Object.fromEntries(new Headers(init?.headers).entries()), Authorization: `Bearer ${session.token}` } })
     const first = await doFetch()
     if (first.status !== 401) return first
-    await refresh()
-    return doFetch()
+    try {
+      await refresh()
+    } catch (err) {
+      // El refresh en sí falló (red caída, sesión ya no existe server-side,
+      // etc.) — este authorizedFetch concreto sigue propagando el error tal
+      // cual (comportamiento preexistente: un llamante puede reintentar más
+      // tarde y recuperarse si el refresh vuelve a funcionar), pero la señal
+      // de "puede que esta sesión ya no sea recuperable" se dispara igual.
+      markDead()
+      throw err
+    }
+    const second = await doFetch()
+    if (second.status === 401) markDead() // refresh "funcionó" pero el reintento sigue sin autorizar: sesión muerta
+    return second
   }
 
   return {
@@ -93,6 +127,11 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
     getSession: () => issuedSession,
     wasResumed: () => resumed,
     authorizedFetch,
+    onSessionDead: (cb) => {
+      deadListeners.add(cb)
+      if (dead) cb()
+      return () => { deadListeners.delete(cb) }
+    },
     destroy: () => {
       destroyed = true
     },

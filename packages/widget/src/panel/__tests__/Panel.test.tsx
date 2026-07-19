@@ -113,4 +113,19 @@ describe('Panel', () => {
     const { root } = await mountPanel({ transport: fakeTransport(store) })
     expect(root.querySelector('.welcome')).toBeNull()
   })
+
+  // Task W4 — recuperación de sesión muerta: newConversationNotice es un flag
+  // del store (ver message-store.ts#resetForNewConversation), no una fase de
+  // conversationState — Panel debe pintarlo independientemente de la fase.
+  it('Task W4 — store.newConversationNotice pinta NewConversationCard', async () => {
+    const store = createMessageStore(() => '2026-07-18T14:00:00.000Z')
+    store.resetForNewConversation(true)
+    const { root } = await mountPanel({ transport: fakeTransport(store) })
+    expect(root.querySelector('.syscard.new-conversation')).not.toBeNull()
+  })
+
+  it('Task W4 — sin newConversationNotice (caso normal), NewConversationCard no se pinta', async () => {
+    const { root } = await mountPanel()
+    expect(root.querySelector('.syscard.new-conversation')).toBeNull()
+  })
 })

@@ -355,3 +355,89 @@ describe('events channel — resilience & lifecycle', () => {
     ch.close()
   })
 })
+
+// Task W4 — el canal debe dejar de reintentar una sesión MUERTA (terminal,
+// no un fallo transitorio) en vez de seguir el ciclo reconnecting/polling
+// para siempre ("Reconectando…" eterno, el bug real reproducido). La
+// clasificación "muerta" vive en session.ts (SessionClient#onSessionDead,
+// Task W4) — el canal solo se suscribe y para su bucle; no reimplementa
+// ninguna heurística de status code propia.
+describe('events channel — muerte de sesión (Task W4)', () => {
+  function deadClient(authorizedFetch: (path: string) => Promise<Response>): { client: { authorizedFetch: typeof authorizedFetch; onSessionDead: (cb: () => void) => () => void }; kill: () => void } {
+    let cb: (() => void) | null = null
+    return {
+      client: { authorizedFetch, onSessionDead: (fn) => { cb = fn; return () => { cb = null } } },
+      kill: () => cb?.(),
+    }
+  }
+
+  it('al morir la sesión, el canal detiene su bucle (isActive pasa a false) y no vuelve a llamar a /events', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let eventsCalls = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      eventsCalls += 1
+      return sseFail() // reconnecting/polling perpetuo si nadie lo para
+    })
+    const { client, kill } = deadClient(authorizedFetch)
+    const ch = createEventsChannel({ client, store, scheduler: immediate(), backoff: fastBackoff(), pollIntervalMs: 1, reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(eventsCalls).toBeGreaterThanOrEqual(1))
+    const callsAtDeath = eventsCalls
+
+    kill()
+
+    await vi.waitFor(() => expect(ch.isActive()).toBe(false))
+    // Deja pasar unos ticks reales: si el bucle NO se hubiera parado de
+    // verdad seguiría llamando a /events o /events/poll en cada uno.
+    await new Promise((r) => setTimeout(r, 20))
+    expect(eventsCalls).toBe(callsAtDeath)
+  })
+
+  it('la muerte NO fuerza connection a idle/offline — deja el estado tal cual, a la espera del re-bootstrap', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      return sseFail()
+    })
+    const { client, kill } = deadClient(authorizedFetch)
+    const ch = createEventsChannel({ client, store, scheduler: immediate(), backoff: fastBackoff(), pollIntervalMs: 1, reconnectDelayMs: 1 })
+    ch.open()
+    // 'reconnecting' o ya 'polling' (2 fallos consecutivos) según el timing —
+    // lo que importa es que sea uno de los dos estados "en fallo", nunca aún
+    // 'idle'/'offline' (esos solo los pone close()/isOnline()).
+    await vi.waitFor(() => expect(['reconnecting', 'polling']).toContain(store.getState().connection))
+    const stateBeforeDeath = store.getState().connection
+
+    kill()
+
+    await vi.waitFor(() => expect(ch.isActive()).toBe(false))
+    expect(store.getState().connection).toBe(stateBeforeDeath) // ni 'idle' ni 'offline': close() no corrió
+  })
+
+  it('un cliente sin onSessionDead (compat hacia atrás) funciona exactamente igual que antes', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages')) return jsonRes(SNAP)
+      return sseOpen([ev(2, 'm2', 'x')])
+    })
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    ch.close()
+    expect(store.getState().connection).toBe('idle')
+  })
+
+  it('un canal nuevo, creado sobre un cliente nuevo tras un rebuild, abre y reconcilia con normalidad', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages')) return jsonRes(SNAP)
+      return sseOpen([ev(2, 'm2', 'tras-rebuild')])
+    })
+    const { client } = deadClient(authorizedFetch) // onSessionDead presente pero nunca invocado: cliente sano
+    const ch = createEventsChannel({ client, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    ch.close()
+  })
+})

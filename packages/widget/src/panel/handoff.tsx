@@ -68,3 +68,16 @@ export function ResolvedCard({ agentName, onFeedback }: ResolvedCardProps) {
     </div>
   )
 }
+
+// Task W4: se muestra tras un re-bootstrap silencioso (sesión muerta a mitad
+// de vida) cuyo cliente nuevo NO resumió la conversación anterior — ver
+// shell/app.tsx y message-store.ts#resetForNewConversation. Sin props, igual
+// que WaitingCard: nada que el contrato no traiga se inventa aquí.
+export function NewConversationCard() {
+  return (
+    <div class="syscard new-conversation" role="status">
+      <div class="ttl">Conversación nueva</div>
+      <div class="dsc">La conversación anterior expiró. Cuéntanos en qué te ayudamos.</div>
+    </div>
+  )
+}

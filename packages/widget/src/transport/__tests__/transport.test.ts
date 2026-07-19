@@ -5,6 +5,7 @@ import type { Scheduler } from '../events-channel'
 import type { SessionClient } from '../../shell/session'
 import { fixtureConfig, fixtureSession } from '../../contract/fixtures'
 import type { MessagesSnapshot } from '../../contract/types'
+import { createMessageStore } from '../../store/message-store'
 
 function jsonRes(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
@@ -46,7 +47,10 @@ function botEvt(seq: number, id: string, text: string): string {
   return `event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_${seq}","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:0${seq}:00Z","type":"message.created","payload":{"messageId":"${id}","role":"bot","text":"${text}"}}\n\n`
 }
 function fakeClient(authorizedFetch: SessionClient['authorizedFetch']): SessionClient {
-  return { getConfig: () => fixtureConfig(), getSession: () => fixtureSession(), wasResumed: () => false, authorizedFetch, destroy: vi.fn() }
+  return {
+    getConfig: () => fixtureConfig(), getSession: () => fixtureSession(), wasResumed: () => false, authorizedFetch,
+    onSessionDead: () => () => {}, destroy: vi.fn(),
+  }
 }
 let n = 0
 const uuid = () => `cid_${++n}`
@@ -151,6 +155,32 @@ describe('createTransport (integration)', () => {
     // 3) ...the channel reconciles (the re-snapshot brings the missed m3) and dedups the m2 overlap.
     await vi.waitFor(() => expect(t.store.getState().messages.some((m) => m.id === 'm3')).toBe(true))
     expect(t.store.getState().messages.filter((m) => m.id === 'm2')).toHaveLength(1)
+    t.destroy()
+  })
+
+  // Task W4: tras un re-bootstrap de sesión (cliente NUEVO), shell/app.tsx
+  // necesita seguir usando el MISMO store para no perder el historial ya
+  // mostrado en pantalla — createTransport debe aceptar uno existente en vez
+  // de fabricar uno propio.
+  it('Task W4 — opts.store: reutiliza el store dado en vez de crear uno nuevo', () => {
+    n = 0
+    const existingStore = createMessageStore(() => '2026-07-17T15:00:00Z')
+    existingStore.applyDurableEvent({
+      eventId: 'evt_v1_conv_demo_01_1', schemaVersion: 1, conversationId: 'conv_demo_01',
+      occurredAt: '2026-07-17T14:01:00Z', type: 'message.created', payload: { messageId: 'm1', role: 'bot', text: 'previo' },
+    })
+    const authorizedFetch = vi.fn(async () => jsonRes({}))
+    const t = createTransport(fakeClient(authorizedFetch), { ...opts(), store: existingStore })
+    expect(t.store).toBe(existingStore)
+    expect(t.store.getState().messages.some((m) => m.id === 'm1')).toBe(true)
+    t.destroy()
+  })
+
+  it('sin opts.store (comportamiento por defecto): crea un store nuevo, vacío', () => {
+    n = 0
+    const authorizedFetch = vi.fn(async () => jsonRes({}))
+    const t = createTransport(fakeClient(authorizedFetch), opts())
+    expect(t.store.getState().messages).toEqual([])
     t.destroy()
   })
 })

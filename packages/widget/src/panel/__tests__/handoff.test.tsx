@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { VNode } from 'preact'
-import { WaitingCard, AgentJoinedSysline, TypingDots, ResolvedCard } from '../handoff'
+import { WaitingCard, AgentJoinedSysline, TypingDots, ResolvedCard, NewConversationCard } from '../handoff'
 import { mount, rerender, cleanupMounted } from './test-utils'
 
 afterEach(cleanupMounted)
@@ -56,5 +56,22 @@ describe('ResolvedCard', () => {
   it('sin agentName (edge: resuelto sin handoff), no rompe y no muestra "undefined"', async () => {
     const root = await mount(<ResolvedCard agentName={null} />)
     expect(root.textContent).not.toContain('undefined')
+  })
+})
+
+// Task W4 — recuperación de sesión muerta: se muestra tras un re-bootstrap
+// silencioso cuyo cliente nuevo NO resumió la conversación anterior (ver
+// message-store.ts#resetForNewConversation), únicamente cuando había algo
+// que perder. Mismo patrón que ResolvedCard/WaitingCard (arriba): sin props,
+// sin cifras ni datos inventados.
+describe('NewConversationCard', () => {
+  it('título y cuerpo exactos (sentence case)', async () => {
+    const root = await mount(<NewConversationCard />)
+    expect(root.querySelector('.ttl')?.textContent).toBe('Conversación nueva')
+    expect(root.querySelector('.dsc')?.textContent).toBe('La conversación anterior expiró. Cuéntanos en qué te ayudamos.')
+  })
+  it('role=status, igual que el resto de tarjetas de sistema (se anuncia a lectores de pantalla)', async () => {
+    const root = await mount(<NewConversationCard />)
+    expect(root.querySelector('[role=status]')).not.toBeNull()
   })
 })

@@ -15,6 +15,7 @@ function fakeClient(overrides: Partial<SessionClient> = {}): SessionClient {
     getSession: () => fixtureSession(),
     wasResumed: () => false,
     authorizedFetch: vi.fn(),
+    onSessionDead: () => () => {},
     destroy: vi.fn(),
     ...overrides,
   } as unknown as SessionClient
@@ -245,6 +246,74 @@ describe('shell', () => {
       // cualquier documento que compartiera la misma window (p.ej. un iframe
       // de un tercero co-residente en la página del anfitrión).
       expect(persistCall[1]).toBe(PARENT_ORIGIN)
+    })
+  })
+
+  // Task W4 — recuperación de sesión muerta a mitad de vida: el shell debe
+  // reutilizar el MISMO camino de arranque (createClient) para reconstruir
+  // la sesión, parametrizado por el resumeSecret VIGENTE en ese momento —
+  // ver main.tsx#buildClient. La orquestación fina (single-flight, rate
+  // limit, tarjeta de conversación nueva) ya tiene su propia cobertura
+  // exhaustiva en app.test.tsx; aquí solo se prueba el CABLEADO real
+  // main.tsx→App→createClient de punta a punta.
+  // Doble cuyo onSessionDead captura el callback en una variable devuelta —
+  // mismo patrón que app.test.tsx#deathClient (probado allí: TS necesita el
+  // callback envuelto en una función, no un `let` reasignado inline, para
+  // que la narrowing de tipos no lo estreche a `never` en el punto de uso).
+  // Set, no una única variable: en real, MÁS DE UN suscriptor coexiste (el
+  // canal de eventos se suscribe dentro de createTransport()/createEventsChannel()
+  // en cuanto App monta, y App se suscribe por su cuenta vía useEffect poco
+  // después) — un fake de un solo listener sobreescribiría el del canal con
+  // el de App y kill() dispararía sobre el listener EQUIVOCADO.
+  function deathClient(overrides: Partial<SessionClient> = {}): { client: SessionClient; kill: () => void; listenerCount: () => number } {
+    const listeners = new Set<() => void>()
+    const client = fakeClient({ onSessionDead: (fn) => { listeners.add(fn); return () => { listeners.delete(fn) } }, ...overrides })
+    return { client, kill: () => { for (const l of listeners) l() }, listenerCount: () => listeners.size }
+  }
+
+  describe('recuperación de sesión muerta (Task W4)', () => {
+    it('al morir la sesión, reconstruye vía la MISMA fábrica createClient, con el resumeSecret vigente, y emite un session_persist nuevo', async () => {
+      const { client: oldClient, kill, listenerCount } = deathClient({
+        getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_vigente' }),
+      })
+      const newClient = fakeClient({
+        getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_tras_rebuild' }),
+        // El re-bootstrap fuerza un openChannel() en el transport nuevo (ver
+        // app.tsx) — un fetch que nunca resuelve mantiene esa reconciliación
+        // real en silencio, sin backoff/timers reales de fondo que este test
+        // no necesita ejercitar (ya cubierto en app.test.tsx).
+        authorizedFetch: vi.fn(() => new Promise<Response>(() => {})),
+      })
+      const createClient = vi.fn().mockResolvedValueOnce(oldClient).mockResolvedValueOnce(newClient)
+      const parentPost = vi.fn()
+      startShell(window, { apiBase: 'https://api.test', createClient })
+      sendInit('nevw_test1', makeParentSource(parentPost))
+      await vi.waitFor(() => expect(createClient).toHaveBeenCalledTimes(1))
+      // Espera a que App haya montado Y a que su efecto de suscripción a
+      // onSessionDead (Task W4) haya corrido — render() de preact confirma
+      // el commit del DOM síncronamente, pero useEffect se dispara en un
+      // ciclo posterior; sin esto, kill() dispararía sobre un `cb` aún null.
+      await vi.waitFor(() => expect(document.querySelector('[data-part=root]')).not.toBeNull())
+      // DOS suscriptores esperados: el canal de eventos (createTransport, en
+      // el render) y el propio App (useEffect, tras el commit) — esperar
+      // solo al primero dispararía kill() sobre el listener equivocado.
+      await vi.waitFor(() => expect(listenerCount()).toBe(2))
+
+      kill()
+
+      await vi.waitFor(() => expect(createClient).toHaveBeenCalledTimes(2))
+      expect(createClient.mock.calls[1]![0]).toMatchObject({
+        apiBase: 'https://api.test', installationId: 'inst_demo_festival_01',
+        embeddingOrigin: PARENT_ORIGIN, resumeSecret: 'resume_vigente',
+      })
+
+      await vi.waitFor(() => {
+        const persistTypes = parentPost.mock.calls.filter((c) => (c[0] as { type: string }).type === 'session_persist')
+        expect(persistTypes).toHaveLength(2) // uno del arranque inicial, otro del rebuild
+      })
+      const secondPersist = parentPost.mock.calls.filter((c) => (c[0] as { type: string }).type === 'session_persist')[1]!
+      expect((secondPersist[0] as { payload: { resumeSecret: string } }).payload).toEqual({ resumeSecret: 'resume_tras_rebuild' })
+      expect(secondPersist[1]).toBe(PARENT_ORIGIN) // mismo guard de targetOrigin que el arranque (Important #2, W3)
     })
   })
 })

@@ -9,7 +9,7 @@ import { Header } from './Header'
 import { ConnectionBanner } from './ConnectionBanner'
 import { MessageList } from './MessageList'
 import { Composer } from './Composer'
-import { WaitingCard, TypingDots, ResolvedCard } from './handoff'
+import { WaitingCard, TypingDots, ResolvedCard, NewConversationCard } from './handoff'
 
 export interface PanelProps {
   config: WidgetConfig
@@ -59,6 +59,11 @@ export function Panel({ config, transport, onMinimize, onClose, onResize, viewpo
           finge una cronología o un éxito que no persiste en ningún sitio —
           la presencia del agente ya se ve en el cambio de cabecera. */}
       {viewState.conversationPhase === 'resolved' && <ResolvedCard agentName={state.agentName} />}
+      {/* Task W4: newConversationNotice es un flag del STORE (reset tras un
+          re-bootstrap silencioso), no una fase de conversationState — se
+          pinta independientemente de la fase, igual que un aviso de sistema
+          puntual en vez de un estado en curso. */}
+      {state.newConversationNotice && <NewConversationCard />}
     </>
   )
 

@@ -24,6 +24,12 @@ export interface StoreState {
   readonly agentAvatarUrl: string | null
   readonly agentTyping: boolean
   readonly connection: ConnectionStatus
+  // Task W4: se activa cuando shell/app.tsx recupera una sesión muerta con
+  // una NUEVA (no resumida) — ver resetForNewConversation. Una vez true, se
+  // queda así (no es un estado transitorio como agentTyping/connection): es
+  // un marcador permanente de "aquí empezó una conversación nueva", no un
+  // reflejo de estado del servidor.
+  readonly newConversationNotice: boolean
 }
 
 export interface MessageStore {
@@ -33,6 +39,16 @@ export interface MessageStore {
   replaceSnapshot(snapshot: MessagesSnapshot): void
   applyDurableEvent(event: WidgetEvent): void
   advanceCursorTo(eventId: string): void
+  // Task W4: recuperación de sesión muerta con una sesión NUEVA (no resume
+  // genuino) — olvida todo lo que este store sabía de la conversación
+  // ANTERIOR (cursor, conversationState, identidad de agente, dedup) para
+  // que el eventId de la conversación NUEVA (su propio contador, no
+  // comparable con el viejo) se adopte sin colisionar. Descarta los mensajes
+  // ya enviados (pertenecían a la conversación anterior); conserva los
+  // pendientes/en streaming (un envío en curso no debe perderse). `showNotice`
+  // activa newConversationNotice — lo decide el llamante (solo cuando había
+  // algo que perder: el store tenía mensajes antes del reset).
+  resetForNewConversation(showNotice: boolean): void
   addOptimistic(clientId: string, text: string): void
   ackOptimistic(clientId: string, messageId: string): void
   failOptimistic(clientId: string): void
@@ -65,6 +81,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   let connection: ConnectionStatus = 'idle'
   let lastStateSeq = -1
   let lastAgentSeq = -1
+  let newConversationNotice = false
 
   const listeners = new Set<() => void>()
   let published: StoreState | null = null
@@ -178,6 +195,24 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     lastAgentSeq = -1
     assignMessages(mergeSnapshotMessages(keep, snap))
     notify()
+  }
+
+  // Task W4 — ver comentario de la interfaz MessageStore#resetForNewConversation.
+  // Deliberadamente NO reutiliza replaceSnapshot: no hay un MessagesSnapshot
+  // a mano en el momento del re-bootstrap (el fetch a la conversación nueva
+  // lo hará el canal recién abierto, DESPUÉS de este reset) — este método
+  // solo limpia lo viejo, sin intentar adivinar el estado del servidor.
+  const resetForNewConversation = (showNotice: boolean): void => {
+    appliedEventIds.clear()
+    cursor = null
+    conversationState = null
+    agentName = null
+    agentAvatarUrl = null
+    lastStateSeq = -1
+    lastAgentSeq = -1
+    if (showNotice) newConversationNotice = true
+    const keep = messages.filter((m) => m.status !== 'sent' || m.streaming)
+    setMessages(keep) // única notify() — mutación atómica, mismo patrón que replaceSnapshot
   }
 
   const advanceCursorTo = (eventId: string): void => {
@@ -298,7 +333,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
         for (const m of messages) Object.freeze(m)
         Object.freeze(messages)
         published = Object.freeze({
-          messages, conversationState, cursor, agentName, agentAvatarUrl, agentTyping, connection,
+          messages, conversationState, cursor, agentName, agentAvatarUrl, agentTyping, connection, newConversationNotice,
         })
       }
       return published
@@ -311,6 +346,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     replaceSnapshot,
     applyDurableEvent,
     advanceCursorTo,
+    resetForNewConversation,
     addOptimistic,
     ackOptimistic,
     failOptimistic,

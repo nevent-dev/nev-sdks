@@ -160,3 +160,75 @@ describe('snapshot sin conversación (snapshotCursor null, backend real)', () =>
     expect(s.getState().cursor).toBeNull()
   })
 })
+
+// Task W4: al recuperarse de una sesión muerta con un cliente NUEVO cuya
+// sesión NO es un resume genuino (conversación distinta o inexistente), el
+// store debe olvidar todo lo que sabía de la conversación ANTERIOR — sobre
+// todo el cursor, que de lo contrario quedaría apuntando a un eventId de una
+// conversación que la sesión nueva ni siquiera posee (los eventId codifican
+// el conversationId, p.ej. evt_v1_conv_demo_01_N — compararlos entre
+// conversaciones distintas no tiene sentido y el siguiente ?after= del canal
+// quedaría roto).
+describe('resetForNewConversation (Task W4 — recuperación de sesión muerta)', () => {
+  it('limpia cursor, conversationState, identidad de agente y el watermark de dedup', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(stateEvent(4, 'AGENT_ACTIVE'))
+    s.applyDurableEvent(agentJoined(5, 'Laura'))
+    expect(s.getState().cursor).not.toBeNull()
+    s.resetForNewConversation(false)
+    const st = s.getState()
+    expect(st.cursor).toBeNull()
+    expect(st.conversationState).toBeNull()
+    expect(st.agentName).toBeNull()
+    expect(st.agentAvatarUrl).toBeNull()
+    // el watermark de agent.joined se resetea de verdad: un replay con seq
+    // MENOR que el anterior (5) debe re-aplicarse tras el reset (mismo
+    // criterio que replaceSnapshot, ver test de arriba).
+    s.applyDurableEvent(agentJoined(2, 'Pedro'))
+    expect(s.getState().agentName).toBe('Pedro')
+  })
+
+  it('descarta los mensajes YA ENVIADOS (pertenecen a la conversación anterior) pero conserva los pendientes/en streaming', () => {
+    const s = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    s.applyDurableEvent(msgEvent(2, 'm2', 'bot', 'de la conversación vieja'))
+    s.addOptimistic('cid_1', 'mensaje del visitante aún no confirmado')
+    s.beginBotTurn('turn_1') // streaming: nunca se pierde un turno en curso
+    s.resetForNewConversation(false)
+    const ids = s.getState().messages.map((m) => m.id)
+    expect(ids).not.toContain('m2')
+    expect(ids).toContain('cid_1')
+    expect(ids).toContain('turn:turn_1')
+  })
+
+  it('un eventId de la conversación nueva tras el reset se adopta sin colisionar con el cursor viejo (cursor arranca null)', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(stateEvent(99, 'RESOLVED')) // cursor alto de la conversación anterior
+    s.resetForNewConversation(false)
+    // Una conversación nueva puede perfectamente tener un seq MENOR (es su
+    // propio contador) — antes del fix, advanceCursor solo avanza hacia
+    // delante y esto se habría quedado pegado al 99 viejo.
+    s.applyDurableEvent(stateEvent(1, 'BOT_ACTIVE'))
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_1')
+    expect(s.getState().conversationState).toBe('BOT_ACTIVE')
+  })
+
+  it('showNotice=true activa newConversationNotice; showNotice=false lo deja en false', () => {
+    const s1 = createMessageStore()
+    expect(s1.getState().newConversationNotice).toBe(false)
+    s1.resetForNewConversation(true)
+    expect(s1.getState().newConversationNotice).toBe(true)
+
+    const s2 = createMessageStore()
+    s2.resetForNewConversation(false)
+    expect(s2.getState().newConversationNotice).toBe(false)
+  })
+
+  it('publica UNA sola notificación a los subscribers (mutación atómica, como applySnapshot/replaceSnapshot)', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(stateEvent(4, 'AGENT_ACTIVE'))
+    const listener = vi.fn()
+    s.subscribe(listener)
+    s.resetForNewConversation(true)
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+})

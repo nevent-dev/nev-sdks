@@ -53,7 +53,14 @@ export function startShell(w: Window, opts: ShellOptions): void {
       const storedSession = payload?.['session'] as { resumeSecret?: unknown } | null | undefined
       const resumeSecret = typeof storedSession?.resumeSecret === 'string' ? storedSession.resumeSecret : null
       parent = { post: (e) => source.postMessage(e, origin), origin, source }
-      void createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin, resumeSecret })
+      // Task W4: misma fábrica para el arranque inicial y para un
+      // re-bootstrap en caliente tras una muerte de sesión a mitad de vida
+      // (App la invoca vía la prop createSession cuando SessionClient#onSessionDead
+      // se dispara) — el POST /sessions real es idéntico en ambos casos,
+      // solo cambia el resumeSecret que se le pasa.
+      const buildClient = (secret: string | null) =>
+        createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin, resumeSecret: secret })
+      void buildClient(resumeSecret)
         .then((client) => {
           // Reenvía al loader lo que el backend acaba de emitir (mismo
           // resumeSecret en un resume genuino, uno nuevo en una sesión
@@ -63,7 +70,7 @@ export function startShell(w: Window, opts: ShellOptions): void {
           bus.emit('session_persist', { resumeSecret: client.getSession().resumeSecret })
           applyTheme(document.documentElement, client.getConfig().theme)
           const root = w.document.getElementById('root')
-          if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} />, root)
+          if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} createSession={buildClient} />, root)
         })
         .catch((err: unknown) => {
           console.error('[nevent-widget] fallo al arrancar la sesión', err)

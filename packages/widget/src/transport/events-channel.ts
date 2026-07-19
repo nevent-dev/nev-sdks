@@ -10,7 +10,11 @@ export interface Scheduler {
 }
 
 export interface EventsChannelDeps {
-  client: Pick<SessionClient, 'authorizedFetch'>
+  // onSessionDead es OPCIONAL a propósito: la mayoría de dobles de test en
+  // esta suite pasan `{ authorizedFetch }` a secas, y el canal debe seguir
+  // funcionando exactamente igual sin él (compat hacia atrás). El cliente
+  // real (shell/session.ts, Task W4) siempre lo implementa.
+  client: Pick<SessionClient, 'authorizedFetch'> & { onSessionDead?: SessionClient['onSessionDead'] }
   store: MessageStore
   scheduler?: Scheduler
   backoff?: Backoff
@@ -297,6 +301,25 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
     runAc = null
     cancelDelay()          // release any pending backoff/poll delay
   }
+
+  // Task W4: una sesión MUERTA (terminal, ver SessionClient#onSessionDead) no
+  // es un fallo transitorio más — reintentarla vía el backoff/polling
+  // habitual es exactamente el bug real reproducido (Reconectando… eterno).
+  // Bumpear `generation` aquí basta: TODOS los puntos de espera relevantes
+  // dentro de runChannel (snapshot/connect/pollOnce, justo después de cada
+  // `await authorizedFetch(...)`) ya comprueban `isCurrent(gen)` antes de
+  // interpretar el status code de la respuesta — el mismo mecanismo que ya
+  // usan close()/suspend() para invalidar un loop en marcha — así que el
+  // 401 terminal que disparó la muerte nunca llega a re-entrar en el
+  // catch/backoff: la llamada en curso simplemente se resuelve como un
+  // no-op y el bucle termina. Deliberadamente NO toca `connection`: un
+  // re-bootstrap está a punto de reemplazar este canal entero (shell/app.tsx)
+  // — forzar 'idle'/'offline' aquí solo produciría un parpadeo del banner.
+  deps.client.onSessionDead?.(() => {
+    stopCurrent()
+    active = false
+    suspended = false
+  })
 
   return {
     open(): void {
