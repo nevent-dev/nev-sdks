@@ -14,6 +14,12 @@ export interface StoredMessage {
   readonly createdAt: string
   readonly clientId: string | null
   readonly turnId: string | null
+  // Fix W5b: display name of the replying agent for THIS message specifically
+  // (backend W5a's WidgetMessage.authorName) — only ever set on role:'agent'
+  // messages hydrated from a snapshot; live message.created events and
+  // optimistic/streaming placeholders carry null. MessageBubble falls back
+  // to the conversation-level agentName, then a neutral glyph, when null.
+  readonly authorName: string | null
 }
 
 export interface StoreState {
@@ -127,6 +133,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
       next.push({
         id: m.messageId, role: m.role, text: m.text, status: 'sent',
         seq: null, streaming: false, createdAt: m.createdAt, clientId: null, turnId: null,
+        authorName: m.authorName ?? null,
       })
     }
     return next
@@ -160,6 +167,11 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
           next.push({
             id: event.payload.messageId, role: event.payload.role, text: event.payload.text,
             status: 'sent', seq, streaming: false, createdAt: event.occurredAt, clientId: null, turnId: null,
+            // The live message.created contract carries no authorName (that
+            // field is snapshot-only, backend W5a) — an agent-role message
+            // arriving this way relies on the conversation-level agentName
+            // (set by agent.joined) for its avatar, same as before W5b.
+            authorName: null,
           })
         }
         setMessages(next)
@@ -176,6 +188,15 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     const snapSeq = cursorSeq(snap.snapshotCursor)
     assignMessages(mergeSnapshotMessages(messages.slice(), snap))
     if (snapSeq >= lastStateSeq) { conversationState = snap.state; lastStateSeq = snapSeq }
+    // Fix W5b: backend W5a puts agent identity directly in the snapshot
+    // (`agent.name`, present iff a human agent is assigned right now) — hydrate
+    // it the same way conversationState is refreshed above, on the same
+    // watermark. The snapshot is a FLOOR, never a ceiling: only applied when at
+    // least as fresh as the newest agent.joined already recorded, so a live
+    // event that landed after this snapshot's cutoff is never clobbered. An
+    // absent block (resolved / unassigned) clears the identity — this is what
+    // returns the header to the assistant name after a resolve+reconcile.
+    if (snapSeq >= lastAgentSeq) { agentName = snap.agent ? snap.agent.name : null; lastAgentSeq = snapSeq }
     advanceCursor(snap.snapshotCursor)
     notify()
   }
@@ -189,12 +210,16 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     const snapSeq = cursorSeq(snap.snapshotCursor)
     conversationState = snap.state
     lastStateSeq = snapSeq
-    // The snapshot carries state but NOT agent identity — reset it and its
-    // watermark so the agent.joined replay (arriving after the lowered cursor)
-    // re-applies even though its seq is below the pre-reset watermark.
-    agentName = null
+    // Fix W5b: the snapshot now carries agent identity directly (backend
+    // W5a) — hydrate/clear it straight from `snap.agent`, unconditionally,
+    // the same way conversationState above trusts the fresh snapshot
+    // entirely on a hard reset. The watermark moves to snapSeq (NOT reset to
+    // -1): any FUTURE agent.joined in the new cursor space (seq > snapSeq)
+    // still refines it — there is no more need to wait for a replay the
+    // lowered cursor might never receive.
+    agentName = snap.agent ? snap.agent.name : null
     agentAvatarUrl = null
-    lastAgentSeq = -1
+    lastAgentSeq = snapSeq
     assignMessages(mergeSnapshotMessages(keep, snap))
     notify()
   }
@@ -234,7 +259,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   const addOptimistic = (clientId: string, text: string): void => {
     setMessages([...messages, {
       id: clientId, role: 'user', text, status: 'pending', seq: null,
-      streaming: false, createdAt: now(), clientId, turnId: null,
+      streaming: false, createdAt: now(), clientId, turnId: null, authorName: null,
     }])
   }
   const ackOptimistic = (clientId: string, messageId: string): void => {
@@ -288,7 +313,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   const beginBotTurn = (turnId: string): void => {
     setMessages([...messages, {
       id: `turn:${turnId}`, role: 'bot', text: '', status: 'sent', seq: null,
-      streaming: true, createdAt: now(), clientId: null, turnId,
+      streaming: true, createdAt: now(), clientId: null, turnId, authorName: null,
     }])
   }
   const appendBotDelta = (turnId: string, delta: string): void => {

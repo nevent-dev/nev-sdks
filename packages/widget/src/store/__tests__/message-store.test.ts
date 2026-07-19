@@ -77,6 +77,70 @@ describe('message store — durable core', () => {
     expect(s.getState().agentName).toBe('Laura')
   })
 
+  // Fix W5b: backend W5a adds `agent: { name }` to the snapshot — present
+  // iff a human agent is currently assigned. A soft reconcile (the normal
+  // reconnect/reload path, see events-channel.ts's `hard=false` default)
+  // must hydrate the SAME identity state agent.joined sets, without waiting
+  // for that durable event to replay (it may be outside the poll window).
+  it('applySnapshot with an agent block hydrates agent identity like agent.joined would', () => {
+    const s = createMessageStore()
+    const snap = { ...fixtureSnapshot(), agent: { name: 'Ana' } }
+    s.applySnapshot(snap)
+    expect(s.getState().agentName).toBe('Ana')
+  })
+
+  // The W5a-review "post-resolve disappearance" concern, now on the client:
+  // once a conversation resolves, the backend stops sending the agent block
+  // — a later soft reconcile must clear the identity so the header goes back
+  // to the assistant, instead of leaving the last-seen agent name stuck.
+  it('applySnapshot with NO agent block clears a previously-set agent identity (resolve+reconcile)', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(agentJoined(3, 'Laura'))
+    expect(s.getState().agentName).toBe('Laura')
+    // snapshotCursor seq=5 > lastAgentSeq=3: this snapshot is fresher than
+    // the join we applied, so its absent agent block is authoritative.
+    const snap = { messages: [], state: 'RESOLVED' as const, snapshotCursor: 'evt_v1_conv_demo_01_5' }
+    s.applySnapshot(snap)
+    expect(s.getState().agentName).toBeNull()
+  })
+
+  // The snapshot is a FLOOR, never a ceiling: a live agent.joined that landed
+  // AFTER the snapshot's own cutoff must not be clobbered by that snapshot,
+  // whichever order the two arrive in — no flicker/contradiction.
+  it('a snapshot older than the last live agent.joined does not regress the identity', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(agentJoined(9, 'Laura')) // live event already ahead of the snapshot below
+    const staleSnap = { messages: [], state: 'AGENT_ACTIVE' as const, snapshotCursor: 'evt_v1_conv_demo_01_4' }
+    s.applySnapshot(staleSnap) // no agent block, but seq 4 < lastAgentSeq 9 — must not clear
+    expect(s.getState().agentName).toBe('Laura')
+  })
+
+  it('a live agent.joined newer than the snapshot cursor refines the identity set by the snapshot', () => {
+    const s = createMessageStore()
+    const snap = { messages: [], state: 'AGENT_ACTIVE' as const, snapshotCursor: 'evt_v1_conv_demo_01_4', agent: { name: 'Ana' } }
+    s.applySnapshot(snap)
+    expect(s.getState().agentName).toBe('Ana')
+    s.applyDurableEvent(agentJoined(9, 'Laura')) // reassignment after the snapshot's cutoff
+    expect(s.getState().agentName).toBe('Laura')
+  })
+
+  it('mergeSnapshotMessages carries authorName per message, defaulting to null when absent', () => {
+    const s = createMessageStore()
+    const snap = {
+      messages: [
+        { messageId: 'm1', role: 'agent' as const, text: 'Hola, soy Ana', createdAt: '2026-07-18T10:00:00Z', authorName: 'Ana' },
+        { messageId: 'm2', role: 'bot' as const, text: 'Hola', createdAt: '2026-07-18T09:59:00Z' },
+      ],
+      state: 'AGENT_ACTIVE' as const,
+      snapshotCursor: 'evt_v1_conv_demo_01_2',
+      agent: { name: 'Ana' },
+    }
+    s.applySnapshot(snap)
+    const messages = s.getState().messages
+    expect(messages.find((m) => m.id === 'm1')?.authorName).toBe('Ana')
+    expect(messages.find((m) => m.id === 'm2')?.authorName).toBeNull()
+  })
+
   it('applySnapshot after events keeps the max cursor and merges (no rewind, no dup)', () => {
     const s = createMessageStore()
     s.applyDurableEvent(msgEvent(5, 'm5', 'bot', 'live'))
@@ -94,14 +158,24 @@ describe('message store — durable core', () => {
     expect(s.getState().messages.map((m) => m.id)).toEqual(['msg_0001']) // rebuilt from snapshot
   })
 
-  it('replaceSnapshot resets agent identity + watermark so a lower-seq agent.joined re-applies', () => {
+  it('replaceSnapshot with NO agent block clears identity and lowers the watermark to the new snapshot cursor', () => {
     const s = createMessageStore()
     s.applyDurableEvent(agentJoined(8, 'Laura'))
     expect(s.getState().agentName).toBe('Laura')
-    s.replaceSnapshot(fixtureSnapshot())          // hard reset drops the cursor to seq=1
+    s.replaceSnapshot(fixtureSnapshot())          // hard reset, snapshotCursor seq=1, no agent block
     expect(s.getState().agentName).toBeNull()     // identity cleared
-    s.applyDurableEvent(agentJoined(3, 'Laura'))  // valid replay with seq LOWER than the old 8
-    expect(s.getState().agentName).toBe('Laura')  // re-applied (watermark was reset to -1)
+    s.applyDurableEvent(agentJoined(2, 'Pedro'))  // future event in the new cursor space (seq 2 > 1)
+    expect(s.getState().agentName).toBe('Pedro')
+  })
+
+  // Fix W5b: backend W5a puts agent identity directly in the snapshot, so a
+  // hard reset no longer needs to null + wait for an agent.joined replay
+  // that a lowered cursor might never receive.
+  it('replaceSnapshot with an agent block hydrates identity directly — no replay needed', () => {
+    const s = createMessageStore()
+    const snap = { ...fixtureSnapshot(), agent: { name: 'Ana' } }
+    s.replaceSnapshot(snap)
+    expect(s.getState().agentName).toBe('Ana')
   })
 
   it('advanceCursorTo moves the cursor forward monotonically only', () => {

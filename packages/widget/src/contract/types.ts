@@ -70,6 +70,11 @@ export interface WidgetMessage {
   role: 'bot' | 'agent' | 'user'
   text: string
   createdAt: string
+  // Fix W5b (backend W5a, JsonInclude NON_NULL): presente solo en mensajes
+  // role:'agent' cuyo evento original llevaba el nombre del agente; ausente
+  // en eventos legacy y en mensajes bot/user. Nunca se confía en el shape
+  // tal cual llega de red (mismo criterio que assistantName/welcome arriba).
+  authorName?: string
 }
 
 // GET /widget/v1/conversations/current/messages?limit=N
@@ -78,6 +83,12 @@ export interface MessagesSnapshot {
   state: ConversationState
   /** null cuando la sesión aún no tiene conversación (drift cazado en la integración E2E real). */
   snapshotCursor: string | null
+  // Fix W5b (backend W5a, JsonInclude NON_NULL): presente sii hay un agente
+  // humano asignado a la conversación ahora mismo — la snapshot nunca
+  // reproduce el evento durable agent.joined, así que esto es la ÚNICA
+  // fuente de identidad de agente tras un rebuild desde snapshot (reconnect
+  // / reload). Sin avatarUrl: el bloque del backend solo lleva `name`.
+  agent?: { name: string }
 }
 
 // GET /widget/v1/events/poll?after={cursor} — ALL durables after the cursor.

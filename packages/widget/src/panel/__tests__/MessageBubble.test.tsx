@@ -6,7 +6,7 @@ import { mount, cleanupMounted } from './test-utils'
 function msg(overrides: Partial<StoredMessage> = {}): StoredMessage {
   return {
     id: 'm1', role: 'bot', text: 'Hola', status: 'sent', seq: 1, streaming: false,
-    createdAt: '2026-07-18T14:02:00.000Z', clientId: null, turnId: null, ...overrides,
+    createdAt: '2026-07-18T14:02:00.000Z', clientId: null, turnId: null, authorName: null, ...overrides,
   }
 }
 
@@ -64,10 +64,33 @@ describe('MessageBubble', () => {
     expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
   })
 
-  it('agente sin agentName aún (edge: mensaje ya llegó como agent pero agent.joined todavía no): recae en BotIcon', async () => {
+  // Fix W5b: un mensaje role:'agent' JAMÁS pinta el BotIcon, ni siquiera sin
+  // ninguna identidad conocida todavía (edge: llegó como agent pero ni
+  // authorName ni el agentName de conversación están disponibles) — cae al
+  // glifo neutro de agente (AgentInitialsAvatar con nombre undefined → '?'),
+  // nunca al icono del bot.
+  it('agente sin ninguna identidad conocida (ni authorName ni agentName de conversación): glifo neutro de agente, nunca BotIcon', async () => {
     const root = await mount(<MessageBubble message={msg({ role: 'agent' })} agentName={null} onRetry={vi.fn()} compact={false} />)
-    expect(root.querySelector('svg[data-icon=bot]')).not.toBeNull()
-    expect(root.querySelector('.initials-avatar')).toBeNull()
+    expect(root.querySelector('svg[data-icon=bot]')).toBeNull()
+    expect(root.querySelector('.initials-avatar')?.textContent).toBe('?')
+  })
+
+  // Fix W5b: authorName por mensaje (backend W5a, solo mensajes de snapshot)
+  // tiene prioridad sobre el agentName de la conversación — un histórico
+  // atendido por un agente DISTINTO al actualmente asignado muestra su
+  // propia inicial, no la del agente actual.
+  it('authorName del mensaje tiene prioridad sobre el agentName de la conversación', async () => {
+    const root = await mount(
+      <MessageBubble message={msg({ role: 'agent', authorName: 'Ana' })} agentName="Laura" onRetry={vi.fn()} compact={false} />,
+    )
+    expect(root.querySelector('.initials-avatar')?.textContent).toBe('A')
+  })
+
+  it('sin authorName en el mensaje: recae en el agentName de la conversación', async () => {
+    const root = await mount(
+      <MessageBubble message={msg({ role: 'agent', authorName: null })} agentName="Laura" onRetry={vi.fn()} compact={false} />,
+    )
+    expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
   })
 
   it('compact:true oculta el avatar visualmente (ghost) para agrupar burbujas consecutivas', async () => {

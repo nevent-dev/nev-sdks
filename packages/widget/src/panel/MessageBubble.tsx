@@ -16,13 +16,20 @@ function formatTime(iso: string): string {
 
 export function MessageBubble({ message, agentName, onRetry, compact }: MessageBubbleProps) {
   const isUser = message.role === 'user'
-  const showAgentInitials = message.role === 'agent' && agentName !== null
+  const isAgent = message.role === 'agent'
+  // Fix W5b: per-message authorName (snapshot-only, backend W5a) wins over
+  // the conversation-level agentName (live agent.joined) — a historical
+  // message authored by a PREVIOUSLY assigned agent must keep showing ITS
+  // author, not whoever is assigned now. Neither present → undefined, which
+  // AgentInitialsAvatar renders as a neutral '?' glyph. An agent-role message
+  // NEVER falls back to BotIcon, whatever the identity resolution yields.
+  const agentAvatarName = message.authorName ?? agentName ?? undefined
 
   return (
     <div class={`m${isUser ? ' user' : ''}${compact ? ' compact' : ''}`}>
       {!isUser && (
         <div class={`b-avatar${compact ? ' ghost' : ''}`}>
-          {showAgentInitials ? <AgentInitialsAvatar name={agentName as string} /> : <BotIcon />}
+          {isAgent ? <AgentInitialsAvatar name={agentAvatarName} /> : <BotIcon />}
         </div>
       )}
       <div>
