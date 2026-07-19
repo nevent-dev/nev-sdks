@@ -57,11 +57,18 @@ export function App({ client, bus }: { client: SessionClient; bus: ShellBus }) {
   }, [isOpen, bus])
 
   useEffect(() => {
-    // D7 (spec, decisión #7): el canal de eventos vive solo con el panel
-    // abierto — se cierra al cerrarlo, nunca queda en background.
-    if (isOpen) transport.openChannel()
+    // D7 (spec, decisión #7): el canal de eventos vive mientras exista una
+    // conversación durable (cursor no nulo) — con el panel abierto o
+    // cerrado — para que useUnreadCount siga contando respuestas y el badge
+    // del Launcher las refleje sin necesidad de reabrir el panel (patrón
+    // Chatwoot: el visitante se entera de una respuesta aunque no esté
+    // mirando el widget). Solo se cierra cuando NO hay conversación en curso
+    // (visitante que nunca escribió) y el panel está cerrado — así se evitan
+    // conexiones sin nada que escuchar.
+    const conversationExists = storeState.cursor !== null
+    if (isOpen || conversationExists) transport.openChannel()
     else transport.closeChannel()
-  }, [isOpen, transport])
+  }, [isOpen, storeState.cursor, transport])
 
   useEffect(() => () => transport.destroy(), [transport])
 
