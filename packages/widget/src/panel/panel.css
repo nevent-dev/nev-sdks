@@ -4,7 +4,9 @@
    useResizeReport (Step 3) puede medirlo con getBoundingClientRect() en un
    único elemento, y el modo (launcher/panel) se decide declarativamente en
    App.tsx (Task 17) sin necesitar un efecto en este componente. */
-html, body { margin: 0; }
+html, body { margin: 0; font-family: var(--font-body); }
+/* Los controles de formulario no heredan la fuente del body por defecto */
+button, input, textarea, select { font-family: inherit; }
 [data-part="root"] { display: inline-flex; padding: 24px; box-sizing: border-box; }
 
 /* ===== Launcher ===== */
