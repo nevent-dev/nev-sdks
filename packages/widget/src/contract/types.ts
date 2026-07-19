@@ -25,6 +25,13 @@ export interface WidgetSession {
   token: string
   expiresInSeconds: number
   resumeSecret: string
+  // Task W3c: SOLO presente en la respuesta de POST /sessions (creación),
+  // nunca en /sessions/refresh. true cuando el backend resumió de verdad una
+  // sesión existente vía el resumeSecret enviado (incl. la ventana de solape
+  // de la rotación, W3b); false cuando acuñó una sesión nueva. Ausente en un
+  // backend aún no desplegado con este campo — ver shell/session.ts
+  // wasResumed() y su fallback al echo-compare.
+  resumed?: boolean
 }
 
 interface EventBase {

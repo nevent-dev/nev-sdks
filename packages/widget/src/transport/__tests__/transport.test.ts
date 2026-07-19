@@ -48,7 +48,8 @@ function botEvt(seq: number, id: string, text: string): string {
 }
 function fakeClient(authorizedFetch: SessionClient['authorizedFetch']): SessionClient {
   return {
-    getConfig: () => fixtureConfig(), getSession: () => fixtureSession(), wasResumed: () => false, authorizedFetch,
+    getConfig: () => fixtureConfig(), getSession: () => fixtureSession(),
+    getCurrentResumeSecret: () => fixtureSession().resumeSecret, wasResumed: () => false, authorizedFetch,
     onSessionDead: () => () => {}, destroy: vi.fn(),
   }
 }

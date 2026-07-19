@@ -197,6 +197,86 @@ describe('session client', () => {
     })
   })
 
+  // Task W3c — la rotación con solape (W3b, backend) hace que el resumeSecret
+  // devuelto en un resume genuino sea SIEMPRE distinto al enviado, así que el
+  // echo-compare de arriba (Task W3) queda roto: todo resume real se leía
+  // como wasResumed()=false. El backend ahora añade un campo `resumed`
+  // explícito en la respuesta de POST /sessions — se usa ESE campo cuando
+  // está presente; el echo-compare queda solo como fallback para un backend
+  // aún no desplegado con el campo (mid-rollout).
+  describe('resumed flag explícito del backend (Task W3c)', () => {
+    it('resumed:true aunque la resumeSecret devuelta esté rotada (distinta a la enviada): wasResumed() es true y getSession() trae la rotada', async () => {
+      const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.endsWith('/config')) return jsonResponse(fixtureConfig())
+        if (url.endsWith('/sessions')) return jsonResponse({ ...fixtureSession(), resumeSecret: 'resume_rotado_tras_resume', resumed: true })
+        return jsonResponse({ ok: true })
+      })
+      const client = await createSessionClient({ ...OPTS, fetchFn, resumeSecret: 'resume_enviado_original' })
+      expect(client.wasResumed()).toBe(true)
+      expect(client.getSession().resumeSecret).toBe('resume_rotado_tras_resume')
+    })
+
+    it('resumed:false explícito aunque la resumeSecret devuelta coincida con la enviada (edge defensivo): wasResumed() respeta el flag, no el echo', async () => {
+      const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.endsWith('/config')) return jsonResponse(fixtureConfig())
+        if (url.endsWith('/sessions')) return jsonResponse({ ...fixtureSession(), resumed: false })
+        return jsonResponse({ ok: true })
+      })
+      const client = await createSessionClient({ ...OPTS, fetchFn, resumeSecret: fixtureSession().resumeSecret })
+      expect(client.wasResumed()).toBe(false)
+    })
+
+    it('backend SIN el campo resumed (aún no desplegado): cae al echo-compare, mismo comportamiento que antes de esta task', async () => {
+      const { fetchFn } = mockApi() // fixtureSession() no trae 'resumed'
+      const client = await createSessionClient({ ...OPTS, fetchFn, resumeSecret: fixtureSession().resumeSecret })
+      expect(client.wasResumed()).toBe(true) // echo-compare: mismo resumeSecret enviado y devuelto
+    })
+  })
+
+  // Task W3c — el resumeSecret VIGENTE (a diferencia de getSession(), snapshot
+  // inmutable tomado al crear/resumir): arranca igual, pero se actualiza si un
+  // refresh posterior devuelve uno nuevo. El re-bootstrap de W4 (shell/app.tsx)
+  // y la persistencia en el dominio anfitrión (session_persist) deben usar
+  // ESTE valor, nunca el snapshot inmutable — ver session.ts.
+  describe('resumeSecret vigente — getCurrentResumeSecret() (Task W3c)', () => {
+    it('arranca igual al resumeSecret emitido (mismo valor que getSession())', async () => {
+      const { fetchFn } = mockApi()
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      expect(client.getCurrentResumeSecret()).toBe(client.getSession().resumeSecret)
+    })
+
+    it('tras un refresh cuya respuesta SÍ trae una resumeSecret nueva (tolerado, contrato futuro): se actualiza; getSession() se queda con el emitido original', async () => {
+      const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.endsWith('/config')) return jsonResponse(fixtureConfig())
+        if (url.endsWith('/sessions')) return jsonResponse(fixtureSession())
+        if (url.endsWith('/sessions/refresh')) return jsonResponse({ token: 'sess_jwt_renovado', expiresInSeconds: 2700, resumeSecret: 'resume_rotado_en_refresh' })
+        const auth = new Headers(init?.headers).get('Authorization')
+        return auth === `Bearer ${fixtureSession().token}` ? jsonResponse({ error: 'expired' }, 401) : jsonResponse({ ok: true })
+      })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      await client.authorizedFetch('/widget/v1/conversations/current/messages') // fuerza un refresh real
+      expect(client.getCurrentResumeSecret()).toBe('resume_rotado_en_refresh')
+      expect(client.getSession().resumeSecret).toBe(fixtureSession().resumeSecret) // snapshot inmutable, intacto
+    })
+
+    it('tras un refresh cuya respuesta NO trae resumeSecret (contrato real hoy): no cambia', async () => {
+      const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.endsWith('/config')) return jsonResponse(fixtureConfig())
+        if (url.endsWith('/sessions')) return jsonResponse(fixtureSession())
+        if (url.endsWith('/sessions/refresh')) return jsonResponse({ token: 'sess_jwt_renovado', expiresInSeconds: 2700 })
+        const auth = new Headers(init?.headers).get('Authorization')
+        return auth === `Bearer ${fixtureSession().token}` ? jsonResponse({ error: 'expired' }, 401) : jsonResponse({ ok: true })
+      })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      await client.authorizedFetch('/widget/v1/conversations/current/messages')
+      expect(client.getCurrentResumeSecret()).toBe(fixtureSession().resumeSecret)
+    })
+  })
+
   // Task W4 — recuperación de sesión muerta a mitad de vida: authorizedFetch ya
   // maneja UN ciclo 401→refresh→retry; lo que falta es una señal TIPADA (no un
   // string lanzado que el llamante tendría que parsear) para que capas

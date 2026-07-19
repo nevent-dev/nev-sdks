@@ -315,7 +315,12 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
   // no-op y el bucle termina. Deliberadamente NO toca `connection`: un
   // re-bootstrap está a punto de reemplazar este canal entero (shell/app.tsx)
   // — forzar 'idle'/'offline' aquí solo produciría un parpadeo del banner.
-  deps.client.onSessionDead?.(() => {
+  // Nit W4 review (Task W3c): capturar la desuscripción, no descartarla — sin
+  // esto, un swap de cliente (rebuild tras muerte de sesión, ver
+  // shell/app.tsx) deja este listener colgado en el Set de deadListeners del
+  // cliente VIEJO (session.ts) para siempre, aunque ese canal ya esté
+  // cerrado y nadie vuelva a usarlo.
+  const unsubscribeSessionDead = deps.client.onSessionDead?.(() => {
     stopCurrent()
     active = false
     suspended = false
@@ -334,6 +339,7 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
       suspended = false
       stopCurrent()
       deps.store.setConnection('idle')
+      unsubscribeSessionDead?.()
     },
     suspend(): void {
       if (!active) return

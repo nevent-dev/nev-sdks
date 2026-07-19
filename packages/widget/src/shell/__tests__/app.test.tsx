@@ -13,6 +13,7 @@ function fakeClient(overrides: Partial<SessionClient> = {}): SessionClient {
   return {
     getConfig: () => fixtureConfig(),
     getSession: () => fixtureSession(),
+    getCurrentResumeSecret: () => fixtureSession().resumeSecret,
     wasResumed: () => false,
     authorizedFetch: vi.fn(),
     onSessionDead: () => () => {},
@@ -197,9 +198,9 @@ describe('App — Task W4: recuperación de sesión muerta a mitad de vida', () 
     return { client, kill: () => cb?.() }
   }
 
-  it('al morir la sesión, reconstruye llamando a createSession con el resumeSecret de la sesión ACTUAL', async () => {
+  it('al morir la sesión, reconstruye llamando a createSession con el resumeSecret VIGENTE (Task W3c: getCurrentResumeSecret(), no el snapshot inmutable de getSession())', async () => {
     const { calls } = mockCreateTransport()
-    const { client: oldClient, kill } = deathClient({ getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_actual' }) })
+    const { client: oldClient, kill } = deathClient({ getCurrentResumeSecret: () => 'resume_actual' })
     const newClient = fakeClient()
     const createSession = vi.fn(async (_secret: string | null) => newClient)
     const { bus } = fakeBus()
@@ -213,10 +214,10 @@ describe('App — Task W4: recuperación de sesión muerta a mitad de vida', () 
     expect(calls[1]!.client).toBe(newClient)
   })
 
-  it('tras reconstruir, persiste la sesión nueva vía bus.emit(session_persist) con SU resumeSecret', async () => {
+  it('tras reconstruir, persiste la sesión nueva vía bus.emit(session_persist) con SU resumeSecret VIGENTE (Task W3c)', async () => {
     mockCreateTransport()
     const { client: oldClient, kill } = deathClient()
-    const newClient = fakeClient({ getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_reconstruido' }) })
+    const newClient = fakeClient({ getCurrentResumeSecret: () => 'resume_reconstruido' })
     const createSession = vi.fn(async () => newClient)
     const emit = vi.fn()
     const bus: ShellBus = { onCommand: () => {}, emit, getLatchedViewport: () => null }
@@ -354,5 +355,26 @@ describe('App — Task W4: recuperación de sesión muerta a mitad de vida', () 
     await mount(<App client={oldClient} bus={bus} />)
 
     expect(() => kill()).not.toThrow()
+  })
+
+  // Nit W4 review (Task W3c): hadMessages contaba CUALQUIER mensaje en el
+  // store, incluido un draft 'pending' que el visitante nunca llegó a enviar
+  // de verdad (p.ej. un envío que seguía en vuelo justo cuando la sesión
+  // murió). Solo un mensaje 'sent' (confirmado) es "algo que perder" — un
+  // draft sin confirmar no debe disparar la tarjeta "Conversación nueva".
+  it('sesión fresca (wasResumed=false) con SOLO un mensaje pendiente (sin confirmar) en el store: NO activa newConversationNotice', async () => {
+    const { calls } = mockCreateTransport()
+    const { client: oldClient, kill } = deathClient()
+    const newClient = fakeClient({ wasResumed: () => false })
+    const createSession = vi.fn(async () => newClient)
+    const { bus } = fakeBus()
+    await mount(<App client={oldClient} bus={bus} createSession={createSession} />)
+    calls[0]!.store.addOptimistic('cid_draft', 'mensaje sin confirmar')
+    expect(calls[0]!.store.getState().messages[0]?.status).toBe('pending')
+
+    kill()
+
+    await vi.waitFor(() => expect(calls).toHaveLength(2))
+    expect(calls[1]!.store.getState().newConversationNotice).toBe(false)
   })
 })

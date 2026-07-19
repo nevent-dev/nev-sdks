@@ -440,4 +440,22 @@ describe('events channel — muerte de sesión (Task W4)', () => {
     await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
     ch.close()
   })
+
+  // Nit W4 review (Task W3c): el canal se suscribía a onSessionDead al
+  // crearse pero descartaba la función de desuscripción que devuelve — un
+  // swap de cliente (rebuild) dejaba el listener del canal VIEJO colgado
+  // para siempre (el Set de listeners de session.ts, ver session.ts, no lo
+  // limpia solo). close() debe desuscribirlo explícitamente.
+  it('close() se desuscribe de onSessionDead (sin listener colgado tras un swap de cliente)', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const unsubscribe = vi.fn()
+    const onSessionDead = vi.fn(() => unsubscribe)
+    const authorizedFetch = vi.fn(async (path: string) => (path.includes('/messages') ? jsonRes(EMPTY) : sseFail()))
+    const ch = createEventsChannel({ client: { authorizedFetch, onSessionDead }, store, scheduler: immediate(), backoff: fastBackoff() })
+    ch.open()
+
+    ch.close()
+
+    expect(unsubscribe).toHaveBeenCalledTimes(1)
+  })
 })

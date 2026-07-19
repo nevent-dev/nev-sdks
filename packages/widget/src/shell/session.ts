@@ -8,9 +8,23 @@ export interface SessionClient {
   // no trae resumeSecret; leerlo perezosamente de ahí devolvería undefined
   // tras el primer refresh).
   getSession(): WidgetSession
-  // true solo cuando se envió un resumeSecret Y el backend lo confirmó
-  // devolviendo ESE MISMO resumeSecret (ver WidgetSessionService#createOrResume
-  // en nev-api) — el contrato no trae un campo "resumed" explícito.
+  // Task W3c: el resumeSecret VIGENTE — arranca igual que getSession().resumeSecret,
+  // pero a diferencia de ese snapshot inmutable SÍ se actualiza si un refresh
+  // posterior devuelve uno nuevo (el contrato actual de POST /sessions/refresh
+  // no lo trae, pero se tolera por si un futuro despliegue lo añade). Un
+  // re-bootstrap (shell/app.tsx, Task W4) o la persistencia en el dominio
+  // anfitrión (session_persist) deben sourcear SIEMPRE este valor, nunca el
+  // snapshot inmutable de getSession() — ese solo existe para blindar
+  // token/expiresInSeconds contra la ausencia de resumeSecret en RefreshResponse.
+  getCurrentResumeSecret(): string
+  // true cuando el backend confirma un resume genuino — lee el campo `resumed`
+  // explícito de la respuesta de POST /sessions (Task W3c) cuando está
+  // presente. La rotación-con-solape del backend (W3b) hace que el
+  // resumeSecret devuelto en un resume real sea SIEMPRE distinto al enviado,
+  // así que comparar ambos (como hacía esta task antes de W3c) queda roto:
+  // TODO resume genuino se leía como false. El echo-compare se conserva SOLO
+  // como fallback para un backend aún no desplegado con el campo `resumed`
+  // (ausente en la respuesta) — mid-rollout, sin romper nada.
   wasResumed(): boolean
   authorizedFetch(path: string, init?: RequestInit): Promise<Response>
   // Task W4: se dispara UNA vez (latch) cuando authorizedFetch agota su único
@@ -67,7 +81,15 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
   // Snapshot tomado AQUÍ, antes de que refresh() pueda reasignar `session` a
   // algo sin resumeSecret — ver comentario de SessionClient#getSession arriba.
   const issuedSession: WidgetSession = { token: session.token, expiresInSeconds: session.expiresInSeconds, resumeSecret: session.resumeSecret }
-  const resumed = opts.resumeSecret != null && opts.resumeSecret.length > 0 && opts.resumeSecret === session.resumeSecret
+  // Task W3c: `resumed` explícito manda cuando el backend lo envía; el
+  // echo-compare de antes de esta task solo sobrevive como fallback — ver
+  // comentario de SessionClient#wasResumed arriba.
+  const resumed = typeof session.resumed === 'boolean'
+    ? session.resumed
+    : (opts.resumeSecret != null && opts.resumeSecret.length > 0 && opts.resumeSecret === session.resumeSecret)
+
+  // Task W3c: resumeSecret VIGENTE — ver comentario de SessionClient#getCurrentResumeSecret.
+  let currentResumeSecret = issuedSession.resumeSecret
 
   let refreshing: Promise<void> | null = null
   let destroyed = false
@@ -92,7 +114,15 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.token}` },
         })
-        if (res.ok) session = (await res.json()) as WidgetSession
+        if (res.ok) {
+          session = (await res.json()) as WidgetSession
+          // Task W3c: el contrato real de RefreshResponse hoy no trae
+          // resumeSecret (ver SessionClient#getSession) — esto tolera que un
+          // futuro despliegue lo añada, sin romper nada si sigue ausente.
+          if (typeof session.resumeSecret === 'string' && session.resumeSecret.length > 0) {
+            currentResumeSecret = session.resumeSecret
+          }
+        }
       } finally {
         refreshing = null
       }
@@ -125,6 +155,7 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
   return {
     getConfig: () => config,
     getSession: () => issuedSession,
+    getCurrentResumeSecret: () => currentResumeSecret,
     wasResumed: () => resumed,
     authorizedFetch,
     onSessionDead: (cb) => {

@@ -133,9 +133,15 @@ export function App({ client: initialClient, bus, resumedSession = false, create
         if (lastRebuildAtRef.current !== null && now - lastRebuildAtRef.current < SESSION_REBUILD_COOLDOWN_MS) return // rate-limit
         rebuildingRef.current = true
         try {
-          const hadMessages = transport.store.getState().messages.length > 0
-          const newClient = await createSession(client.getSession().resumeSecret)
-          bus.emit('session_persist', { resumeSecret: newClient.getSession().resumeSecret })
+          // Task W3c (nit W4 review): un draft 'pending' (envío en vuelo que
+          // nunca llegó a confirmarse) o uno 'failed' no es "algo confirmado
+          // que perder" — solo un mensaje 'sent' cuenta para decidir si la
+          // tarjeta "Conversación nueva" tiene sentido.
+          const hadMessages = transport.store.getState().messages.some((m) => m.status === 'sent')
+          // Task W3c: el resumeSecret VIGENTE, nunca el snapshot inmutable de
+          // getSession() — ver comentario de SessionClient#getCurrentResumeSecret.
+          const newClient = await createSession(client.getCurrentResumeSecret())
+          bus.emit('session_persist', { resumeSecret: newClient.getCurrentResumeSecret() })
           // Task W4 gaps 3: resume genuino (misma conversación) → seamless,
           // el store sigue tal cual. Sesión fresca (conversación distinta o
           // inexistente) → olvida lo que sabía de la anterior; la tarjeta

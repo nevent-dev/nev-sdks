@@ -25,10 +25,12 @@ export interface StoreState {
   readonly agentTyping: boolean
   readonly connection: ConnectionStatus
   // Task W4: se activa cuando shell/app.tsx recupera una sesión muerta con
-  // una NUEVA (no resumida) — ver resetForNewConversation. Una vez true, se
-  // queda así (no es un estado transitorio como agentTyping/connection): es
-  // un marcador permanente de "aquí empezó una conversación nueva", no un
-  // reflejo de estado del servidor.
+  // una NUEVA (no resumida) — ver resetForNewConversation. NO es un reflejo
+  // de estado del servidor, es un marcador puramente cliente. Task W3c
+  // (nit W4 review): one-shot, no permanente — se apaga sola en el próximo
+  // ackOptimistic exitoso (ver #ackOptimistic más abajo), para que la
+  // tarjeta no quede pegada bajo mensajes nuevos de la conversación de
+  // verdad para siempre.
   readonly newConversationNotice: boolean
 }
 
@@ -242,6 +244,11 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     // matching is equally idempotent (a second ack call finds nothing 'pending').
     const oi = indexOf((m) => m.clientId === clientId && m.status === 'pending')
     if (oi === -1) return // already acked / reconciled by a durable twin (idempotent)
+    // Nit W4 review (Task W3c): one-shot — el aviso "Conversación nueva" solo
+    // debe sobrevivir hasta que el visitante retome la conversación de
+    // verdad (su próximo turno CONFIRMADO), no quedarse pegado bajo mensajes
+    // nuevos para siempre.
+    if (newConversationNotice) newConversationNotice = false
     const next = messages.slice()
     if (messageId !== clientId) {
       // normal ack: the server told us the real id.

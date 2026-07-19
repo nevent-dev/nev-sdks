@@ -66,8 +66,9 @@ export function startShell(w: Window, opts: ShellOptions): void {
           // resumeSecret en un resume genuino, uno nuevo en una sesión
           // fresca) para que sobreviva al próximo reload/pestaña — el loader
           // es quien puede escribirlo en el storage del anfitrión, el shell
-          // (iframe) no.
-          bus.emit('session_persist', { resumeSecret: client.getSession().resumeSecret })
+          // (iframe) no. Task W3c: el VIGENTE (getCurrentResumeSecret()), no
+          // el snapshot inmutable de getSession() — ver shell/session.ts.
+          bus.emit('session_persist', { resumeSecret: client.getCurrentResumeSecret() })
           applyTheme(document.documentElement, client.getConfig().theme)
           const root = w.document.getElementById('root')
           if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} createSession={buildClient} />, root)

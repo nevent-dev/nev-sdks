@@ -163,4 +163,35 @@ describe('message store — optimistic + streaming', () => {
     s.setConnection('polling')
     expect(s.getState().connection).toBe('polling')
   })
+
+  // Nit W4 review (Task W3c): newConversationNotice era permanente — una vez
+  // activado por un re-bootstrap silencioso (ver message-store.ts#resetForNewConversation),
+  // nunca se apagaba, así que la tarjeta seguía viva bajo los mensajes NUEVOS
+  // que el visitante fuera mandando en la conversación de verdad. One-shot:
+  // se apaga en el próximo turno de usuario que se confirma de verdad
+  // (ackOptimistic), no solo por escribir.
+  describe('newConversationNotice — one-shot (Task W3c)', () => {
+    it('se limpia sola en el próximo ackOptimistic exitoso', () => {
+      const s = createMessageStore(clock)
+      s.resetForNewConversation(true)
+      expect(s.getState().newConversationNotice).toBe(true)
+      s.addOptimistic('cid_1', 'Hola de nuevo')
+      s.ackOptimistic('cid_1', 'msg_srv_1')
+      expect(s.getState().newConversationNotice).toBe(false)
+    })
+
+    it('NO se limpia solo por escribir (addOptimistic) — hace falta que el turno se confirme', () => {
+      const s = createMessageStore(clock)
+      s.resetForNewConversation(true)
+      s.addOptimistic('cid_1', 'Hola de nuevo')
+      expect(s.getState().newConversationNotice).toBe(true) // sigue activo: aún no hubo ack
+    })
+
+    it('sin newConversationNotice activo, un ackOptimistic normal no hace nada raro (no-op)', () => {
+      const s = createMessageStore(clock)
+      s.addOptimistic('cid_1', 'Hola')
+      s.ackOptimistic('cid_1', 'msg_srv_1')
+      expect(s.getState().newConversationNotice).toBe(false)
+    })
+  })
 })

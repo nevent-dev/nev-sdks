@@ -13,6 +13,7 @@ function fakeClient(overrides: Partial<SessionClient> = {}): SessionClient {
   return {
     getConfig: () => fixtureConfig(),
     getSession: () => fixtureSession(),
+    getCurrentResumeSecret: () => fixtureSession().resumeSecret,
     wasResumed: () => false,
     authorizedFetch: vi.fn(),
     onSessionDead: () => () => {},
@@ -227,8 +228,8 @@ describe('shell', () => {
       expect(createClient.mock.calls[0]![0]).toMatchObject({ resumeSecret: null })
     })
 
-    it('tras crear la sesión, el shell emite session_persist al parent con el resumeSecret que devolvió el backend', async () => {
-      const createClient = vi.fn(async () => fakeClient({ getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_emitido' }) }))
+    it('tras crear la sesión, el shell emite session_persist al parent con el resumeSecret VIGENTE que devolvió el backend (Task W3c: getCurrentResumeSecret())', async () => {
+      const createClient = vi.fn(async () => fakeClient({ getCurrentResumeSecret: () => 'resume_emitido' }))
       const parentPost = vi.fn()
       startShell(window, { apiBase: 'https://api.test', createClient })
       sendInit('nevw_test1', makeParentSource(parentPost))
@@ -260,11 +261,16 @@ describe('shell', () => {
   // mismo patrón que app.test.tsx#deathClient (probado allí: TS necesita el
   // callback envuelto en una función, no un `let` reasignado inline, para
   // que la narrowing de tipos no lo estreche a `never` en el punto de uso).
-  // Set, no una única variable: en real, MÁS DE UN suscriptor coexiste (el
-  // canal de eventos se suscribe dentro de createTransport()/createEventsChannel()
-  // en cuanto App monta, y App se suscribe por su cuenta vía useEffect poco
-  // después) — un fake de un solo listener sobreescribiría el del canal con
-  // el de App y kill() dispararía sobre el listener EQUIVOCADO.
+  // Set, no una única variable: en real, MÁS DE UN suscriptor puede coexistir
+  // brevemente (el canal de eventos se suscribe dentro de
+  // createTransport()/createEventsChannel() en cuanto App monta, y App se
+  // suscribe por su cuenta vía useEffect poco después) — un fake de un solo
+  // listener sobreescribiría el del canal con el de App y kill() dispararía
+  // sobre el listener EQUIVOCADO. En este escenario concreto (sesión fresca,
+  // panel cerrado, sin conversación) el efecto D7 cierra el canal casi al
+  // instante — y, desde Task W3c (nit W4 review: close() ahora se
+  // desuscribe de onSessionDead, ver events-channel.ts), esa desuscripción
+  // deja SOLO el listener de App vivo en régimen estable.
   function deathClient(overrides: Partial<SessionClient> = {}): { client: SessionClient; kill: () => void; listenerCount: () => number } {
     const listeners = new Set<() => void>()
     const client = fakeClient({ onSessionDead: (fn) => { listeners.add(fn); return () => { listeners.delete(fn) } }, ...overrides })
@@ -274,10 +280,10 @@ describe('shell', () => {
   describe('recuperación de sesión muerta (Task W4)', () => {
     it('al morir la sesión, reconstruye vía la MISMA fábrica createClient, con el resumeSecret vigente, y emite un session_persist nuevo', async () => {
       const { client: oldClient, kill, listenerCount } = deathClient({
-        getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_vigente' }),
+        getCurrentResumeSecret: () => 'resume_vigente',
       })
       const newClient = fakeClient({
-        getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_tras_rebuild' }),
+        getCurrentResumeSecret: () => 'resume_tras_rebuild',
         // El re-bootstrap fuerza un openChannel() en el transport nuevo (ver
         // app.tsx) — un fetch que nunca resuelve mantiene esa reconciliación
         // real en silencio, sin backoff/timers reales de fondo que este test
@@ -294,10 +300,21 @@ describe('shell', () => {
       // el commit del DOM síncronamente, pero useEffect se dispara en un
       // ciclo posterior; sin esto, kill() dispararía sobre un `cb` aún null.
       await vi.waitFor(() => expect(document.querySelector('[data-part=root]')).not.toBeNull())
-      // DOS suscriptores esperados: el canal de eventos (createTransport, en
-      // el render) y el propio App (useEffect, tras el commit) — esperar
-      // solo al primero dispararía kill() sobre el listener equivocado.
-      await vi.waitFor(() => expect(listenerCount()).toBe(2))
+      // Deja pasar un tick real: entre el commit y que TODOS los efectos
+      // posteriores terminen de asentarse hay un hueco transitorio en el que
+      // el canal de eventos (createTransport, subscrito al crearse) YA está
+      // suscrito pero D7 (que lo cierra al no haber conversación ni panel
+      // abierto) todavía no ha corrido — un vi.waitFor(listenerCount===1) en
+      // ESE instante pillaría el listener EQUIVOCADO (el del canal, a punto
+      // de desuscribirse, no el de App). Un `setTimeout` real, no una
+      // promesa/microtask, dado el mismo motivo documentado en el helper
+      // `immediate()` de events-channel.test.ts.
+      await new Promise((r) => setTimeout(r, 20))
+      // UN solo suscriptor en régimen estable: el canal se suscribe al
+      // crearse pero D7 lo cierra casi al instante (sin conversación, panel
+      // cerrado) — con el fix de Task W3c, close() se desuscribe (nit W4
+      // review), así que en régimen estable solo queda el listener de App.
+      expect(listenerCount()).toBe(1)
 
       kill()
 
