@@ -3,7 +3,7 @@ import { createTransport } from '../index'
 import { createBackoff } from '../backoff'
 import type { Scheduler } from '../events-channel'
 import type { SessionClient } from '../../shell/session'
-import { fixtureConfig } from '../../contract/fixtures'
+import { fixtureConfig, fixtureSession } from '../../contract/fixtures'
 import type { MessagesSnapshot } from '../../contract/types'
 
 function jsonRes(body: unknown, status = 200): Response {
@@ -46,7 +46,7 @@ function botEvt(seq: number, id: string, text: string): string {
   return `event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_${seq}","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:0${seq}:00Z","type":"message.created","payload":{"messageId":"${id}","role":"bot","text":"${text}"}}\n\n`
 }
 function fakeClient(authorizedFetch: SessionClient['authorizedFetch']): SessionClient {
-  return { getConfig: () => fixtureConfig(), authorizedFetch, destroy: vi.fn() }
+  return { getConfig: () => fixtureConfig(), getSession: () => fixtureSession(), wasResumed: () => false, authorizedFetch, destroy: vi.fn() }
 }
 let n = 0
 const uuid = () => `cid_${++n}`

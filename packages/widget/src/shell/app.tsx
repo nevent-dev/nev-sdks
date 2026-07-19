@@ -21,7 +21,7 @@ export interface ShellBus {
   getLatchedViewport(): ViewportState | null
 }
 
-export function App({ client, bus }: { client: SessionClient; bus: ShellBus }) {
+export function App({ client, bus, resumedSession = false }: { client: SessionClient; bus: ShellBus; resumedSession?: boolean }) {
   const config: WidgetConfig = client.getConfig()
   const [isOpen, setOpen] = useState(false)
   // Inicializador perezoso: se ejecuta UNA vez, síncronamente, en el primer
@@ -69,6 +69,18 @@ export function App({ client, bus }: { client: SessionClient; bus: ShellBus }) {
     if (isOpen || conversationExists) transport.openChannel()
     else transport.closeChannel()
   }, [isOpen, storeState.cursor, transport])
+
+  useEffect(() => {
+    // Task W3: una sesión RESUMIDA puede traer conversación e historial que
+    // esta store recién creada aún no conoce (cursor arranca null en cada
+    // arranque del shell). Fuerza un primer snapshot aunque el panel esté
+    // cerrado y el store no sepa todavía que hay conversación — es la única
+    // forma de que el efecto D7 de arriba (que decide seguir abierto por
+    // storeState.cursor) llegue a enterarse de que existe una. Sin esto, un
+    // visitante que vuelve con respuestas del agente pendientes nunca vería
+    // el badge hasta abrir el panel a mano.
+    if (resumedSession) transport.openChannel()
+  }, [resumedSession, transport])
 
   useEffect(() => () => transport.destroy(), [transport])
 

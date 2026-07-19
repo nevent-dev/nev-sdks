@@ -3,6 +3,15 @@ import { normalizeWelcome } from '../contract/normalize-welcome'
 
 export interface SessionClient {
   getConfig(): WidgetConfig
+  // Task W3: snapshot INMUTABLE tomado en el momento de crear/resumir la
+  // sesión — nunca la mutable interna que refresh() reasigna (RefreshResponse
+  // no trae resumeSecret; leerlo perezosamente de ahí devolvería undefined
+  // tras el primer refresh).
+  getSession(): WidgetSession
+  // true solo cuando se envió un resumeSecret Y el backend lo confirmó
+  // devolviendo ESE MISMO resumeSecret (ver WidgetSessionService#createOrResume
+  // en nev-api) — el contrato no trae un campo "resumed" explícito.
+  wasResumed(): boolean
   authorizedFetch(path: string, init?: RequestInit): Promise<Response>
   destroy(): void
 }
@@ -12,6 +21,10 @@ interface Options {
   installationId: string
   embeddingOrigin: string
   fetchFn?: typeof fetch
+  // Blob persistido por el loader en el dominio anfitrión (Task W3, ver
+  // loader/session-storage.ts). null/ausente = visitante nuevo o sin nada
+  // recuperable — se crea sesión fresca igual que antes de esta task.
+  resumeSecret?: string | null
 }
 
 export async function createSessionClient(opts: Options): Promise<SessionClient> {
@@ -37,10 +50,15 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
   const sessionRes = await fetchFn(`${installationBase}/sessions`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ embeddingOrigin: opts.embeddingOrigin }),
+    body: JSON.stringify({ embeddingOrigin: opts.embeddingOrigin, ...(opts.resumeSecret ? { resumeSecret: opts.resumeSecret } : {}) }),
   })
   if (!sessionRes.ok) throw new Error(`session_failed:${sessionRes.status}`)
   let session = (await sessionRes.json()) as WidgetSession
+
+  // Snapshot tomado AQUÍ, antes de que refresh() pueda reasignar `session` a
+  // algo sin resumeSecret — ver comentario de SessionClient#getSession arriba.
+  const issuedSession: WidgetSession = { token: session.token, expiresInSeconds: session.expiresInSeconds, resumeSecret: session.resumeSecret }
+  const resumed = opts.resumeSecret != null && opts.resumeSecret.length > 0 && opts.resumeSecret === session.resumeSecret
 
   let refreshing: Promise<void> | null = null
   let destroyed = false
@@ -72,6 +90,8 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
 
   return {
     getConfig: () => config,
+    getSession: () => issuedSession,
+    wasResumed: () => resumed,
     authorizedFetch,
     destroy: () => {
       destroyed = true

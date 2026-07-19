@@ -127,3 +127,35 @@ describe('App — D7: el canal de eventos vive mientras exista conversación act
     expect(openChannel).not.toHaveBeenCalled()
   })
 })
+
+describe('App — Task W3: resumedSession fuerza un primer snapshot', () => {
+  it('resumedSession=true abre el canal en el arranque aunque el panel esté cerrado y el store aún no sepa que hay conversación', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport, openChannel } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus } = fakeBus()
+    await mount(<App client={fakeClient()} bus={bus} resumedSession />)
+
+    expect(openChannel).toHaveBeenCalled()
+  })
+
+  it('resumedSession omitido (comportamiento por defecto): el canal NO se abre solo — se mantiene la conducta previa', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport, openChannel } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus } = fakeBus()
+    await mount(<App client={fakeClient()} bus={bus} />)
+
+    expect(openChannel).not.toHaveBeenCalled()
+  })
+
+  it('resumedSession=false explícito: idéntico al caso por defecto, canal cerrado', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport, openChannel } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus } = fakeBus()
+    await mount(<App client={fakeClient()} bus={bus} resumedSession={false} />)
+
+    expect(openChannel).not.toHaveBeenCalled()
+  })
+})

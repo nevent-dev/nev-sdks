@@ -140,4 +140,60 @@ describe('session client', () => {
     expect(config.theme.position).toBe('right')
     expect(config.theme.mode).toBe('light')
   })
+
+  // Task W3 — persistencia de sesión: el wire contract real es
+  // WidgetBootstrapController#createSession (nev-api) — POST /sessions con
+  // {embeddingOrigin, resumeSecret?}. La respuesta NO trae un campo explícito
+  // "resumed": WidgetSessionService#createOrResume echa hacia atrás el MISMO
+  // resumeSecret que se envió cuando resume de verdad, y siempre genera uno
+  // NUEVO cuando crea sesión fresca (secreto desconocido, expirado, o el
+  // gate widget.session.resume-enabled apagado) — esa comparación ES la
+  // señal, no hay otra en el contrato actual.
+  describe('resume de sesión (Task W3)', () => {
+    it('sin resumeSecret previo: el body NO lo incluye y wasResumed() es false', async () => {
+      const { fetchFn } = mockApi()
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      const sessionInit = fetchFn.mock.calls[1]?.[1]
+      expect(JSON.parse(String(sessionInit?.body))).toEqual({ embeddingOrigin: 'https://demofest.example' })
+      expect(client.wasResumed()).toBe(false)
+    })
+
+    it('con resumeSecret previo y el backend confirma el resume (misma resumeSecret devuelta): wasResumed() es true', async () => {
+      const { fetchFn } = mockApi()
+      const client = await createSessionClient({ ...OPTS, fetchFn, resumeSecret: fixtureSession().resumeSecret })
+      const sessionInit = fetchFn.mock.calls[1]?.[1]
+      expect(JSON.parse(String(sessionInit?.body))).toEqual({
+        embeddingOrigin: 'https://demofest.example',
+        resumeSecret: fixtureSession().resumeSecret,
+      })
+      expect(client.wasResumed()).toBe(true)
+      expect(client.getSession().resumeSecret).toBe(fixtureSession().resumeSecret)
+    })
+
+    it('con resumeSecret previo pero el backend lo ignora/rechaza (devuelve una resumeSecret distinta): wasResumed() es false y getSession() trae la NUEVA', async () => {
+      const fetchFn = vi.fn(async (input: RequestInfo | URL) => {
+        const url = String(input)
+        if (url.endsWith('/config')) return jsonResponse(fixtureConfig())
+        if (url.endsWith('/sessions')) return jsonResponse({ ...fixtureSession(), resumeSecret: 'resume_nuevo_mint' })
+        return jsonResponse({ ok: true })
+      })
+      const client = await createSessionClient({ ...OPTS, fetchFn, resumeSecret: 'resume_secreto_desconocido' })
+      expect(client.wasResumed()).toBe(false)
+      expect(client.getSession().resumeSecret).toBe('resume_nuevo_mint')
+    })
+
+    it('getSession() conserva el resumeSecret emitido al crear la sesión aunque un refresh posterior no lo devuelva (RefreshResponse real no trae ese campo)', async () => {
+      const fetchFn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        if (url.endsWith('/config')) return jsonResponse(fixtureConfig())
+        if (url.endsWith('/sessions')) return jsonResponse(fixtureSession())
+        if (url.endsWith('/sessions/refresh')) return jsonResponse({ token: 'sess_jwt_renovado', expiresInSeconds: 2700 }) // shape real de RefreshResponse: sin resumeSecret
+        const auth = new Headers(init?.headers).get('Authorization')
+        return auth === 'Bearer sess_jwt_fixture_0123456789abcdef' ? jsonResponse({ error: 'expired' }, 401) : jsonResponse({ ok: true })
+      })
+      const client = await createSessionClient({ ...OPTS, fetchFn })
+      await client.authorizedFetch('/widget/v1/conversations/current/messages') // fuerza un refresh real
+      expect(client.getSession().resumeSecret).toBe(fixtureSession().resumeSecret)
+    })
+  })
 })

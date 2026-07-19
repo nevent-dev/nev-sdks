@@ -2,15 +2,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render } from 'preact'
 import { startShell } from '../main'
 import { seal } from '../../protocol/envelope'
-import { fixtureConfig } from '../../contract/fixtures'
+import { fixtureConfig, fixtureSession } from '../../contract/fixtures'
 import * as themeModule from '../../panel/theme'
 import * as appModule from '../app'
 import type { SessionClient } from '../session'
 
 const PARENT_ORIGIN = 'https://demofest.example'
 
-function fakeClient(): SessionClient {
-  return { getConfig: () => fixtureConfig(), authorizedFetch: vi.fn(), destroy: vi.fn() } as unknown as SessionClient
+function fakeClient(overrides: Partial<SessionClient> = {}): SessionClient {
+  return {
+    getConfig: () => fixtureConfig(),
+    getSession: () => fixtureSession(),
+    wasResumed: () => false,
+    authorizedFetch: vi.fn(),
+    destroy: vi.fn(),
+    ...overrides,
+  } as unknown as SessionClient
 }
 
 // `source` representa la Window real del anfitrión: en un navegador real es el
@@ -190,5 +197,47 @@ describe('shell', () => {
       applyThemeSpy.mockRestore()
       appSpy.mockRestore()
     }
+  })
+
+  describe('persistencia de sesión (Task W3)', () => {
+    it('un init con session.resumeSecret lo pasa a createClient', async () => {
+      const createClient = vi.fn(async (_opts: unknown) => fakeClient())
+      const parentSource = makeParentSource(vi.fn())
+      startShell(window, { apiBase: 'https://api.test', createClient })
+      window.dispatchEvent(new MessageEvent('message', {
+        data: seal('init', { installationId: 'inst_demo_festival_01', session: { resumeSecret: 'resume_del_loader' } }, 'nevw_test1'),
+        origin: PARENT_ORIGIN,
+        source: parentSource,
+      }))
+      await vi.waitFor(() => expect(createClient).toHaveBeenCalledTimes(1))
+      expect(createClient.mock.calls[0]![0]).toMatchObject({ resumeSecret: 'resume_del_loader' })
+    })
+
+    it('un init con session:null pasa resumeSecret:null (visitante nuevo, sin nada que resumir)', async () => {
+      const createClient = vi.fn(async (_opts: unknown) => fakeClient())
+      const parentSource = makeParentSource(vi.fn())
+      startShell(window, { apiBase: 'https://api.test', createClient })
+      window.dispatchEvent(new MessageEvent('message', {
+        data: seal('init', { installationId: 'inst_demo_festival_01', session: null }, 'nevw_test1'),
+        origin: PARENT_ORIGIN,
+        source: parentSource,
+      }))
+      await vi.waitFor(() => expect(createClient).toHaveBeenCalledTimes(1))
+      expect(createClient.mock.calls[0]![0]).toMatchObject({ resumeSecret: null })
+    })
+
+    it('tras crear la sesión, el shell emite session_persist al parent con el resumeSecret que devolvió el backend', async () => {
+      const createClient = vi.fn(async () => fakeClient({ getSession: () => ({ ...fixtureSession(), resumeSecret: 'resume_emitido' }) }))
+      const parentPost = vi.fn()
+      startShell(window, { apiBase: 'https://api.test', createClient })
+      sendInit('nevw_test1', makeParentSource(parentPost))
+      await vi.waitFor(() => expect(createClient).toHaveBeenCalledTimes(1))
+      await vi.waitFor(() => {
+        const types = parentPost.mock.calls.map((c) => (c[0] as { type: string }).type)
+        expect(types).toContain('session_persist')
+      })
+      const persistCall = parentPost.mock.calls.find((c) => (c[0] as { type: string }).type === 'session_persist')!
+      expect((persistCall[0] as { payload: { resumeSecret: string } }).payload).toEqual({ resumeSecret: 'resume_emitido' })
+    })
   })
 })

@@ -1,5 +1,6 @@
 import { installGlobalStub, drainQueue, type ApiStub } from './api-queue'
 import { seal, open as openEnvelope, isCommand, SHELL_TO_LOADER } from '../protocol/envelope'
+import { readSessionBlob, writeSessionBlob } from './session-storage'
 
 interface LoaderOptions { shellUrl: string }
 
@@ -151,8 +152,23 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
       const env = openEnvelope(ev.data, { instanceId: instance.instanceId })
       if (!env || !isCommand(env.type, SHELL_TO_LOADER)) return
       if (env.type === 'ready') {
-        sendToShell('init', { installationId: instance.installationId, opts: instance.opts })
+        // Task W3: el blob de sesión persistido (cookie/localStorage, ver
+        // session-storage.ts) viaja en el mismo init que installationId/opts
+        // — el shell lo usa para intentar un resume en vez de crear sesión
+        // nueva. null si no hay nada guardado (visitante nuevo / expiró).
+        const session = readSessionBlob(w.document, w, instance.installationId)
+        sendToShell('init', { installationId: instance.installationId, opts: instance.opts, session })
         sendViewport()
+        return
+      }
+      if (env.type === 'session_persist') {
+        // Interno shell→loader: nunca se reenvía a los listeners públicos de
+        // on() más abajo (a diferencia de opened/closed/resize).
+        const payload = env.payload as { resumeSecret?: unknown } | null | undefined
+        const resumeSecret = payload?.resumeSecret
+        if (typeof resumeSecret === 'string' && resumeSecret.length > 0) {
+          writeSessionBlob(w.document, w, instance.installationId, { resumeSecret })
+        }
         return
       }
       if (env.type === 'opened') {

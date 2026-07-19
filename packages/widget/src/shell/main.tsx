@@ -47,12 +47,23 @@ export function startShell(w: Window, opts: ShellOptions): void {
       // para siempre (brick/DoS).
       if (typeof installationId !== 'string' || installationId.length === 0) return
       const origin = ev.origin // SIEMPRE del evento, nunca del payload (spec §4.1)
+      // Task W3: el loader reenvía aquí lo que tenía persistido en el
+      // dominio anfitrión (ver loader/session-storage.ts) — null si es un
+      // visitante nuevo o no había nada guardado.
+      const storedSession = payload?.['session'] as { resumeSecret?: unknown } | null | undefined
+      const resumeSecret = typeof storedSession?.resumeSecret === 'string' ? storedSession.resumeSecret : null
       parent = { post: (e) => source.postMessage(e, origin), origin, source }
-      void createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin })
+      void createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin, resumeSecret })
         .then((client) => {
+          // Reenvía al loader lo que el backend acaba de emitir (mismo
+          // resumeSecret en un resume genuino, uno nuevo en una sesión
+          // fresca) para que sobreviva al próximo reload/pestaña — el loader
+          // es quien puede escribirlo en el storage del anfitrión, el shell
+          // (iframe) no.
+          bus.emit('session_persist', { resumeSecret: client.getSession().resumeSecret })
           applyTheme(document.documentElement, client.getConfig().theme)
           const root = w.document.getElementById('root')
-          if (root) render(<App client={client} bus={bus} />, root)
+          if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} />, root)
         })
         .catch((err: unknown) => {
           console.error('[nevent-widget] fallo al arrancar la sesión', err)

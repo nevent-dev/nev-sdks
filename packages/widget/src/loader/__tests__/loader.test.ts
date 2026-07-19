@@ -491,4 +491,77 @@ describe('loader', () => {
     expect(cssTextSetter).not.toHaveBeenCalled()
     cssTextSetter.mockRestore()
   })
+
+  describe('persistencia de sesión (Task W3)', () => {
+    function clearSessionCookie(installationId: string): void {
+      document.cookie = `nevw_session_${installationId}=; path=/; max-age=0`
+    }
+
+    afterEach(() => {
+      clearSessionCookie('inst_demo_festival_01')
+      localStorage.clear()
+    })
+
+    it('sin sesión guardada previa: el init lleva session:null', () => {
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const post = vi.fn()
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: post } })
+      fakeShellMessage('ready', null, bootedInstanceId())
+      const [env] = post.mock.calls[0]!
+      expect(env).toMatchObject({ type: 'init', payload: { session: null } })
+    })
+
+    it('con una cookie de sesión previa: el init reenvía {resumeSecret} en session', () => {
+      document.cookie = `nevw_session_inst_demo_festival_01=${btoa(JSON.stringify({ resumeSecret: 'resume_previo' }))}; path=/`
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const post = vi.fn()
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: post } })
+      fakeShellMessage('ready', null, bootedInstanceId())
+      const [env] = post.mock.calls[0]!
+      expect(env).toMatchObject({ type: 'init', payload: { session: { resumeSecret: 'resume_previo' } } })
+    })
+
+    it('session_persist del shell guarda el resumeSecret en la cookie de la instalación', () => {
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      fakeShellMessage('session_persist', { resumeSecret: 'resume_nuevo' }, bootedInstanceId())
+
+      // Un boot NUEVO (simulando un reload) debe recoger lo que se acaba de guardar.
+      getApi()('destroy')
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe2 = document.querySelector('iframe')!
+      const post2 = vi.fn()
+      Object.defineProperty(iframe2, 'contentWindow', { value: { postMessage: post2 } })
+      fakeShellMessage('ready', null, bootedInstanceId())
+      const [env] = post2.mock.calls[0]!
+      expect(env).toMatchObject({ type: 'init', payload: { session: { resumeSecret: 'resume_nuevo' } } })
+    })
+
+    it('session_persist es interno: no se reenvía a los listeners públicos registrados con on()', () => {
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      const cb = vi.fn()
+      getApi()('on', 'session_persist', cb)
+      fakeShellMessage('session_persist', { resumeSecret: 'resume_nuevo' }, bootedInstanceId())
+      expect(cb).not.toHaveBeenCalled()
+    })
+
+    it('session_persist con payload inválido (sin resumeSecret string) no escribe nada ni lanza', () => {
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      expect(() => fakeShellMessage('session_persist', { resumeSecret: 123 }, bootedInstanceId())).not.toThrow()
+      expect(document.cookie).not.toContain('nevw_session_inst_demo_festival_01')
+    })
+  })
 })
