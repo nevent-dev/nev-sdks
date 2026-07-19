@@ -30,7 +30,17 @@ function controllableSse(frames: string[]): { response: Response; error: () => v
   })
   return { response: new Response(body, { status: 200 }), error: () => ctrl.error(new Error('drop')) }
 }
-const immediate: Scheduler = { setTimeout: (fn) => { queueMicrotask(fn); return 0 }, clearTimeout: () => {} }
+// A real (0ms) timer, NOT queueMicrotask (see events-channel.test.ts's
+// `immediate()` for the full rationale). This matters even more now: the
+// events channel's connect() watchdog (events-channel.ts) arms its timeout
+// BEFORE the fetch call, so a queueMicrotask-based "fire ASAP" scheduler
+// would have that timer's microtask queued strictly earlier than even the
+// fastest legitimate mock fetch's own resolution — aborting healthy attempts
+// and driving the retry loop into an unbroken microtask cycle that never
+// yields to a macrotask (OOM). A real (macrotask) 0ms timer lets any
+// microtask-only mock response/stream fully settle — and disarm the
+// watchdog — before the timer phase is ever reached.
+const immediate: Scheduler = { setTimeout: (fn) => setTimeout(fn, 0) as unknown as number, clearTimeout: (id) => clearTimeout(id as unknown as ReturnType<typeof setTimeout>) }
 const EMPTY: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_conv_demo_01_0' }
 function botEvt(seq: number, id: string, text: string): string {
   return `event: message.created\ndata: {"eventId":"evt_v1_conv_demo_01_${seq}","schemaVersion":1,"conversationId":"conv_demo_01","occurredAt":"2026-07-17T14:0${seq}:00Z","type":"message.created","payload":{"messageId":"${id}","role":"bot","text":"${text}"}}\n\n`

@@ -16,6 +16,7 @@ export interface EventsChannelDeps {
   backoff?: Backoff
   pollIntervalMs?: number
   reconnectDelayMs?: number
+  connectWatchdogMs?: number
   isOnline?: () => boolean
 }
 
@@ -51,6 +52,7 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
   const backoff = deps.backoff ?? createBackoff()
   const pollIntervalMs = deps.pollIntervalMs ?? 3000
   const reconnectDelayMs = deps.reconnectDelayMs ?? 500
+  const connectWatchdogMs = deps.connectWatchdogMs ?? 10000
   const isOnline = deps.isOnline ?? (() => globalThis.navigator?.onLine ?? true)
 
   let active = false
@@ -103,26 +105,71 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
   const eventsUrl = (base: string, after: string | null): string =>
     after ? `${base}?after=${encodeURIComponent(after)}` : base
 
+  // Arms a per-attempt watchdog: if `attemptAc` isn't aborted for some other
+  // reason first, fires attemptAc.abort() once connectWatchdogMs elapses.
+  // Returns a disarm function (idempotent, safe to call more than once).
+  //
+  // Cancellation is enforced via the local `disarmed` flag, NOT solely via
+  // scheduler.clearTimeout() — mirrors delay()/cancelDelay()'s pendingDelay
+  // guard above. A test (or a real environment) is free to hand in a
+  // Scheduler whose clearTimeout() doesn't actually prevent the callback from
+  // firing; if the watchdog callback ran unconditionally in that case, it
+  // would abort every single connect() attempt shortly after arming it —
+  // including healthy ones — and drive the retry loop into a tight,
+  // never-yielding cycle.
+  const armWatchdog = (attemptAc: AbortController): (() => void) => {
+    let disarmed = false
+    const id = scheduler.setTimeout(() => { if (!disarmed) attemptAc.abort() }, connectWatchdogMs)
+    return () => { disarmed = true; scheduler.clearTimeout(id) }
+  }
+
   // Parks on the live stream. Returns when the server closes it cleanly WITH
   // progress; throws on transport error or a 0-frame close; throws
   // CursorResetError on a 409. On the FIRST frame it resets BOTH the backoff and
-  // the failure counter (Codex #4) — a stream that opens then drops without a
-  // single frame still counts as a failure, so 2 such drops reach the fallback.
+  // the failure counter — a stream that opens then drops without a single
+  // frame still counts as a failure, so 2 such drops reach the fallback.
+  //
+  // This attempt gets its OWN AbortController, chained to the caller's
+  // `signal` (aborting one aborts the other) and additionally torn down by
+  // armWatchdog() if neither a response nor a first frame shows up within
+  // connectWatchdogMs — a backgrounded mobile radio can leave a half-open
+  // socket where the request is sent but nothing, not even a rejection, ever
+  // comes back on its own; without this, that single attempt parks forever
+  // and the channel never falls through to the retry/backoff path.
   const connect = async (gen: number, signal: AbortSignal): Promise<void> => {
     const after = deps.store.getState().cursor
-    const res = await deps.client.authorizedFetch(eventsUrl('/widget/v1/events', after), { signal })
-    if (!isCurrent(gen)) return
-    if (res.status === 409) throw new CursorResetError('events_cursor_reset')
-    if (!res.ok || !res.body) throw new Error(`events_http:${res.status}`)
-    deps.store.setConnection('live')
-    let progressed = false
-    for await (const frame of parseSSEStream(res.body, signal)) {
+    const attemptAc = new AbortController()
+    const onParentAbort = (): void => attemptAc.abort()
+    if (signal.aborted) attemptAc.abort()
+    else signal.addEventListener('abort', onParentAbort)
+    const disarmWatchdog = armWatchdog(attemptAc)
+    try {
+      let res: Response
+      try {
+        res = await deps.client.authorizedFetch(eventsUrl('/widget/v1/events', after), { signal: attemptAc.signal })
+      } catch (err) {
+        // Distinguishes "the watchdog gave up on this attempt" from a genuine
+        // parent-driven abort (close()/generation bump); isCurrent(gen) below
+        // still governs what happens next either way.
+        if (attemptAc.signal.aborted && !signal.aborted) throw new Error('events_connect_timeout')
+        throw err
+      }
       if (!isCurrent(gen)) return
-      if (!progressed) { progressed = true; consecutiveFailures = 0; backoff.reset() }
-      routeFrame(frame.event, frame.data)
+      if (res.status === 409) throw new CursorResetError('events_cursor_reset')
+      if (!res.ok || !res.body) throw new Error(`events_http:${res.status}`)
+      deps.store.setConnection('live')
+      let progressed = false
+      for await (const frame of parseSSEStream(res.body, attemptAc.signal)) {
+        if (!isCurrent(gen)) return
+        if (!progressed) { progressed = true; consecutiveFailures = 0; backoff.reset(); disarmWatchdog() }
+        routeFrame(frame.event, frame.data)
+      }
+      if (!isCurrent(gen)) return
+      if (!progressed) throw new Error('events_closed_no_progress')
+    } finally {
+      disarmWatchdog()
+      signal.removeEventListener('abort', onParentAbort)
     }
-    if (!isCurrent(gen)) return
-    if (!progressed) throw new Error('events_closed_no_progress')
   }
 
   const pollOnce = async (gen: number, signal: AbortSignal): Promise<void> => {
@@ -173,6 +220,14 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
             active = false
             return
           }
+          // Reconcile just proved the network (and this session) are healthy
+          // — reflect that immediately instead of waiting for connect() to
+          // make any progress of its own. Previously only connect()/the catch
+          // block ever touched connection state, so a connect() attempt that
+          // stalled (see armWatchdog above) left the banner showing
+          // offline/reconnecting forever even though data was already
+          // flowing again via reconcile.
+          deps.store.setConnection('live')
           await connect(gen, ac.signal)  // parks while live
           if (!isCurrent(gen)) return
           await delay(reconnectDelayMs)  // clean close → brief pause, then reconcile
