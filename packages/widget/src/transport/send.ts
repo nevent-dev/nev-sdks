@@ -29,8 +29,26 @@ function asRecord(data: string): Record<string, unknown> {
   }
 }
 
+// crypto.randomUUID() only exists in secure contexts (https / localhost) —
+// embedding the widget on a plain-http page (e.g. a phone hitting a LAN IP)
+// leaves it undefined. crypto.getRandomValues() has no such restriction, so
+// build a v4 UUID from it by hand: 16 random bytes with the version nibble
+// forced to 4 (byte 6) and the variant bits forced to 10xx (byte 8),
+// formatted as 8-4-4-4-12 hex.
+function randomUuidV4(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = 0x40 | (bytes[6]! & 0x0f)
+  bytes[8] = 0x80 | (bytes[8]! & 0x3f)
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+function generateClientId(): string {
+  return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : randomUuidV4()
+}
+
 export function createSender(deps: SenderDeps): Sender {
-  const uuid = deps.uuid ?? (() => crypto.randomUUID())
+  const uuid = deps.uuid ?? generateClientId
   const texts = new Map<string, string>()
   let useStreaming = deps.streaming
   let started = false

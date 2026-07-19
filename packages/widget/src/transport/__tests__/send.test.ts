@@ -245,3 +245,46 @@ describe('createSender', () => {
     expect(started).toHaveBeenCalledTimes(1) // fired on accepted
   })
 })
+
+describe('createSender default clientId generator (no injected uuid dep)', () => {
+  const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+  it('falls back to a v4 UUID built from crypto.getRandomValues when crypto.randomUUID is unavailable (non-secure context)', async () => {
+    // http:// pages (non-secure context) never expose crypto.randomUUID —
+    // simulate that by shadowing it with undefined while keeping
+    // getRandomValues, which IS available outside secure contexts.
+    // (randomUUID lives on Crypto.prototype in this runtime, so `delete
+    // globalThis.crypto.randomUUID` is a no-op: there is no own property to
+    // remove and the prototype method stays reachable. Assigning `undefined`
+    // creates a shadowing own property instead.)
+    const original = globalThis.crypto.randomUUID
+    ;(globalThis.crypto as { randomUUID?: unknown }).randomUUID = undefined
+    try {
+      const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+      const authorizedFetch = vi.fn(async (_path: string, _init?: RequestInit) => json({ turnId: 't1', userMessageId: 'u1', state: 'BOT_ACTIVE' }))
+      const sender = createSender({ client: { authorizedFetch }, store, streaming: false })
+      await sender.send('Hola') // must not throw despite randomUUID being gone
+      const idempotencyKey = new Headers(authorizedFetch.mock.calls[0]![1]?.headers).get('Idempotency-Key')
+      expect(idempotencyKey).toMatch(UUID_V4)
+      expect(store.getState().messages[0]).toMatchObject({ status: 'sent' }) // full send path still works
+    } finally {
+      globalThis.crypto.randomUUID = original
+    }
+  })
+
+  it('uses crypto.randomUUID when available (secure context)', async () => {
+    const fixedUuid: `${string}-${string}-${string}-${string}-${string}` = '11111111-1111-4111-8111-111111111111'
+    const spy = vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(fixedUuid)
+    try {
+      const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+      const authorizedFetch = vi.fn(async (_path: string, _init?: RequestInit) => json({ turnId: 't1', userMessageId: 'u1', state: 'BOT_ACTIVE' }))
+      const sender = createSender({ client: { authorizedFetch }, store, streaming: false })
+      await sender.send('Hola')
+      expect(spy).toHaveBeenCalled()
+      const idempotencyKey = new Headers(authorizedFetch.mock.calls[0]![1]?.headers).get('Idempotency-Key')
+      expect(idempotencyKey).toBe(fixedUuid)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+})
