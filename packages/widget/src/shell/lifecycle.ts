@@ -14,17 +14,21 @@ export function bindPageLifecycle(target: Window, handlers: LifecycleHandlers): 
     else handlers.onResume()
   }
 
-  target.addEventListener('freeze', suspend)
+  // Page Lifecycle API: `freeze`/`resume` are dispatched on `document`, NOT
+  // `window` (unlike `pageshow`/`online`/`offline`, which are Window events).
+  // Binding them to `target` was dead code — Chrome's tab-freezing never
+  // reached these handlers.
+  doc.addEventListener('freeze', suspend)
   target.addEventListener('offline', suspend)
-  target.addEventListener('resume', resume)
+  doc.addEventListener('resume', resume)
   target.addEventListener('pageshow', resume)
   target.addEventListener('online', resume)
   doc.addEventListener('visibilitychange', onVisibility)
 
   return () => {
-    target.removeEventListener('freeze', suspend)
+    doc.removeEventListener('freeze', suspend)
     target.removeEventListener('offline', suspend)
-    target.removeEventListener('resume', resume)
+    doc.removeEventListener('resume', resume)
     target.removeEventListener('pageshow', resume)
     target.removeEventListener('online', resume)
     doc.removeEventListener('visibilitychange', onVisibility)

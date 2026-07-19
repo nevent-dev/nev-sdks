@@ -62,7 +62,6 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
   let pendingDelay: (() => void) | null = null
   let loopPromise: Promise<void> | null = null
   let loopGen = 0                            // generation of the loop currently running (0 = none)
-  let restartRequested = false
 
   const isCurrent = (gen: number): boolean => active && !suspended && gen === generation
   const cancelDelay = (): void => {
@@ -212,21 +211,28 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
     }
   }
 
-  // At most ONE loop runs at a time. A launch requested while a loop is still
-  // unwinding is deferred to that loop's `finally` (Codex #7) — so a suspend()
-  // immediately followed by resume() never yields two concurrent reconciliations.
-  // A launch while a CURRENT loop is live is a no-op (nothing to restart).
+  // At most one CURRENT (tracked) loop runs at a time, but launch() never
+  // blocks progress on a stale generation actually unwinding: a resume()
+  // that lands while the previous generation's runChannel() hasn't yet
+  // noticed its abort (e.g. its in-flight fetch simply never settles — real
+  // mobile browsers can freeze a backgrounded page's task queue before the
+  // abort-triggered rejection task runs, stalling that promise indefinitely)
+  // must still make forward progress. Every consequential branch inside
+  // runChannel() (reconcile/connect/pollOnce, the catch block) checks
+  // isCurrent(gen) before touching store/runAc/timer, so a stale generation
+  // that wakes up late is always a safe no-op — it's fine for its promise to
+  // keep dangling. The one thing that must NOT happen is the stale run's
+  // `finally` clobbering a newer generation's `loopPromise`/`loopGen`; the
+  // `loopGen === gen` guard below makes that finally inert once superseded.
   const launch = (): void => {
     if (loopPromise && loopGen === generation) return // a live/current loop is already running
-    if (loopPromise) { restartRequested = true; return } // a stale loop is unwinding → chain
-    restartRequested = false
     generation += 1
     loopGen = generation
     const gen = generation
     loopPromise = runChannel(gen).finally(() => {
+      if (loopGen !== gen) return // superseded by a newer generation — its bookkeeping owns loopPromise/loopGen now
       loopPromise = null
       loopGen = 0
-      if (restartRequested && active && !suspended) { restartRequested = false; launch() }
     })
   }
 
@@ -242,14 +248,12 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
       if (active) return
       active = true
       suspended = false
-      restartRequested = false
       backoff.reset()
       launch()
     },
     close(): void {
       active = false
       suspended = false
-      restartRequested = false
       stopCurrent()
       deps.store.setConnection('idle')
     },
