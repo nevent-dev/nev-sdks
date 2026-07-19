@@ -238,6 +238,13 @@ describe('shell', () => {
       })
       const persistCall = parentPost.mock.calls.find((c) => (c[0] as { type: string }).type === 'session_persist')!
       expect((persistCall[0] as { payload: { resumeSecret: string } }).payload).toEqual({ resumeSecret: 'resume_emitido' })
+      // Important #2 (review W3): session_persist es el mensaje que de verdad
+      // lleva el resumeSecret — debe ir SIEMPRE al origin exacto del parent
+      // vinculado en init, nunca a '*' (spec §4.1, mismo criterio que el resto
+      // de mensajes shell→loader). Una regresión a '*' filtraría el secreto a
+      // cualquier documento que compartiera la misma window (p.ej. un iframe
+      // de un tercero co-residente en la página del anfitrión).
+      expect(persistCall[1]).toBe(PARENT_ORIGIN)
     })
   })
 })

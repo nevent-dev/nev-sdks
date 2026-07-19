@@ -104,4 +104,62 @@ describe('session-storage', () => {
     expect(() => readSessionBlob(fakeDoc, brokenWindow, INSTALLATION_ID)).not.toThrow()
     expect(readSessionBlob(fakeDoc, brokenWindow, INSTALLATION_ID)).toBeNull()
   })
+
+  // Important #1 (review W3): a diferencia de la cookie (acotada por su
+  // propio max-age, el navegador la borra solo), localStorage no tiene TTL
+  // nativo — sin un expiresAt guardado a mano en el blob, un resumeSecret
+  // caído al fallback viviría para siempre.
+  describe('TTL del fallback de localStorage', () => {
+    const KEY = `nevw_session_${INSTALLATION_ID}`
+
+    it('blob de localStorage con expiresAt en el pasado: readSessionBlob devuelve null y LIMPIA la entrada', () => {
+      const past = Date.now() - 1000
+      localStorage.setItem(KEY, btoa(JSON.stringify({ resumeSecret: 'resume_caducado', expiresAt: past })))
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toBeNull()
+      expect(localStorage.getItem(KEY)).toBeNull()
+    })
+
+    it('blob de localStorage con expiresAt en el futuro: se lee con normalidad, sin exponer expiresAt en el resultado', () => {
+      const future = Date.now() + 60_000
+      localStorage.setItem(KEY, btoa(JSON.stringify({ resumeSecret: 'resume_vigente', expiresAt: future })))
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toEqual({ resumeSecret: 'resume_vigente' })
+    })
+
+    it('un blob de localStorage SIN expiresAt (formato previo a este fix) no se trata como caducado', () => {
+      localStorage.setItem(KEY, btoa(JSON.stringify({ resumeSecret: 'resume_formato_viejo' })))
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toEqual({ resumeSecret: 'resume_formato_viejo' })
+    })
+
+    it('al caer a localStorage (cookies bloqueadas), el blob escrito lleva expiresAt ~= ahora + 30 días', () => {
+      const fakeDoc = {
+        get cookie() { return '' },
+        set cookie(_v: string) { /* no-op */ },
+      } as unknown as Document
+      const before = Date.now()
+      writeSessionBlob(fakeDoc, window, INSTALLATION_ID, { resumeSecret: 'resume_fallback_ttl' })
+      const after = Date.now()
+      const raw = localStorage.getItem(KEY)
+      expect(raw).not.toBeNull()
+      const decoded = JSON.parse(atob(raw!)) as { resumeSecret: string; expiresAt: number }
+      expect(decoded.resumeSecret).toBe('resume_fallback_ttl')
+      expect(decoded.expiresAt).toBeGreaterThanOrEqual(before + COOKIE_MAX_AGE_SECONDS * 1000)
+      expect(decoded.expiresAt).toBeLessThanOrEqual(after + COOKIE_MAX_AGE_SECONDS * 1000)
+    })
+
+    it('la cookie SIGUE sin llevar expiresAt en el blob (su max-age ya la acota; no hace falta duplicarlo)', () => {
+      writeSessionBlob(document, window, INSTALLATION_ID, { resumeSecret: 'resume_cookie_normal' })
+      const raw = readCookieRaw(document, INSTALLATION_ID)
+      const decoded = JSON.parse(atob(raw!)) as Record<string, unknown>
+      expect(decoded).toEqual({ resumeSecret: 'resume_cookie_normal' })
+      expect(decoded['expiresAt']).toBeUndefined()
+    })
+  })
 })
+
+function readCookieRaw(doc: Document, installationId: string): string | null {
+  const prefix = `nevw_session_${installationId}=`
+  for (const pair of doc.cookie.split('; ')) {
+    if (pair.startsWith(prefix)) return pair.slice(prefix.length)
+  }
+  return null
+}
