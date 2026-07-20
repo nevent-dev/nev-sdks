@@ -108,8 +108,8 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     assignMessages(next)
     notify()
   }
-  const advanceCursor = (eventId: string | null): void => {
-    if (eventId === null) return // sesión sin conversación: no hay cursor que avanzar
+  const advanceCursor = (eventId: string | null | undefined): void => {
+    if (eventId == null) return // sesión sin conversación: no hay cursor que avanzar (wire real puede omitir el campo, no solo mandarlo null)
     if (cursor === null || cursorSeq(eventId) > cursorSeq(cursor)) cursor = eventId
   }
   const indexOf = (pred: (m: StoredMessage) => boolean): number => messages.findIndex(pred)
@@ -206,7 +206,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     // the fresh snapshot, keeping only unsent optimistic / in-flight streaming.
     appliedEventIds.clear()
     const keep = messages.filter((m) => m.status !== 'sent' || m.streaming)
-    cursor = snap.snapshotCursor
+    cursor = snap.snapshotCursor ?? null // el resto del código compara === null / !== null, nunca undefined
     const snapSeq = cursorSeq(snap.snapshotCursor)
     conversationState = snap.state
     lastStateSeq = snapSeq

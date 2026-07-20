@@ -167,6 +167,38 @@ describe('events channel — core', () => {
   })
 })
 
+// Drift real de wire (2026-07-20): MessagesSnapshotDto se serializa con
+// @JsonInclude(NON_NULL) — para una sesión SIN conversación el body es
+// exactamente `{"messages":[],"state":"BOT_ACTIVE"}`, snapshotCursor NI
+// SIQUIERA aparece (no es `snapshotCursor: null`, ese caso ya cubierto por
+// el test "no conversación yet" de arriba con snapshotCursor: ''). Antes del
+// fix, reconcile() propagaba la excepción de cursorSeq(undefined) hasta el
+// catch de runChannel, que lo contaba como fallo de CONEXIÓN en vez de
+// reconocer la sesión sin conversación: reconnecting → polling → poll sin
+// cursor → 409 en bucle, banner "Reconectando…" eterno para todo visitante
+// nuevo con el panel abierto.
+describe('canal — snapshot cuyo body real omite snapshotCursor (JsonInclude NON_NULL)', () => {
+  it('sesión nueva sin conversación: idlea sin pasar nunca por reconnecting/polling y sin llamar a /events ni /events/poll', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let eventsCalls = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages')) return jsonRes({ messages: [], state: 'BOT_ACTIVE' })
+      eventsCalls += 1 // /events o /events/poll — nunca deberían llamarse
+      return sseFail()
+    })
+    const seen: string[] = []
+    store.subscribe(() => seen.push(store.getState().connection))
+    const ch = createEventsChannel({ client: { authorizedFetch }, store, scheduler: immediate(), backoff: fastBackoff(), reconnectDelayMs: 1 })
+    ch.open()
+    await vi.waitFor(() => expect(ch.isActive()).toBe(false))
+    expect(store.getState().connection).toBe('idle')
+    expect(seen).not.toContain('reconnecting')
+    expect(seen).not.toContain('polling')
+    expect(eventsCalls).toBe(0)
+    ch.close()
+  })
+})
+
 function durableEvent(seq: number, id: string, text: string) {
   return {
     eventId: `evt_v1_conv_demo_01_${seq}`, schemaVersion: 1 as const, conversationId: 'conv_demo_01',

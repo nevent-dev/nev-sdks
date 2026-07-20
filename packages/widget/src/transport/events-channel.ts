@@ -111,7 +111,12 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
     if (!isCurrent(gen)) return null
     if (res.status === 409) throw new CursorResetError('snapshot_cursor_reset')
     if (!res.ok) throw new Error(`snapshot_http:${res.status}`)
-    return (await res.json()) as MessagesSnapshot
+    const parsed = (await res.json()) as MessagesSnapshot
+    // Frontera del wire: el backend serializa con @JsonInclude(NON_NULL), así
+    // que una sesión sin conversación OMITE snapshotCursor por completo (no
+    // manda null). Normalizamos aquí, en el único punto de entrada de todos
+    // los snapshots, para que el resto del store nunca vea `undefined`.
+    return { ...parsed, snapshotCursor: parsed.snapshotCursor ?? null }
   }
 
   // Never send `after=` empty: an absent cursor means "build the URL with no

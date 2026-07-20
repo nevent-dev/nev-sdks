@@ -81,8 +81,13 @@ export interface WidgetMessage {
 export interface MessagesSnapshot {
   messages: WidgetMessage[]
   state: ConversationState
-  /** null cuando la sesión aún no tiene conversación (drift cazado en la integración E2E real). */
-  snapshotCursor: string | null
+  // Opcional: el backend serializa MessagesSnapshotDto con @JsonInclude(NON_NULL),
+  // así que una sesión sin conversación NO manda `snapshotCursor: null` sino que
+  // OMITE el campo por completo (drift cazado en integración E2E, 2026-07-20).
+  // null también se acepta (algún fixture/mock previo lo incluía así). Nunca se
+  // confía en el shape tal cual llega de red — normalizado en la frontera en
+  // transport/events-channel.ts `snapshot()`.
+  snapshotCursor?: string | null
   // Fix W5b (backend W5a, JsonInclude NON_NULL): presente sii hay un agente
   // humano asignado a la conversación ahora mismo — la snapshot nunca
   // reproduce el evento durable agent.joined, así que esto es la ÚNICA

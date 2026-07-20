@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { createMessageStore } from '../message-store'
-import type { WidgetEvent } from '../../contract/types'
+import type { WidgetEvent, MessagesSnapshot } from '../../contract/types'
 import { fixtureSnapshot } from '../../contract/fixtures'
 
 function msgEvent(seq: number, messageId: string, role: 'bot' | 'agent' | 'user', text: string): WidgetEvent {
@@ -231,6 +231,34 @@ describe('snapshot sin conversación (snapshotCursor null, backend real)', () =>
     const s = createMessageStore()
     s.applySnapshot(fixtureSnapshot())
     expect(() => s.replaceSnapshot(emptySnap)).not.toThrow()
+    expect(s.getState().cursor).toBeNull()
+  })
+})
+
+// Drift real de wire (2026-07-20): MessagesSnapshotDto se serializa con
+// @JsonInclude(NON_NULL) — para una sesión sin conversación el body NO es
+// `{"snapshotCursor":null,...}` (el caso de arriba), es directamente
+// `{"messages":[],"state":"BOT_ACTIVE"}`: el campo snapshotCursor NI SIQUIERA
+// aparece. cursorSeq(undefined) revienta igual que cursorSeq hacía antes con
+// null (solo guardaba `=== null`), y applySnapshot/replaceSnapshot lo llaman
+// incondicionalmente.
+describe('snapshot sin snapshotCursor en el wire (campo ausente, JsonInclude NON_NULL real)', () => {
+  // Body real de una sesión sin conversación: la clave snapshotCursor no
+  // aparece (no es un `null` explícito). El tipo la declara opcional
+  // precisamente por esto, así que el literal es asignable tal cual.
+  const wireSnapNoField: MessagesSnapshot = { messages: [], state: 'BOT_ACTIVE' }
+
+  it('applySnapshot no lanza y deja cursor en null cuando snapshotCursor falta por completo', () => {
+    const s = createMessageStore()
+    expect(() => s.applySnapshot(wireSnapNoField)).not.toThrow()
+    expect(s.getState().cursor).toBeNull()
+    expect(s.getState().conversationState).toBe('BOT_ACTIVE')
+  })
+
+  it('replaceSnapshot (hard reset) tampoco lanza cuando snapshotCursor falta por completo', () => {
+    const s = createMessageStore()
+    s.applySnapshot(fixtureSnapshot())
+    expect(() => s.replaceSnapshot(wireSnapNoField)).not.toThrow()
     expect(s.getState().cursor).toBeNull()
   })
 })
