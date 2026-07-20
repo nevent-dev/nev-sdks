@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { createEventsChannel, type Scheduler } from '../events-channel'
+import { createEventsChannel, type Scheduler, BACKEND_SSE_HEARTBEAT_MS, DEFAULT_CONNECT_WATCHDOG_MS } from '../events-channel'
 import { createBackoff } from '../backoff'
 import { createMessageStore } from '../../store/message-store'
 import type { MessagesSnapshot } from '../../contract/types'
@@ -511,6 +511,87 @@ describe("events channel — armWatchdog's disarmed flag guards a broken Schedul
 
     expect(eventsCalls).toBe(1) // no spurious reconnect triggered by the stale watchdog callback
     expect(store.getState().connection).toBe('live')
+    ch.close()
+  })
+})
+
+// Regression: the connect() watchdog must outlast the backend's idle heartbeat.
+// On an idle stream (parked at the cursor tip) the server sends NOTHING until its
+// first heartbeat at BACKEND_SSE_HEARTBEAT_MS (15s). If the watchdog is shorter,
+// it aborts that healthy stream first — a 0-frame close counted as a failure that
+// flaps the banner to "Reconectando…" on every idle conversation and drops SSE to
+// polling until a real event happens to arrive. The `immediate()` scheduler used
+// elsewhere collapses every timer to 0ms, so it CANNOT see this ordering bug; these
+// tests use real timers and a first-frame delay to reproduce it.
+describe('events channel — watchdog must survive the backend idle heartbeat', () => {
+  // A stream that stays silent for `firstFrameDelayMs` (simulating the wait for the
+  // backend's first heartbeat), then emits one frame and parks open — the exact
+  // shape of a healthy idle connection.
+  const sseFirstFrameAfter = (firstFrameDelayMs: number, frame: string): Response => {
+    const enc = new TextEncoder()
+    const body = new ReadableStream<Uint8Array>({
+      start(c) { setTimeout(() => c.enqueue(enc.encode(frame)), firstFrameDelayMs) },
+    })
+    return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
+  }
+  const realTimers = (): Scheduler => ({
+    setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+    clearTimeout: (id) => clearTimeout(id as unknown as ReturnType<typeof setTimeout>),
+  })
+
+  it('the default watchdog is strictly longer than the backend heartbeat interval', () => {
+    // The coupling contract in one assertion: if someone lowers the watchdog below
+    // the heartbeat (the original bug: 10s watchdog vs 15s heartbeat), this fails.
+    expect(DEFAULT_CONNECT_WATCHDOG_MS).toBeGreaterThan(BACKEND_SSE_HEARTBEAT_MS)
+  })
+
+  it('an idle stream whose first frame (heartbeat) arrives before the watchdog stays live — no reconnect flap', async () => {
+    // Ratio-preserving scale of the real numbers (frame at 25ms < 40ms watchdog,
+    // mirroring heartbeat 15s < watchdog 20s): the healthy idle stream must reach
+    // its first heartbeat and settle 'live', never flapping to 'reconnecting'.
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    const seen: string[] = []
+    store.subscribe(() => seen.push(store.getState().connection))
+    let eventsCalls = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(SNAP)
+      if (path.includes('/events?')) { eventsCalls += 1; return sseFirstFrameAfter(25, ev(2, 'm2', 'heartbeat-tardio')) }
+      return jsonRes({})
+    })
+    const ch = createEventsChannel({
+      client: { authorizedFetch }, store, scheduler: realTimers(), backoff: fastBackoff(),
+      reconnectDelayMs: 1, connectWatchdogMs: 40,
+    })
+    ch.open()
+
+    await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    // Give any spurious watchdog-driven reconnect a chance to fire before asserting.
+    await new Promise((r) => setTimeout(r, 80))
+
+    expect(eventsCalls).toBe(1) // the stream was never torn down and reopened
+    expect(store.getState().connection).toBe('live')
+    expect(seen).not.toContain('reconnecting')
+    ch.close()
+  })
+
+  it('an idle stream whose first frame arrives after the watchdog IS torn down — proves the watchdog is what kills it (the original bug)', async () => {
+    // Control: frame at 70ms > 40ms watchdog (mirroring heartbeat 15s > the old 10s
+    // watchdog). The watchdog aborts the silent stream, so it reopens (2nd /events
+    // call) — exactly the flap that a watchdog < heartbeat produced in production.
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let eventsCalls = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(SNAP)
+      if (path.includes('/events?')) { eventsCalls += 1; return sseFirstFrameAfter(70, ev(2, 'm2', 'demasiado-tarde')) }
+      return jsonRes({})
+    })
+    const ch = createEventsChannel({
+      client: { authorizedFetch }, store, scheduler: realTimers(), backoff: fastBackoff(),
+      reconnectDelayMs: 1, connectWatchdogMs: 40,
+    })
+    ch.open()
+
+    await vi.waitFor(() => expect(eventsCalls).toBeGreaterThanOrEqual(2))
     ch.close()
   })
 })

@@ -34,6 +34,20 @@ export interface EventsChannel {
 
 const DURABLE_TYPES = new Set(['message.created', 'conversation.state_changed', 'agent.joined'])
 
+// Backend liveness contract: on an idle /widget/v1/events stream (parked at the
+// cursor tip, no durable events flowing) the server's FIRST frame is a heartbeat,
+// emitted every BACKEND_SSE_HEARTBEAT_MS (WidgetProperties.Events.heartbeatSeconds,
+// 15s). The connect() watchdog MUST outlast one full heartbeat interval with
+// margin: it exists to catch a half-open socket where NOTHING ever arrives, but a
+// healthy idle stream legitimately sends nothing until its first heartbeat. A
+// watchdog shorter than the heartbeat aborts every healthy idle stream before it
+// can prove liveness — a 0-frame close counted as a failure, flapping the banner
+// to "Reconectando…" and needlessly dropping SSE to polling until a real event
+// happens to arrive inside the window. Keep DEFAULT_CONNECT_WATCHDOG_MS strictly
+// greater than BACKEND_SSE_HEARTBEAT_MS.
+export const BACKEND_SSE_HEARTBEAT_MS = 15000
+export const DEFAULT_CONNECT_WATCHDOG_MS = 20000
+
 class CursorResetError extends Error {}
 
 function parseDurable(data: string): WidgetEvent | null {
@@ -56,7 +70,7 @@ export function createEventsChannel(deps: EventsChannelDeps): EventsChannel {
   const backoff = deps.backoff ?? createBackoff()
   const pollIntervalMs = deps.pollIntervalMs ?? 3000
   const reconnectDelayMs = deps.reconnectDelayMs ?? 500
-  const connectWatchdogMs = deps.connectWatchdogMs ?? 10000
+  const connectWatchdogMs = deps.connectWatchdogMs ?? DEFAULT_CONNECT_WATCHDOG_MS
   const isOnline = deps.isOnline ?? (() => globalThis.navigator?.onLine ?? true)
 
   let active = false
