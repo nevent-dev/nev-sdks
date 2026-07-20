@@ -154,6 +154,68 @@ describe('session-storage', () => {
       expect(decoded['expiresAt']).toBeUndefined()
     })
   })
+
+  // Marca de último-visto acotada por conversación (unread watermark) — por
+  // IDENTIDAD del último mensaje visto, no por seq (WidgetMessage no lleva
+  // seq por mensaje). Reutiliza el mismo blob/canal que el resumeSecret.
+  describe('lastSeen (watermark de no-leídos)', () => {
+    it('write + read hace round-trip de resumeSecret + lastSeen', () => {
+      writeSessionBlob(document, window, INSTALLATION_ID, {
+        resumeSecret: 'resume_abc123',
+        lastSeen: { conversationId: 'conv_demo_festival_01', messageId: 'msg_0007' },
+      })
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toEqual({
+        resumeSecret: 'resume_abc123',
+        lastSeen: { conversationId: 'conv_demo_festival_01', messageId: 'msg_0007' },
+      })
+    })
+
+    it('un blob legado (sin lastSeen) sigue siendo válido tal cual', () => {
+      document.cookie = `nevw_session_${INSTALLATION_ID}=${btoa(JSON.stringify({ resumeSecret: 'resume_legado' }))}; path=/`
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toEqual({ resumeSecret: 'resume_legado' })
+    })
+
+    it('lastSeen corrupto (conversationId vacío) se DESCARTA pero el resumeSecret sobrevive', () => {
+      document.cookie = `nevw_session_${INSTALLATION_ID}=${btoa(JSON.stringify({
+        resumeSecret: 'resume_ok', lastSeen: { conversationId: '', messageId: 'msg_1' },
+      }))}; path=/`
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toEqual({ resumeSecret: 'resume_ok' })
+    })
+
+    it('lastSeen corrupto (messageId vacío) se DESCARTA pero el resumeSecret sobrevive', () => {
+      document.cookie = `nevw_session_${INSTALLATION_ID}=${btoa(JSON.stringify({
+        resumeSecret: 'resume_ok', lastSeen: { conversationId: 'conv_demo', messageId: '' },
+      }))}; path=/`
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toEqual({ resumeSecret: 'resume_ok' })
+    })
+
+    it('lastSeen corrupto (messageId no-string) se DESCARTA pero el resumeSecret sobrevive', () => {
+      document.cookie = `nevw_session_${INSTALLATION_ID}=${btoa(JSON.stringify({
+        resumeSecret: 'resume_ok', lastSeen: { conversationId: 'conv_demo', messageId: 42 },
+      }))}; path=/`
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toEqual({ resumeSecret: 'resume_ok' })
+    })
+
+    it('lastSeen corrupto (shape ajeno) se DESCARTA pero el resumeSecret sobrevive', () => {
+      document.cookie = `nevw_session_${INSTALLATION_ID}=${btoa(JSON.stringify({
+        resumeSecret: 'resume_ok', lastSeen: 'no-es-un-objeto',
+      }))}; path=/`
+      expect(readSessionBlob(document, window, INSTALLATION_ID)).toEqual({ resumeSecret: 'resume_ok' })
+    })
+
+    it('round-trip de lastSeen también funciona vía el fallback de localStorage', () => {
+      const fakeDoc = {
+        get cookie() { return '' },
+        set cookie(_v: string) { /* no-op: cookies bloqueadas */ },
+      } as unknown as Document
+      writeSessionBlob(fakeDoc, window, INSTALLATION_ID, {
+        resumeSecret: 'resume_fallback', lastSeen: { conversationId: 'conv_demo', messageId: 'msg_0004' },
+      })
+      expect(readSessionBlob(fakeDoc, window, INSTALLATION_ID)).toEqual({
+        resumeSecret: 'resume_fallback', lastSeen: { conversationId: 'conv_demo', messageId: 'msg_0004' },
+      })
+    })
+  })
 })
 
 function readCookieRaw(doc: Document, installationId: string): string | null {

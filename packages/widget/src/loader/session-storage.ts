@@ -10,12 +10,34 @@
 // — nunca en una URL, donde persistiría en logs de servidor, historial del
 // navegador y el Referer de terceros.
 //
-// Solo se guarda el resumeSecret — NUNCA el bearer token de sesión (vive
+// Se guarda el resumeSecret y, opcionalmente, la marca de último-visto del
+// badge de no-leídos (lastSeen) — NUNCA el bearer token de sesión (vive
 // 45 min en memoria del shell, no merece persistencia; ver shell/session.ts,
 // que ya tiene un test dedicado a que el token no toque ningún storage).
 
+// Marca por IDENTIDAD+POSICIÓN, no por seq: WidgetMessage (GET /messages) no
+// lleva seq por mensaje — solo el snapshot en conjunto vía snapshotCursor —
+// así que todo mensaje rehidratado por snapshot llega con seq:null SIEMPRE
+// (ver store/message-store.ts#mergeSnapshotMessages). Un watermark basado en
+// seq trataría todo mensaje sin seq propio como "ya visto", matando el caso
+// "el agente respondió mientras la pestaña estaba cerrada" — justo el caso
+// que este badge existe para cubrir (spec §3.2, patrón Chatwoot). messageId
+// es la posición del ÚLTIMO mensaje visto la última vez que se abrió el
+// panel — panel/use-unread-count.ts localiza ese id en la lista (cronológica)
+// y cuenta solo lo que viene DESPUÉS.
+export interface StoredLastSeen {
+  conversationId: string
+  messageId: string
+}
+
 export interface StoredSessionBlob {
   resumeSecret: string
+  // Watermark de no-leídos ACOTADO por conversación (un messageId de una
+  // conversación no dice nada de la posición en otra). Ausente en un blob
+  // legado (pre-existente antes de esta feature) o si nunca se abrió el
+  // panel en esta sesión: ambos casos son válidos, solo significa "sin
+  // baseline todavía".
+  lastSeen?: StoredLastSeen
 }
 
 // 30 días: espeja widget.session.max-idle-days en nev-api (WidgetProperties.Session,
@@ -40,6 +62,22 @@ interface DecodedBlob extends StoredSessionBlob {
   expiresAt?: number
 }
 
+// Valida el shape de lastSeen tal cual viene del JSON decodificado — usada
+// tanto al leer el blob persistido (decodeBlob) como al validar el payload
+// entrante de session_persist (loader/index.ts), para que ambos lados acepten
+// exactamente lo mismo. Nunca lanza: una entrada corrupta (edición manual,
+// formato de una versión previa sin este campo, drift de contrato) DESCARTA
+// solo lastSeen — jamás invalida el resumeSecret que la acompaña (ver
+// decodeBlob más abajo).
+export function parseLastSeen(raw: unknown): StoredLastSeen | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined
+  const conversationId = (raw as Record<string, unknown>)['conversationId']
+  const messageId = (raw as Record<string, unknown>)['messageId']
+  if (typeof conversationId !== 'string' || conversationId.length === 0) return undefined
+  if (typeof messageId !== 'string' || messageId.length === 0) return undefined
+  return { conversationId, messageId }
+}
+
 // Nunca lanza: una cookie/entrada de localStorage corrupta (edición manual,
 // un formato antiguo de una versión previa del widget, truncamiento) debe
 // producir un arranque limpio con sesión nueva, no un crash del shell.
@@ -50,10 +88,25 @@ function decodeBlob(raw: string): DecodedBlob | null {
     const resumeSecret = (parsed as Record<string, unknown>)['resumeSecret']
     if (typeof resumeSecret !== 'string' || resumeSecret.length === 0) return null
     const rawExpiresAt = (parsed as Record<string, unknown>)['expiresAt']
-    return typeof rawExpiresAt === 'number' ? { resumeSecret, expiresAt: rawExpiresAt } : { resumeSecret }
+    const expiresAt = typeof rawExpiresAt === 'number' ? rawExpiresAt : undefined
+    // lastSeen corrupto se descarta EN SILENCIO — el resumeSecret sigue
+    // siendo válido igualmente, un watermark roto no debe tirar la sesión.
+    const lastSeen = parseLastSeen((parsed as Record<string, unknown>)['lastSeen'])
+    return {
+      resumeSecret,
+      ...(expiresAt !== undefined ? { expiresAt } : {}),
+      ...(lastSeen !== undefined ? { lastSeen } : {}),
+    }
   } catch {
     return null
   }
+}
+
+// Construye el blob PÚBLICO (sin expiresAt, de uso interno del fallback de
+// localStorage) a partir de lo decodificado — único punto que decide qué
+// campos de DecodedBlob se exponen al llamante de readSessionBlob.
+function toPublicBlob(decoded: DecodedBlob): StoredSessionBlob {
+  return decoded.lastSeen ? { resumeSecret: decoded.resumeSecret, lastSeen: decoded.lastSeen } : { resumeSecret: decoded.resumeSecret }
 }
 
 function readCookie(doc: Document, name: string): string | null {
@@ -116,7 +169,7 @@ export function readSessionBlob(doc: Document, win: Window, installationId: stri
   const cookieRaw = readCookie(doc, name)
   if (cookieRaw !== null) {
     const decoded = decodeBlob(cookieRaw)
-    return decoded ? { resumeSecret: decoded.resumeSecret } : null
+    return decoded ? toPublicBlob(decoded) : null
   }
   const lsRaw = readLocalStorage(win, name)
   if (lsRaw === null) return null
@@ -130,7 +183,7 @@ export function readSessionBlob(doc: Document, win: Window, installationId: stri
     removeLocalStorage(win, name)
     return null
   }
-  return { resumeSecret: decoded.resumeSecret }
+  return toPublicBlob(decoded)
 }
 
 export function writeSessionBlob(doc: Document, win: Window, installationId: string, blob: StoredSessionBlob): void {

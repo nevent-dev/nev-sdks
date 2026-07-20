@@ -1,6 +1,6 @@
 import { installGlobalStub, drainQueue, type ApiStub } from './api-queue'
 import { seal, open as openEnvelope, isCommand, SHELL_TO_LOADER } from '../protocol/envelope'
-import { readSessionBlob, writeSessionBlob } from './session-storage'
+import { readSessionBlob, writeSessionBlob, parseLastSeen } from './session-storage'
 
 interface LoaderOptions { shellUrl: string }
 
@@ -164,10 +164,16 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
       if (env.type === 'session_persist') {
         // Interno shell→loader: nunca se reenvía a los listeners públicos de
         // on() más abajo (a diferencia de opened/closed/resize).
-        const payload = env.payload as { resumeSecret?: unknown } | null | undefined
+        const payload = env.payload as { resumeSecret?: unknown; lastSeen?: unknown } | null | undefined
         const resumeSecret = payload?.resumeSecret
         if (typeof resumeSecret === 'string' && resumeSecret.length > 0) {
-          writeSessionBlob(w.document, w, instance.installationId, { resumeSecret })
+          // El shell manda SIEMPRE el payload completo (resumeSecret +
+          // lastSeen si lo tiene) — se escribe el blob entero de una vez, sin
+          // merge con lo que ya hubiera guardado (ver diseño de la task). Un
+          // lastSeen corrupto se descarta EN SILENCIO (parseLastSeen), nunca
+          // bloquea la persistencia del resumeSecret.
+          const lastSeen = parseLastSeen(payload?.lastSeen)
+          writeSessionBlob(w.document, w, instance.installationId, { resumeSecret, ...(lastSeen ? { lastSeen } : {}) })
         }
         return
       }

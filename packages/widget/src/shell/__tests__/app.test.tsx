@@ -6,7 +6,7 @@ import type { Transport, TransportOptions } from '../../transport'
 import { createMessageStore, type MessageStore } from '../../store/message-store'
 import { fixtureConfig, fixtureSession } from '../../contract/fixtures'
 import type { SessionClient } from '../session'
-import type { WidgetEvent } from '../../contract/types'
+import type { WidgetEvent, MessagesSnapshot } from '../../contract/types'
 import { mount, cleanupMounted } from '../../panel/__tests__/test-utils'
 
 function fakeClient(overrides: Partial<SessionClient> = {}): SessionClient {
@@ -67,6 +67,21 @@ function agentMessageEvent(seq: number, messageId: string, text: string): Widget
   return {
     eventId: `evt_v1_conv_test_${seq}`, schemaVersion: 1, conversationId: 'conv_test',
     occurredAt: '2026-07-19T10:00:00.000Z', type: 'message.created', payload: { messageId, role: 'agent', text },
+  }
+}
+
+// Historial hidratado vía snapshot (GET /messages) — cada mensaje llega con
+// seq:null (WidgetMessage no lleva seq por mensaje, ver
+// store/message-store.ts#mergeSnapshotMessages), igual que tras un F5 con
+// sesión resumida.
+function historicalSnapshot(conversationId: string, cursorSeq: number): MessagesSnapshot {
+  return {
+    messages: [
+      { messageId: 'msg_hist_1', role: 'bot', text: 'hola', createdAt: '2026-07-18T09:00:00.000Z' },
+      { messageId: 'msg_hist_2', role: 'agent', text: 'en qué te ayudo', createdAt: '2026-07-18T09:01:00.000Z' },
+    ],
+    state: 'AGENT_ACTIVE',
+    snapshotCursor: `evt_v1_${conversationId}_${cursorSeq}`,
   }
 }
 
@@ -166,6 +181,76 @@ describe('App — Task W3: resumedSession fuerza un primer snapshot', () => {
     await mount(<App client={fakeClient()} bus={bus} resumedSession={false} />)
 
     expect(openChannel).not.toHaveBeenCalled()
+  })
+})
+
+describe('App — watermark de no-leídos persistido (initialLastSeen / onLastSeen)', () => {
+  it('initialLastSeen suprime el badge del historial rehidratado por snapshot de la MISMA conversación (bug del F5 que recontaba todo)', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    store.applySnapshot(historicalSnapshot('conv_demo_01', 5))
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus } = fakeBus()
+
+    const root = await mount(<App client={fakeClient()} bus={bus} initialLastSeen={{ conversationId: 'conv_demo_01', messageId: 'msg_hist_2' }} />)
+
+    expect(root.querySelector('.badge')).toBeNull()
+  })
+
+  it('sin initialLastSeen (prop omitida): el historial rehidratado SÍ cuenta — comportamiento por defecto intacto', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    store.applySnapshot(historicalSnapshot('conv_demo_01', 5))
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus } = fakeBus()
+
+    const root = await mount(<App client={fakeClient()} bus={bus} />)
+
+    expect(root.querySelector('.badge')?.textContent).toBe('2')
+  })
+
+  it('al abrir el panel, App persiste el watermark vía bus.emit(session_persist) con resumeSecret + lastSeen', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    store.applyDurableEvent(agentMessageEvent(2, 'm_agent_1', 'hola'))
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    let handler: ((type: string, payload: unknown) => void) | null = null
+    const emit = vi.fn()
+    const bus: ShellBus = { onCommand: (cb) => { handler = cb }, emit, getLatchedViewport: () => null }
+
+    await mount(<App client={fakeClient({ getCurrentResumeSecret: () => 'resume_actual' })} bus={bus} />)
+    await act(() => { handler?.('open', null) })
+
+    expect(emit).toHaveBeenCalledWith('session_persist', { resumeSecret: 'resume_actual', lastSeen: { conversationId: 'conv_test', messageId: 'm_agent_1' } })
+  })
+
+  it('W4: el rebuild tras muerte de sesión conserva el lastSeen YA conocido (no lo pierde al persistir la sesión nueva)', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const emit = vi.fn()
+    const bus: ShellBus = { onCommand: () => {}, emit, getLatchedViewport: () => null }
+    // Callback capturado dentro de una función factory (no un `let`
+    // reasignado inline) — mismo motivo que el deathClient de la describe
+    // Task W4 más abajo: sin este envoltorio, TS estrecha el tipo a `never`
+    // en el punto de uso (kill?.()).
+    function deathClient(): { client: SessionClient; kill: () => void } {
+      let cb: (() => void) | null = null
+      const client = fakeClient({ onSessionDead: (fn) => { cb = fn; return () => { cb = null } } })
+      return { client, kill: () => cb?.() }
+    }
+    const { client: oldClient, kill } = deathClient()
+    const newClient = fakeClient({ getCurrentResumeSecret: () => 'resume_tras_rebuild' })
+    const createSession = vi.fn(async () => newClient)
+
+    await mount(<App client={oldClient} bus={bus} createSession={createSession}
+      initialLastSeen={{ conversationId: 'conv_demo_01', messageId: 'msg_0004' }} />)
+
+    kill()
+
+    await vi.waitFor(() => expect(emit).toHaveBeenCalledWith('session_persist', {
+      resumeSecret: 'resume_tras_rebuild', lastSeen: { conversationId: 'conv_demo_01', messageId: 'msg_0004' },
+    }))
   })
 })
 

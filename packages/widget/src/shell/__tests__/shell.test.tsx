@@ -248,6 +248,91 @@ describe('shell', () => {
       // de un tercero co-residente en la página del anfitrión).
       expect(persistCall[1]).toBe(PARENT_ORIGIN)
     })
+
+    describe('lastSeen (watermark de no-leídos)', () => {
+      it('un init con session.lastSeen lo pasa a App como prop initialLastSeen', async () => {
+        const createClient = vi.fn(async () => fakeClient())
+        const actualApp = await vi.importActual<typeof import('../app')>('../app')
+        const appSpy = vi.spyOn(appModule, 'App').mockImplementation((...args) => actualApp.App(...args))
+        try {
+          const parentSource = makeParentSource(vi.fn())
+          startShell(window, { apiBase: 'https://api.test', createClient })
+          window.dispatchEvent(new MessageEvent('message', {
+            data: seal('init', {
+              installationId: 'inst_demo_festival_01',
+              session: { resumeSecret: 'resume_del_loader', lastSeen: { conversationId: 'conv_demo_01', messageId: 'msg_0007' } },
+            }, 'nevw_test1'),
+            origin: PARENT_ORIGIN,
+            source: parentSource,
+          }))
+          await vi.waitFor(() => expect(appSpy).toHaveBeenCalled())
+          expect(appSpy.mock.calls[0]![0]).toMatchObject({ initialLastSeen: { conversationId: 'conv_demo_01', messageId: 'msg_0007' } })
+        } finally {
+          appSpy.mockRestore()
+        }
+      })
+
+      it('el session_persist INICIAL reenvía el MISMO lastSeen que traía el init, junto al resumeSecret vigente', async () => {
+        const createClient = vi.fn(async () => fakeClient({ getCurrentResumeSecret: () => 'resume_emitido' }))
+        const parentPost = vi.fn()
+        startShell(window, { apiBase: 'https://api.test', createClient })
+        window.dispatchEvent(new MessageEvent('message', {
+          data: seal('init', {
+            installationId: 'inst_demo_festival_01',
+            session: { resumeSecret: 'resume_del_loader', lastSeen: { conversationId: 'conv_demo_01', messageId: 'msg_0007' } },
+          }, 'nevw_test1'),
+          origin: PARENT_ORIGIN,
+          source: makeParentSource(parentPost),
+        }))
+        await vi.waitFor(() => {
+          const persistCall = parentPost.mock.calls.find((c) => (c[0] as { type: string }).type === 'session_persist')
+          expect(persistCall).toBeDefined()
+        })
+        const persistCall = parentPost.mock.calls.find((c) => (c[0] as { type: string }).type === 'session_persist')!
+        expect((persistCall[0] as { payload: unknown }).payload).toEqual({
+          resumeSecret: 'resume_emitido', lastSeen: { conversationId: 'conv_demo_01', messageId: 'msg_0007' },
+        })
+      })
+
+      it('init con session.lastSeen corrupto (conversationId vacío) lo ignora — el resumeSecret viaja con normalidad, sin lastSeen', async () => {
+        const createClient = vi.fn(async () => fakeClient({ getCurrentResumeSecret: () => 'resume_emitido' }))
+        const parentPost = vi.fn()
+        startShell(window, { apiBase: 'https://api.test', createClient })
+        window.dispatchEvent(new MessageEvent('message', {
+          data: seal('init', {
+            installationId: 'inst_demo_festival_01',
+            session: { resumeSecret: 'resume_del_loader', lastSeen: { conversationId: '', messageId: 'msg_0007' } },
+          }, 'nevw_test1'),
+          origin: PARENT_ORIGIN,
+          source: makeParentSource(parentPost),
+        }))
+        await vi.waitFor(() => {
+          const persistCall = parentPost.mock.calls.find((c) => (c[0] as { type: string }).type === 'session_persist')
+          expect(persistCall).toBeDefined()
+        })
+        const persistCall = parentPost.mock.calls.find((c) => (c[0] as { type: string }).type === 'session_persist')!
+        expect((persistCall[0] as { payload: unknown }).payload).toEqual({ resumeSecret: 'resume_emitido' })
+      })
+
+      it('session:null (visitante nuevo): App recibe initialLastSeen null/ausente, sin lanzar', async () => {
+        const createClient = vi.fn(async () => fakeClient())
+        const actualApp = await vi.importActual<typeof import('../app')>('../app')
+        const appSpy = vi.spyOn(appModule, 'App').mockImplementation((...args) => actualApp.App(...args))
+        try {
+          const parentSource = makeParentSource(vi.fn())
+          startShell(window, { apiBase: 'https://api.test', createClient })
+          window.dispatchEvent(new MessageEvent('message', {
+            data: seal('init', { installationId: 'inst_demo_festival_01', session: null }, 'nevw_test1'),
+            origin: PARENT_ORIGIN,
+            source: parentSource,
+          }))
+          await vi.waitFor(() => expect(appSpy).toHaveBeenCalled())
+          expect(appSpy.mock.calls[0]![0]).toMatchObject({ initialLastSeen: null })
+        } finally {
+          appSpy.mockRestore()
+        }
+      })
+    })
   })
 
   // Task W4 — recuperación de sesión muerta a mitad de vida: el shell debe

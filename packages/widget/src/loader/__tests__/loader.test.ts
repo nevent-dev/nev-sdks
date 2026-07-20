@@ -641,5 +641,71 @@ describe('loader', () => {
       expect(() => fakeShellMessage('session_persist', { resumeSecret: 123 }, bootedInstanceId())).not.toThrow()
       expect(document.cookie).not.toContain('nevw_session_inst_demo_festival_01')
     })
+
+    describe('lastSeen (watermark de no-leídos)', () => {
+      it('session_persist con lastSeen escribe el blob COMPLETO (resumeSecret + lastSeen)', () => {
+        bootLoader(window, { shellUrl: SHELL_URL })
+        getApi()('boot', 'inst_demo_festival_01')
+        const iframe = document.querySelector('iframe')!
+        Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+        fakeShellMessage('session_persist', {
+          resumeSecret: 'resume_nuevo',
+          lastSeen: { conversationId: 'conv_demo_festival_01', messageId: 'msg_0005' },
+        }, bootedInstanceId())
+
+        getApi()('destroy')
+        bootLoader(window, { shellUrl: SHELL_URL })
+        getApi()('boot', 'inst_demo_festival_01')
+        const iframe2 = document.querySelector('iframe')!
+        const post2 = vi.fn()
+        Object.defineProperty(iframe2, 'contentWindow', { value: { postMessage: post2 } })
+        fakeShellMessage('ready', null, bootedInstanceId())
+        const [env] = post2.mock.calls[0]!
+        expect(env).toMatchObject({
+          type: 'init',
+          payload: { session: { resumeSecret: 'resume_nuevo', lastSeen: { conversationId: 'conv_demo_festival_01', messageId: 'msg_0005' } } },
+        })
+      })
+
+      it('session_persist SIN lastSeen (visitante que aún no abrió el panel) no escribe watermark — solo resumeSecret', () => {
+        bootLoader(window, { shellUrl: SHELL_URL })
+        getApi()('boot', 'inst_demo_festival_01')
+        const iframe = document.querySelector('iframe')!
+        Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+        fakeShellMessage('session_persist', { resumeSecret: 'resume_sin_watermark' }, bootedInstanceId())
+
+        getApi()('destroy')
+        bootLoader(window, { shellUrl: SHELL_URL })
+        getApi()('boot', 'inst_demo_festival_01')
+        const iframe2 = document.querySelector('iframe')!
+        const post2 = vi.fn()
+        Object.defineProperty(iframe2, 'contentWindow', { value: { postMessage: post2 } })
+        fakeShellMessage('ready', null, bootedInstanceId())
+        const [env] = post2.mock.calls[0]!
+        expect(env).toMatchObject({ type: 'init', payload: { session: { resumeSecret: 'resume_sin_watermark' } } })
+        expect((env as { payload: { session: Record<string, unknown> } }).payload.session['lastSeen']).toBeUndefined()
+      })
+
+      it('session_persist con lastSeen corrupto (conversationId vacío) descarta SOLO el watermark — el resumeSecret se guarda igual', () => {
+        bootLoader(window, { shellUrl: SHELL_URL })
+        getApi()('boot', 'inst_demo_festival_01')
+        const iframe = document.querySelector('iframe')!
+        Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+        expect(() => fakeShellMessage('session_persist', {
+          resumeSecret: 'resume_ok', lastSeen: { conversationId: '', messageId: 'msg_0003' },
+        }, bootedInstanceId())).not.toThrow()
+
+        getApi()('destroy')
+        bootLoader(window, { shellUrl: SHELL_URL })
+        getApi()('boot', 'inst_demo_festival_01')
+        const iframe2 = document.querySelector('iframe')!
+        const post2 = vi.fn()
+        Object.defineProperty(iframe2, 'contentWindow', { value: { postMessage: post2 } })
+        fakeShellMessage('ready', null, bootedInstanceId())
+        const [env] = post2.mock.calls[0]!
+        expect(env).toMatchObject({ type: 'init', payload: { session: { resumeSecret: 'resume_ok' } } })
+        expect((env as { payload: { session: Record<string, unknown> } }).payload.session['lastSeen']).toBeUndefined()
+      })
+    })
   })
 })

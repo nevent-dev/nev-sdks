@@ -11,6 +11,7 @@ import { App, type ShellBus } from './app'
 import { open as openEnvelope, seal, isCommand, LOADER_TO_SHELL } from '../protocol/envelope'
 import { createSessionClient as realCreateSessionClient } from './session'
 import { applyTheme } from '../panel/theme'
+import type { LastSeen } from '../panel/use-unread-count'
 
 interface ShellOptions {
   apiBase: string
@@ -18,6 +19,22 @@ interface ShellOptions {
 }
 
 interface ViewportPayload { kind: 'mobile' | 'desktop'; height: number }
+
+// Frontera loader→shell (postMessage, no trusted): el shell valida el
+// lastSeen del init POR SU CUENTA, igual que ya hace con resumeSecret en la
+// línea de abajo — nunca confía en que el otro lado del mensaje ya lo
+// validó. Mismas reglas que loader/session-storage.ts#parseLastSeen
+// (conversationId y messageId, ambos string no vacíos), duplicadas aquí a
+// propósito: loader/ y shell/ son capas separadas (host vs. iframe) y cada
+// una valida su propio lado del contrato, sin importar cross-package.
+function parseLastSeenPayload(raw: unknown): LastSeen | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const conversationId = (raw as Record<string, unknown>)['conversationId']
+  const messageId = (raw as Record<string, unknown>)['messageId']
+  if (typeof conversationId !== 'string' || conversationId.length === 0) return null
+  if (typeof messageId !== 'string' || messageId.length === 0) return null
+  return { conversationId, messageId }
+}
 
 export function startShell(w: Window, opts: ShellOptions): void {
   const instanceId = w.location.hash.slice(1)
@@ -50,8 +67,12 @@ export function startShell(w: Window, opts: ShellOptions): void {
       // Task W3: el loader reenvía aquí lo que tenía persistido en el
       // dominio anfitrión (ver loader/session-storage.ts) — null si es un
       // visitante nuevo o no había nada guardado.
-      const storedSession = payload?.['session'] as { resumeSecret?: unknown } | null | undefined
+      const storedSession = payload?.['session'] as { resumeSecret?: unknown; lastSeen?: unknown } | null | undefined
       const resumeSecret = typeof storedSession?.resumeSecret === 'string' ? storedSession.resumeSecret : null
+      // Watermark de no-leídos guardado en una visita anterior (ver
+      // loader/session-storage.ts) — null si es un visitante nuevo, si nunca
+      // se abrió el panel, o si el payload venía corrupto.
+      const initialLastSeen = parseLastSeenPayload(storedSession?.lastSeen)
       parent = { post: (e) => source.postMessage(e, origin), origin, source }
       // Task W4: misma fábrica para el arranque inicial y para un
       // re-bootstrap en caliente tras una muerte de sesión a mitad de vida
@@ -68,10 +89,14 @@ export function startShell(w: Window, opts: ShellOptions): void {
           // es quien puede escribirlo en el storage del anfitrión, el shell
           // (iframe) no. Task W3c: el VIGENTE (getCurrentResumeSecret()), no
           // el snapshot inmutable de getSession() — ver shell/session.ts.
-          bus.emit('session_persist', { resumeSecret: client.getCurrentResumeSecret() })
+          // Payload completo SIEMPRE (ver diseño de la task): si el init trajo
+          // un lastSeen, se re-emite igual aquí — el loader escribe el blob
+          // entero sin merge, así que omitirlo borraría el watermark que el
+          // propio init acaba de traer.
+          bus.emit('session_persist', { resumeSecret: client.getCurrentResumeSecret(), ...(initialLastSeen ? { lastSeen: initialLastSeen } : {}) })
           applyTheme(document.documentElement, client.getConfig().theme)
           const root = w.document.getElementById('root')
-          if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} createSession={buildClient} />, root)
+          if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} createSession={buildClient} initialLastSeen={initialLastSeen} />, root)
         })
         .catch((err: unknown) => {
           console.error('[nevent-widget] fallo al arrancar la sesión', err)

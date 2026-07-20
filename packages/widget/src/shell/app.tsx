@@ -4,7 +4,7 @@ import type { SessionClient } from './session'
 import type { MessageStore } from '../store/message-store'
 import { createTransport } from '../transport'
 import { useStoreState } from '../panel/use-store'
-import { useUnreadCount } from '../panel/use-unread-count'
+import { useUnreadCount, type LastSeen } from '../panel/use-unread-count'
 import { Panel } from '../panel/Panel'
 import { Launcher } from '../panel/Launcher'
 
@@ -44,12 +44,22 @@ export interface AppProps {
   // exactamente como antes de esta task — una sesión muerta simplemente deja
   // de reintentar (events-channel.ts) sin ningún intento de recuperación.
   createSession?: (resumeSecret: string | null) => Promise<SessionClient>
+  // Watermark de no-leídos persistido en el dominio anfitrión (ver
+  // loader/session-storage.ts) — lo trae el `init` recibido por
+  // shell/main.tsx cuando había uno guardado de una visita anterior. null/
+  // ausente: visitante nuevo, o nunca se llegó a abrir el panel.
+  initialLastSeen?: LastSeen | null
 }
 
-export function App({ client: initialClient, bus, resumedSession = false, createSession }: AppProps) {
+export function App({ client: initialClient, bus, resumedSession = false, createSession, initialLastSeen = null }: AppProps) {
   const [client, setClient] = useState(initialClient)
   const config: WidgetConfig = client.getConfig()
   const [isOpen, setOpen] = useState(false)
+  // Último watermark conocido (el del init, o uno más nuevo emitido por
+  // useUnreadCount al abrir el panel) — el rebuild W4 lo reutiliza para que
+  // persistir la sesión nueva NUNCA borre un watermark ya guardado (el shell
+  // manda SIEMPRE el payload completo, ver diseño de la task).
+  const lastPersistedLastSeenRef = useRef<LastSeen | null>(initialLastSeen)
   // Inicializador perezoso: se ejecuta UNA vez, síncronamente, en el primer
   // render — nunca un valor inventado si el loader ya reportó el viewport
   // real mientras createClient() seguía pendiente (Critical, ronda 3).
@@ -66,7 +76,14 @@ export function App({ client: initialClient, bus, resumedSession = false, create
     return t
   }, [client])
   const storeState = useStoreState(transport.store)
-  const unread = useUnreadCount(storeState, isOpen)
+  // handleLastSeen cierra sobre `client` (estado, puede swapear tras un
+  // rebuild W4) — se redefine en CADA render, así que siempre persiste con
+  // el resumeSecret VIGENTE del cliente actual, nunca uno stale.
+  const handleLastSeen = (lastSeen: LastSeen): void => {
+    lastPersistedLastSeenRef.current = lastSeen
+    bus.emit('session_persist', { resumeSecret: client.getCurrentResumeSecret(), lastSeen })
+  }
+  const unread = useUnreadCount(storeState, isOpen, { initialLastSeen, onLastSeen: handleLastSeen })
   // Task W4: guards del re-bootstrap automático — refs (no state) porque no
   // deben disparar re-render por sí mismos, solo condicionar el siguiente
   // handleSessionDead().
@@ -141,7 +158,11 @@ export function App({ client: initialClient, bus, resumedSession = false, create
           // Task W3c: el resumeSecret VIGENTE, nunca el snapshot inmutable de
           // getSession() — ver comentario de SessionClient#getCurrentResumeSecret.
           const newClient = await createSession(client.getCurrentResumeSecret())
-          bus.emit('session_persist', { resumeSecret: newClient.getCurrentResumeSecret() })
+          // Payload completo SIEMPRE (ver handleLastSeen arriba): el loader
+          // escribe el blob entero sin merge, así que omitir lastSeen aquí
+          // borraría un watermark ya persistido de antes del rebuild.
+          const lastSeen = lastPersistedLastSeenRef.current
+          bus.emit('session_persist', { resumeSecret: newClient.getCurrentResumeSecret(), ...(lastSeen ? { lastSeen } : {}) })
           // Task W4 gaps 3: resume genuino (misma conversación) → seamless,
           // el store sigue tal cual. Sesión fresca (conversación distinta o
           // inexistente) → olvida lo que sabía de la anterior; la tarjeta
