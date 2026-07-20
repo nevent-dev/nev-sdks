@@ -21,35 +21,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: 'https://registry.npmjs.org/'
-
-      - name: Get npm cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: |
-          npm ci --no-audit --no-fund
-          npm ls --depth=0 || true
+        run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: npm run build
+        run: pnpm run build
+
+      - name: Build widget
+        run: pnpm --filter @nevent/widget build
 
       - name: Generate SRI hashes
-        run: npm run sri
+        run: pnpm run sri
+
+      # El shell fija el origen de la API en dos sitios (meta nevw-api y CSP
+      # connect-src); el build emite los defaults de producción, así que el
+      # artefacto de dev se parchea aquí. La parametrización en build-time es
+      # parte del Plan 4 (versionado CDN + SRI del widget).
+      - name: Point widget shell at dev API
+        run: |
+          sed -i 's|https://api.nevent.es|https://api.dev.nevent.es|g' packages/widget/dist/shell.html
+          grep -c "api.dev.nevent.es" packages/widget/dist/shell.html
 
       - name: Extract versions
         id: version
@@ -97,13 +99,27 @@ jobs:
             --delete \
             --cache-control "public, max-age=300"
 
+      # ── Widget (chat embebible) ──────────────────────────────────────────────
+      # El snippet que emite nev-api (widget.embed.cdn-base-url) carga
+      # {cdn}/widget/v1/loader.js, y el loader resuelve ./shell.html relativo a
+      # su propio src — subir dist/ entero a widget/v1/ reproduce ese layout.
+      # Ruta mutable en dev → cache corta, sin alias latest.
+
+      - name: Upload widget to S3 (widget/v1)
+        run: |
+          aws s3 sync packages/widget/dist/ \
+            s3://dev-nevent-sdks/widget/v1/ \
+            --region eu-west-1 \
+            --delete \
+            --cache-control "public, max-age=300"
+
       # ── CloudFront Invalidation ──────────────────────────────────────────────
 
       - name: Invalidate CloudFront cache
         run: |
           aws cloudfront create-invalidation \
             --distribution-id ${{ secrets.CLOUDFRONT_DEV_DISTRIBUTION_ID }} \
-            --paths "/subs/latest/*" "/chatbot/latest/*"
+            --paths "/subs/latest/*" "/chatbot/latest/*" "/widget/v1/*"
 
       - name: Deployment summary
         run: |
@@ -115,42 +131,21 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### @nevent/subscriptions v${{ steps.version.outputs.subs_version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Versioned (immutable):**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://dev.neventapps.com/subs/v${{ steps.version.outputs.subs_version }}/nevent-subscriptions.umd.cjs" >> $GITHUB_STEP_SUMMARY
-          echo "https://dev.neventapps.com/subs/v${{ steps.version.outputs.subs_version }}/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Latest (updates automatically):**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://dev.neventapps.com/subs/latest/nevent-subscriptions.umd.cjs" >> $GITHUB_STEP_SUMMARY
           echo "https://dev.neventapps.com/subs/latest/nevent-subscriptions.js" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
           echo "### @nevent/chatbot v${{ steps.version.outputs.chatbot_version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Versioned (immutable):**" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://dev.neventapps.com/chatbot/v${{ steps.version.outputs.chatbot_version }}/nevent-chatbot.umd.cjs" >> $GITHUB_STEP_SUMMARY
-          echo "https://dev.neventapps.com/chatbot/v${{ steps.version.outputs.chatbot_version }}/nevent-chatbot.js" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Latest (updates automatically):**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
-          echo "https://dev.neventapps.com/chatbot/latest/nevent-chatbot.umd.cjs" >> $GITHUB_STEP_SUMMARY
           echo "https://dev.neventapps.com/chatbot/latest/nevent-chatbot.js" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Integration Example:**" >> $GITHUB_STEP_SUMMARY
-          echo "\`\`\`html" >> $GITHUB_STEP_SUMMARY
-          echo "<script src=\"https://dev.neventapps.com/chatbot/latest/nevent-chatbot.umd.cjs\"></script>" >> $GITHUB_STEP_SUMMARY
-          echo "<script>" >> $GITHUB_STEP_SUMMARY
-          echo "  const chatbot = new NeventChatbot.ChatbotWidget({" >> $GITHUB_STEP_SUMMARY
-          echo "    chatbotId: 'your-chatbot-id'," >> $GITHUB_STEP_SUMMARY
-          echo "    tenantId: 'your-tenant-id'" >> $GITHUB_STEP_SUMMARY
-          echo "  });" >> $GITHUB_STEP_SUMMARY
-          echo "  chatbot.init();" >> $GITHUB_STEP_SUMMARY
-          echo "</script>" >> $GITHUB_STEP_SUMMARY
+          echo "### @nevent/widget (chat embebible)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "https://dev.neventapps.com/widget/v1/loader.js" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "El snippet completo lo genera el admin en Chatbot → Canal web" >> $GITHUB_STEP_SUMMARY
+          echo "(POST /admin/widget/installations/{id}/embed-code)." >> $GITHUB_STEP_SUMMARY
