@@ -140,6 +140,84 @@ describe('loader', () => {
     expect(() => fakeShellMessage('opened', null, bootedInstanceId())).not.toThrow()
   })
 
+  it("'off' quita un listener ya registrado — un evento posterior YA NO lo invoca (guarda contra fuga de listener)", () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    getApi()('boot', 'inst_demo_festival_01')
+    const iframe = document.querySelector('iframe')!
+    Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+    const cb = vi.fn()
+    getApi()('on', 'opened', cb)
+    getApi()('off', 'opened', cb)
+    fakeShellMessage('opened', null, bootedInstanceId())
+    expect(cb).not.toHaveBeenCalled()
+  })
+
+  it("'off' no afecta a OTRO callback registrado en el mismo evento — solo se quita el suyo", () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    getApi()('boot', 'inst_demo_festival_01')
+    const iframe = document.querySelector('iframe')!
+    Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+    const cbA = vi.fn()
+    const cbB = vi.fn()
+    getApi()('on', 'opened', cbA)
+    getApi()('on', 'opened', cbB)
+    getApi()('off', 'opened', cbA)
+    fakeShellMessage('opened', null, bootedInstanceId())
+    expect(cbA).not.toHaveBeenCalled()
+    expect(cbB).toHaveBeenCalledTimes(1)
+  })
+
+  it("'off' de un callback nunca registrado (o antes de boot()) no lanza — no-op seguro", () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    expect(() => getApi()('off', 'opened', vi.fn())).not.toThrow() // sin instance (antes de boot)
+    getApi()('boot', 'inst_demo_festival_01')
+    expect(() => getApi()('off', 'opened', vi.fn())).not.toThrow() // callback nunca registrado
+  })
+
+  it("'update' reenvía args[0] al shell vía sendToShell('update', ...)", () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    getApi()('boot', 'inst_demo_festival_01')
+    const iframe = document.querySelector('iframe')!
+    const post = vi.fn()
+    Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: post } })
+    getApi()('update', { theme: { primaryColor: '#112233' } })
+    expect(post).toHaveBeenCalledTimes(1)
+    const [env, target] = post.mock.calls[0]!
+    expect(target).toBe(SHELL_ORIGIN)
+    expect(env).toMatchObject({ ns: 'nevw', type: 'update', payload: { theme: { primaryColor: '#112233' } } })
+  })
+
+  it("'update' sin payload reenvía null (args[0] ?? null), no undefined", () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    getApi()('boot', 'inst_demo_festival_01')
+    const iframe = document.querySelector('iframe')!
+    const post = vi.fn()
+    Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: post } })
+    getApi()('update')
+    expect(post).toHaveBeenCalledTimes(1)
+    const [env] = post.mock.calls[0]!
+    expect(env).toMatchObject({ type: 'update', payload: null })
+  })
+
+  it("'consent' reenvía al shell con payload null — igual que open/close/toggle", () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    getApi()('boot', 'inst_demo_festival_01')
+    const iframe = document.querySelector('iframe')!
+    const post = vi.fn()
+    Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: post } })
+    getApi()('consent')
+    expect(post).toHaveBeenCalledTimes(1)
+    const [env, target] = post.mock.calls[0]!
+    expect(target).toBe(SHELL_ORIGIN)
+    expect(env).toMatchObject({ ns: 'nevw', type: 'consent', payload: null })
+  })
+
+  it("'update'/'consent' antes de boot() no lanzan — sin instance, sendToShell es un no-op silencioso", () => {
+    bootLoader(window, { shellUrl: SHELL_URL })
+    expect(() => getApi()('update', { foo: 1 })).not.toThrow()
+    expect(() => getApi()('consent')).not.toThrow()
+  })
+
   it('boot: arranca en modo launcher, anclado a la derecha, con el tamaño INICIAL por defecto del launcher (antes de cualquier medición real)', () => {
     bootLoader(window, { shellUrl: SHELL_URL })
     getApi()('boot', 'inst_demo_festival_01')

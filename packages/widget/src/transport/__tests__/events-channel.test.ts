@@ -459,3 +459,58 @@ describe('events channel — muerte de sesión (Task W4)', () => {
     expect(unsubscribe).toHaveBeenCalledTimes(1)
   })
 })
+
+// armWatchdog's `disarmed` flag (events-channel.ts, source comment right
+// above armWatchdog): cancellation is enforced via the LOCAL `disarmed` flag,
+// not solely via scheduler.clearTimeout() — because a Scheduler is free to
+// hand back a clearTimeout() that doesn't actually prevent the timer callback
+// from firing later. This block constructs exactly that broken Scheduler (a
+// REAL setTimeout so the callback genuinely fires later, paired with a
+// no-op clearTimeout so cancelling it never truly happens) and proves the
+// `disarmed` guard — not the scheduler — is what stops a stale watchdog from
+// aborting a connect() that already made progress.
+describe("events channel — armWatchdog's disarmed flag guards a broken Scheduler.clearTimeout()", () => {
+  // Real timers (not the `immediate()` 0ms helper used elsewhere in this
+  // file): the watchdog must be proven to survive actually waiting past
+  // connectWatchdogMs, not just past a same-tick 0ms timer.
+  const brokenClearTimeout = (): Scheduler => ({
+    setTimeout: (fn, ms) => setTimeout(fn, ms) as unknown as number,
+    clearTimeout: () => {}, // never actually cancels the underlying real timer
+  })
+
+  it('a connect() that already progressed (first frame received) survives past connectWatchdogMs even though clearTimeout() never truly cancels the timer', async () => {
+    const store = createMessageStore(() => '2026-07-17T15:00:00Z')
+    let eventsCalls = 0
+    const authorizedFetch = vi.fn(async (path: string) => {
+      if (path.includes('/messages') && path.includes('limit')) return jsonRes(EMPTY)
+      if (path.includes('/events?')) {
+        eventsCalls += 1
+        // Emits one frame then stays open (sseOpen never closes the stream) —
+        // a healthy long-lived connection parked awaiting the NEXT event,
+        // exactly the state disarmWatchdog() is meant to protect.
+        return sseOpen([ev(2, 'm2', 'progreso-antes-del-watchdog')])
+      }
+      return jsonRes({})
+    })
+    const ch = createEventsChannel({
+      client: { authorizedFetch }, store, scheduler: brokenClearTimeout(), backoff: fastBackoff(),
+      reconnectDelayMs: 1, connectWatchdogMs: 40,
+    })
+    ch.open()
+
+    await vi.waitFor(() => expect(store.getState().messages.some((m) => m.id === 'm2')).toBe(true))
+    expect(store.getState().connection).toBe('live')
+    expect(eventsCalls).toBe(1)
+
+    // Let the real (never-truly-cancelled) watchdog timer's callback actually
+    // fire. If `disarmed` did NOT guard it, attemptAc.abort() would run here:
+    // the parked stream read resolves as a clean close, runChannel treats it
+    // as such and reconciles/reconnects — a SECOND /events attempt — even
+    // though nothing is actually wrong with this connection.
+    await new Promise((r) => setTimeout(r, 120))
+
+    expect(eventsCalls).toBe(1) // no spurious reconnect triggered by the stale watchdog callback
+    expect(store.getState().connection).toBe('live')
+    ch.close()
+  })
+})

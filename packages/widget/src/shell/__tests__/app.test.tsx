@@ -378,3 +378,69 @@ describe('App — Task W4: recuperación de sesión muerta a mitad de vida', () 
     expect(calls[1]!.store.getState().newConversationNotice).toBe(false)
   })
 })
+
+// TOP-15 #1 (auditoría de cobertura 2026-07): 'update' y 'consent' SÍ llegan
+// hasta App vía bus.onCommand — loader/index.ts#drainQueue los reenvía al
+// shell tal cual open/close/toggle (sendToShell('update', args[0] ?? null) /
+// sendToShell('consent', null)), y son parte del allowlist público
+// LOADER_TO_SHELL (protocol/envelope.ts) alcanzable desde
+// NeventWidget('update', opts) / NeventWidget('consent') en la página
+// anfitriona. Pero el switch de bus.onCommand de más arriba solo reconoce
+// 'open'/'close'/'toggle'/'viewport' — ningún branch coincide con 'update' ni
+// 'consent', así que caen al no-op implícito del `else if` en cascada. Este
+// bloque fija ese CONTRATO ACTUAL de forma explícita (nunca antes probado):
+// ninguno de los dos comandos muta open/viewport/canal, y ninguno rompe el
+// procesamiento de comandos posteriores. El comportamiento REAL (aplicar un
+// theme update en caliente, registrar consentimiento) es trabajo pendiente —
+// ver Plan 4 — y NO se ha inventado aquí ningún comportamiento nuevo.
+describe("App — bus.onCommand: 'update'/'consent' (comandos públicos del host, sin handler — no-op silencioso, Plan 4 pendiente)", () => {
+  it("'update' no abre/cierra el panel, no toca el viewport y no dispara el canal — no-op explícito", async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport, openChannel, closeChannel } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus, fire } = fakeBus()
+    const root = await mount(<App client={fakeClient()} bus={bus} />)
+    openChannel.mockClear()
+    closeChannel.mockClear()
+
+    await fire('update', { theme: { primaryColor: '#ff0000' } })
+
+    const el = root.querySelector('[data-part="root"]')
+    expect(el?.getAttribute('data-mode')).toBe('launcher') // isOpen sigue false, sin cambios
+    expect(el?.getAttribute('data-viewport')).toBe('desktop') // viewport intacto
+    expect(openChannel).not.toHaveBeenCalled()
+    expect(closeChannel).not.toHaveBeenCalled()
+  })
+
+  it("'consent' no abre/cierra el panel, no toca el viewport y no dispara el canal — no-op explícito", async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport, openChannel, closeChannel } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus, fire } = fakeBus()
+    const root = await mount(<App client={fakeClient()} bus={bus} />)
+    openChannel.mockClear()
+    closeChannel.mockClear()
+
+    await fire('consent', null)
+
+    const el = root.querySelector('[data-part="root"]')
+    expect(el?.getAttribute('data-mode')).toBe('launcher')
+    expect(el?.getAttribute('data-viewport')).toBe('desktop')
+    expect(openChannel).not.toHaveBeenCalled()
+    expect(closeChannel).not.toHaveBeenCalled()
+  })
+
+  it("'update'/'consent' no dejan al comando en un estado raro: un 'open' recibido justo después sigue abriendo el panel con normalidad", async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus, fire } = fakeBus()
+    const root = await mount(<App client={fakeClient()} bus={bus} />)
+
+    await fire('update', { foo: 1 })
+    await fire('consent')
+    await fire('open')
+
+    expect(root.querySelector('[data-part="root"]')?.getAttribute('data-mode')).toBe('panel')
+  })
+})
