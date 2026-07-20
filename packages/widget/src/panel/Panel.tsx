@@ -38,6 +38,7 @@ export function Panel({ config, transport, onMinimize, onClose, onResize, viewpo
     conversationState: state.conversationState,
     connection: state.connection,
     agentName: state.agentName,
+    agentAvatarUrl: state.agentAvatarUrl,
     assistantName,
     isStreaming,
   })
@@ -75,6 +76,7 @@ export function Panel({ config, transport, onMinimize, onClose, onResize, viewpo
         config={config}
         messages={state.messages}
         agentName={state.agentName}
+        agentAvatarUrl={state.agentAvatarUrl}
         onRetry={(clientId) => transport.retry(clientId)}
         onQuickReply={(text) => transport.send(text)}
         trailing={trailing}

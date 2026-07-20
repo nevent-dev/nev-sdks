@@ -1,9 +1,10 @@
 import type { StoredMessage } from '../store/message-store'
-import { AgentInitialsAvatar, BotIcon } from './icons'
+import { AgentAvatar, BotIcon } from './icons'
 
 export interface MessageBubbleProps {
   message: StoredMessage
   agentName: string | null
+  agentAvatarUrl: string | null
   onRetry: (clientId: string) => void
   compact: boolean
 }
@@ -14,7 +15,7 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function MessageBubble({ message, agentName, onRetry, compact }: MessageBubbleProps) {
+export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, compact }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const isAgent = message.role === 'agent'
   // Fix W5b: per-message authorName (snapshot-only, backend W5a) wins over
@@ -24,12 +25,22 @@ export function MessageBubble({ message, agentName, onRetry, compact }: MessageB
   // AgentInitialsAvatar renders as a neutral '?' glyph. An agent-role message
   // NEVER falls back to BotIcon, whatever the identity resolution yields.
   const agentAvatarName = message.authorName ?? agentName ?? undefined
+  // Foto del agente: el contrato NO trae un authorAvatarUrl por mensaje (solo
+  // authorName, backend W5a) — la única foto disponible es la del agente
+  // ACTUAL de la conversación. Se pinta cuando el mensaje es atribuible a él:
+  // sin autor histórico propio (mensaje vivo) O con un authorName que
+  // coincide con el agente actual (mensaje rehidratado por snapshot tras una
+  // recarga — sin esta rama, un F5 degradaría todas sus burbujas a iniciales
+  // mientras la cabecera sí muestra la foto). Un authorName DISTINTO jamás
+  // hereda la foto del actual: sería fabricar identidad de otro agente.
+  const bubbleAvatarUrl =
+    message.authorName === null || message.authorName === agentName ? agentAvatarUrl : null
 
   return (
     <div class={`m${isUser ? ' user' : ''}${compact ? ' compact' : ''}`}>
       {!isUser && (
         <div class={`b-avatar${compact ? ' ghost' : ''}`}>
-          {isAgent ? <AgentInitialsAvatar name={agentAvatarName} /> : <BotIcon />}
+          {isAgent ? <AgentAvatar name={agentAvatarName} avatarUrl={bubbleAvatarUrl} /> : <BotIcon />}
         </div>
       )}
       <div>

@@ -92,8 +92,12 @@ export interface MessagesSnapshot {
   // humano asignado a la conversación ahora mismo — la snapshot nunca
   // reproduce el evento durable agent.joined, así que esto es la ÚNICA
   // fuente de identidad de agente tras un rebuild desde snapshot (reconnect
-  // / reload). Sin avatarUrl: el bloque del backend solo lleva `name`.
-  agent?: { name: string }
+  // / reload). avatarUrl se añade EN PARALELO por el backend (foto real del
+  // agente, misma CDN propia que agent.joined) — el wire puede omitirlo
+  // (backend aún no desplegado con el campo) o mandarlo `null` (agente sin
+  // foto configurada); nunca se confía en el shape tal cual llega de red,
+  // normalizado en la frontera en store/message-store.ts.
+  agent?: { name: string; avatarUrl?: string | null }
 }
 
 // GET /widget/v1/events/poll?after={cursor} — ALL durables after the cursor.

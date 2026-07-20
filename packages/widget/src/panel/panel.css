@@ -51,14 +51,21 @@ button, input, textarea, select { font-family: inherit; }
 .avatar svg { width: 19px; height: 19px; }
 .avatar .dot-live { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--live); border: 2px solid var(--surface); }
 
-/* Avatar de iniciales (spec §8: sin imágenes de terceros en v1). Fondo
-   --brand-a SÓLIDO, nunca --brand-grad (Important, ronda 3): esto pinta
-   TEXTO real (la inicial del agente) — el modelo de contraste de theme.ts
-   (Task 2) solo garantiza 4.5:1 real contra el color sólido, no contra el
-   degradado. .avatar (arriba) sí puede quedarse en --brand-grad porque ahí
-   dentro solo hay un icono SVG decorativo (BotIcon) cuando no hay iniciales
-   — WCAG 2.2 SC 1.4.11 le exige ≥3:1, no 4.5:1. */
+/* Avatar de iniciales (fallback: sin avatarUrl, o la foto real falló al
+   cargar — ver AgentAvatar en icons.tsx). Fondo --brand-a SÓLIDO, nunca
+   --brand-grad (Important, ronda 3): esto pinta TEXTO real (la inicial del
+   agente) — el modelo de contraste de theme.ts (Task 2) solo garantiza
+   4.5:1 real contra el color sólido, no contra el degradado. .avatar
+   (arriba) sí puede quedarse en --brand-grad porque ahí dentro solo hay un
+   icono SVG decorativo (BotIcon) cuando no hay iniciales — WCAG 2.2 SC
+   1.4.11 le exige ≥3:1, no 4.5:1. */
 .initials-avatar { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; font: 600 14px var(--font-display); color: var(--brand-ink); background: var(--brand-a); }
+
+/* Foto real del agente (nuestra CDN, ver AgentAvatar en icons.tsx): mismo
+   hueco circular que .initials-avatar, con object-fit para no deformar
+   fotos que no sean cuadradas. display:block quita el hueco de línea base
+   que un <img> inline deja bajo sí mismo. */
+.agent-avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 
 .head .id { flex: 1; min-width: 0; }
 .head .name { font: 600 14.5px/1.2 var(--font-display); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -164,6 +171,10 @@ button, input, textarea, select { font-family: inherit; }
 .sysline::before, .sysline::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .sysline .who { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
 .sysline .who .initials-avatar { width: 22px; height: 22px; font-size: 10px; }
+/* AgentAvatar aquí no vive dentro de un .avatar/.b-avatar que le dé tamaño
+   (a diferencia de la cabecera y las burbujas) — mismo hueco 22px que su
+   fallback de iniciales, arriba. */
+.sysline .who .agent-avatar-img { width: 22px; height: 22px; }
 .sysline .who b { color: var(--ink); font-weight: 600; }
 .syscard { align-self: center; text-align: center; max-width: 270px; border-radius: 14px; padding: 14px 18px; margin: 10px auto; }
 .syscard.waiting { background: var(--wait-soft); }

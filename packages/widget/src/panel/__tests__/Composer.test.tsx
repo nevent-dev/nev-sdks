@@ -4,7 +4,7 @@ import { computeViewState } from '../view-state'
 import { mount, cleanupMounted } from './test-utils'
 
 const idleViewState = computeViewState({
-  conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null,
+  conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
   assistantName: 'Asistente de DEMO FEST', isStreaming: false,
 })
 
@@ -52,7 +52,7 @@ describe('Composer', () => {
 
   it('composerDisabled (offline): textarea y botón enviar quedan disabled', async () => {
     const offlineViewState = computeViewState({
-      conversationState: 'BOT_ACTIVE', connection: 'offline', agentName: null,
+      conversationState: 'BOT_ACTIVE', connection: 'offline', agentName: null, agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false,
     })
     const { root, textarea } = await mountComposer({ viewState: offlineViewState, onSend: vi.fn(), onStop: vi.fn() })
@@ -62,7 +62,7 @@ describe('Composer', () => {
 
   it('el botón detener solo aparece cuando showStopButton es true, y llama a onStop', async () => {
     const streamingViewState = computeViewState({
-      conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null,
+      conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: true,
     })
     const onStop = vi.fn()

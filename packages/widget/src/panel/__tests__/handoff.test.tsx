@@ -14,13 +14,21 @@ describe('WaitingCard', () => {
 })
 
 describe('AgentJoinedSysline', () => {
-  it('usa el avatar de iniciales, nunca <img> (spec §8)', async () => {
-    const root = await mount(<AgentJoinedSysline agentName="Laura" />)
+  it('sin agentAvatarUrl: usa el avatar de iniciales, sin <img>', async () => {
+    const root = await mount(<AgentJoinedSysline agentName="Laura" agentAvatarUrl={null} />)
     expect(root.querySelector('img')).toBeNull()
     expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
   })
+  // Foto del agente: coherencia con Header/MessageBubble aunque este
+  // componente no esté montado hoy en el panel integrado (ver Panel.tsx).
+  it('con agentAvatarUrl: pinta la foto real del agente', async () => {
+    const root = await mount(<AgentJoinedSysline agentName="Laura" agentAvatarUrl="https://res.nevent.es/agents/laura.jpg" />)
+    const img = root.querySelector('img.agent-avatar-img')
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/agents/laura.jpg')
+    expect(root.querySelector('.initials-avatar')).toBeNull()
+  })
   it('el texto incluye el nombre del agente', async () => {
-    const root = await mount(<AgentJoinedSysline agentName="Laura" />)
+    const root = await mount(<AgentJoinedSysline agentName="Laura" agentAvatarUrl={null} />)
     expect(root.textContent).toContain('Laura')
     expect(root.textContent).toContain('se ha unido')
   })

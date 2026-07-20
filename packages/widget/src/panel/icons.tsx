@@ -1,3 +1,5 @@
+import { useEffect, useState } from 'preact/hooks'
+
 // Icono de "spark" del bot, reutilizado por Header, Launcher y MessageBubble.
 export function BotIcon() {
   return (
@@ -7,13 +9,31 @@ export function BotIcon() {
   )
 }
 
-// Avatar de iniciales generado localmente — spec §8: v1 no renderiza ninguna
-// imagen de avatar de terceros sin proxy propio. Sustituye por completo a
-// cualquier <img src={agentAvatarUrl}> del mock/rev.1 (Critical #4 de la
-// revisión). `agentAvatarUrl` se sigue recibiendo y guardando en el store
-// (Plan 2) para cuando exista un proxy propio, pero ningún componente de
-// este plan lo pinta como <img>.
+// Avatar de iniciales generado localmente. Spec §8 original: v1 no renderiza
+// NINGUNA imagen de avatar de terceros sin proxy propio (Critical #4 de la
+// revisión) — esa restricción sigue vigente para orígenes ajenos, pero se
+// LEVANTA para nuestra propia CDN (ver AgentAvatar más abajo). Este
+// componente queda como fallback: sin avatarUrl, o cuando la foto falla al
+// cargar.
 export function AgentInitialsAvatar({ name }: { name: string | undefined }) {
   const initial = (name ?? '').trim().charAt(0).toUpperCase() || '?'
   return <span class="initials-avatar" aria-hidden="true">{initial}</span>
+}
+
+// Foto real del agente — igual que el resto del sector (Chatwoot/Intercom/
+// Zendesk). Se pinta como <img> porque ahora vive en NUESTRA CDN
+// (res.nevent.es / res.dev.nevent.es, ver allowlist en la CSP de
+// shell.html), no en un origen de terceros sin proxy: la restricción de
+// spec §8 era sobre imágenes AJENAS, no sobre imágenes en general.
+// `referrerpolicy="no-referrer"` evita filtrar la URL de la conversación al
+// origen de la imagen (aunque hoy sea propio, es higiene por defecto).
+// `alt=""` porque es decorativa: el nombre real ya lo anuncia el texto que
+// siempre la acompaña (cabecera, burbuja, sysline).
+export function AgentAvatar({ name, avatarUrl }: { name: string | undefined; avatarUrl: string | null | undefined }) {
+  const [failed, setFailed] = useState(false)
+  // Un avatarUrl nuevo (reasignación a otro agente) debe tener su propia
+  // oportunidad de cargar — el fallo de la URL ANTERIOR no debe arrastrarse.
+  useEffect(() => { setFailed(false) }, [avatarUrl])
+  if (!avatarUrl || failed) return <AgentInitialsAvatar name={name} />
+  return <img class="agent-avatar-img" src={avatarUrl} referrerpolicy="no-referrer" alt="" onError={() => setFailed(true)} />
 }

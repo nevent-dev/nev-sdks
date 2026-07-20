@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks'
-import { AgentInitialsAvatar } from './icons'
+import { AgentAvatar } from './icons'
 
 // Sin props: ni cifra de ETA (gap #2) ni nombre de tenant (gap #1) — el
 // contrato actual no trae ninguno de los dos y nunca se fabrican.
@@ -14,13 +14,14 @@ export function WaitingCard() {
 
 export interface AgentJoinedSyslineProps {
   agentName: string
+  agentAvatarUrl: string | null
 }
 
-export function AgentJoinedSysline({ agentName }: AgentJoinedSyslineProps) {
+export function AgentJoinedSysline({ agentName, agentAvatarUrl }: AgentJoinedSyslineProps) {
   return (
     <div class="sysline">
       <span class="who">
-        <AgentInitialsAvatar name={agentName} />
+        <AgentAvatar name={agentName} avatarUrl={agentAvatarUrl} />
         <span><b>{agentName}</b> se ha unido</span>
       </span>
     </div>

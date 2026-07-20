@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { computeViewState, type ViewStateInput } from '../view-state'
 
 const base: ViewStateInput = {
-  conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null,
+  conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
   assistantName: 'Asistente de DEMO FEST', isStreaming: false,
 }
 
@@ -54,6 +54,24 @@ describe('computeViewState — conversationPhase es SIEMPRE la fase dictada por 
     const v = computeViewState({ ...base, conversationState: 'AGENT_ACTIVE', agentName: null })
     expect(v.headerName).toBe('El equipo')
     expect(v.showAgentAvatar).toBe(false)
+  })
+
+  // Foto del agente: headerAvatarUrl sigue la MISMA condición que showAgentAvatar
+  // (fase agent + agentName conocido) — nunca se filtra fuera de esa fase, aunque
+  // el store todavía conserve un agentAvatarUrl residual de una fase anterior.
+  it('agent: AGENT_ACTIVE + agentName + agentAvatarUrl → headerAvatarUrl expone la URL', () => {
+    const v = computeViewState({ ...base, conversationState: 'AGENT_ACTIVE', agentName: 'Laura', agentAvatarUrl: 'https://res.nevent.es/agents/laura.jpg' })
+    expect(v.headerAvatarUrl).toBe('https://res.nevent.es/agents/laura.jpg')
+  })
+
+  it('agent: AGENT_ACTIVE + agentName sin agentAvatarUrl (agente sin foto) → headerAvatarUrl null', () => {
+    const v = computeViewState({ ...base, conversationState: 'AGENT_ACTIVE', agentName: 'Laura', agentAvatarUrl: null })
+    expect(v.headerAvatarUrl).toBeNull()
+  })
+
+  it('fuera de fase agent, headerAvatarUrl es null aunque el store conserve un agentAvatarUrl residual', () => {
+    const v = computeViewState({ ...base, conversationState: 'RESOLVED', agentName: 'Laura', agentAvatarUrl: 'https://res.nevent.es/agents/laura.jpg' })
+    expect(v.headerAvatarUrl).toBeNull()
   })
 
   it('CRÍTICO — AGENT_ACTIVE + reconnecting: la fase SIGUE siendo agent (cabecera/avatar no desaparecen), solo se superpone el banner', () => {

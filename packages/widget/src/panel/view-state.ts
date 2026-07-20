@@ -9,6 +9,7 @@ export interface ViewStateInput {
   conversationState: ConversationState | null
   connection: ConnectionStatus
   agentName: string | null
+  agentAvatarUrl: string | null
   assistantName: string
   isStreaming: boolean
 }
@@ -26,10 +27,11 @@ export interface PanelViewState {
   showStopButton: boolean
   connectionBanner: ConnectionBanner
   showAgentAvatar: boolean
+  headerAvatarUrl: string | null
 }
 
 export function computeViewState(input: ViewStateInput): PanelViewState {
-  const { conversationState, connection, agentName, assistantName, isStreaming } = input
+  const { conversationState, connection, agentName, agentAvatarUrl, assistantName, isStreaming } = input
 
   // 1) Fase — dictada EXCLUSIVAMENTE por el servidor (spec §5). Nunca se
   // recalcula ni se oculta por conexión o streaming (Critical #1).
@@ -39,6 +41,13 @@ export function computeViewState(input: ViewStateInput): PanelViewState {
     conversationState === 'RESOLVED' ? 'resolved' : 'idle'
 
   const hasAgent = conversationPhase === 'agent' && agentName !== null
+
+  // Foto del agente: SOLO se expone dentro de la fase agent con identidad
+  // conocida — la misma condición que showAgentAvatar (más abajo). Evita que
+  // un agentAvatarUrl residual del store (p.ej. tras resolver, si el
+  // watermark aún no lo limpió) se filtre a una cabecera que ya no debería
+  // mostrar avatar de agente.
+  const headerAvatarUrl = hasAgent ? agentAvatarUrl : null
 
   // 2) Nombre/avatar de cabecera — reflejan la fase, NUNCA la conexión.
   // Copia neutral "El equipo" para waiting/resolved/agent-sin-nombre-aún
@@ -92,5 +101,6 @@ export function computeViewState(input: ViewStateInput): PanelViewState {
     showStopButton: isStreaming,
     connectionBanner: connection === 'offline' ? 'offline' : (connection === 'reconnecting' || connection === 'polling') ? 'reconnect' : null,
     showAgentAvatar: hasAgent,
+    headerAvatarUrl,
   }
 }

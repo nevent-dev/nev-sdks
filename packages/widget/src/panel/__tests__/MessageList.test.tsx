@@ -34,7 +34,7 @@ afterEach(async () => {
 describe('MessageList', () => {
   it('showWelcome:true y sin mensajes: muestra Welcome, no el divisor "Hoy"', async () => {
     const root = await mount(
-      <MessageList config={fixtureConfig()} messages={[]} agentName={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={true} />,
+      <MessageList config={fixtureConfig()} messages={[]} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={true} />,
     )
     expect(root.querySelector('.welcome')).not.toBeNull()
     expect(root.querySelector('.day')).toBeNull()
@@ -42,7 +42,7 @@ describe('MessageList', () => {
 
   it('Important #9 — showWelcome:false aunque no haya mensajes (p.ej. fase waiting recién escalada sin historial visible): NO muestra Welcome', async () => {
     const root = await mount(
-      <MessageList config={fixtureConfig()} messages={[]} agentName={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
+      <MessageList config={fixtureConfig()} messages={[]} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
     )
     expect(root.querySelector('.welcome')).toBeNull()
   })
@@ -50,7 +50,7 @@ describe('MessageList', () => {
   it('con mensajes: muestra el divisor "Hoy" y una burbuja por mensaje, sin Welcome', async () => {
     const root = await mount(
       <MessageList config={fixtureConfig()} messages={[msg({ id: 'a' }), msg({ id: 'b', role: 'user' })]}
-        agentName={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
+        agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
     )
     expect(root.querySelector('.day')?.textContent).toBe('Hoy')
     expect(root.querySelector('.welcome')).toBeNull()
@@ -61,7 +61,7 @@ describe('MessageList', () => {
     const root = await mount(
       <MessageList config={fixtureConfig()}
         messages={[msg({ id: 'a', role: 'bot' }), msg({ id: 'b', role: 'bot' }), msg({ id: 'c', role: 'user' })]}
-        agentName={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
+        agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
     )
     const ms = root.querySelectorAll('.m')
     expect(ms[0]?.classList.contains('compact')).toBe(false)
@@ -69,10 +69,22 @@ describe('MessageList', () => {
     expect(ms[2]?.classList.contains('compact')).toBe(false)
   })
 
+  // Foto del agente: MessageList es el tramo intermedio entre Panel (que lee
+  // el store) y MessageBubble — debe reenviar agentAvatarUrl igual que ya
+  // reenvía agentName, sin perderlo por el camino.
+  it('reenvía agentAvatarUrl a las burbujas de agente', async () => {
+    const root = await mount(
+      <MessageList config={fixtureConfig()} messages={[msg({ id: 'a', role: 'agent' })]}
+        agentName="Laura" agentAvatarUrl="https://res.nevent.es/agents/laura.jpg" onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
+    )
+    const img = root.querySelector('.b-avatar img.agent-avatar-img')
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/agents/laura.jpg')
+  })
+
   it('clicar un chip de Welcome llama a onQuickReply', async () => {
     const onQuickReply = vi.fn()
     const root = await mount(
-      <MessageList config={fixtureConfig()} messages={[]} agentName={null} onRetry={vi.fn()} onQuickReply={onQuickReply} showWelcome={true} />,
+      <MessageList config={fixtureConfig()} messages={[]} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={onQuickReply} showWelcome={true} />,
     )
     root.querySelectorAll<HTMLButtonElement>('.chip')[0]!.click()
     expect(onQuickReply).toHaveBeenCalledWith('Cambiar el nombre de mi entrada')
@@ -80,7 +92,7 @@ describe('MessageList', () => {
 
   it('trailing: se pinta tras todos los mensajes', async () => {
     const root = await mount(
-      <MessageList config={fixtureConfig()} messages={[msg({ id: 'a' })]} agentName={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false}
+      <MessageList config={fixtureConfig()} messages={[msg({ id: 'a' })]} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false}
         trailing={<div data-testid="trail">Resuelto</div>} />,
     )
     const inner = root.querySelector('.msgs-inner')!
@@ -89,7 +101,7 @@ describe('MessageList', () => {
 
   it('Important #7 — autoscroll: si estaba cerca del fondo, CUALQUIER crecimiento del contenido interior (no solo el último mensaje) mueve scrollTop al fondo', async () => {
     const root = await mount(
-      <MessageList config={fixtureConfig()} messages={[msg({ id: 'a' })]} agentName={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
+      <MessageList config={fixtureConfig()} messages={[msg({ id: 'a' })]} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
     )
     const container = root.querySelector('.msgs') as HTMLDivElement
     Object.defineProperty(container, 'scrollHeight', { value: 500, configurable: true })
@@ -104,7 +116,7 @@ describe('MessageList', () => {
 
   it('autoscroll: si el usuario había subido a leer historial, el crecimiento del contenido NO le arrastra al fondo', async () => {
     const root = await mount(
-      <MessageList config={fixtureConfig()} messages={[msg({ id: 'a' })]} agentName={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
+      <MessageList config={fixtureConfig()} messages={[msg({ id: 'a' })]} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
     )
     const container = root.querySelector('.msgs') as HTMLDivElement
     Object.defineProperty(container, 'scrollHeight', { value: 500, configurable: true })

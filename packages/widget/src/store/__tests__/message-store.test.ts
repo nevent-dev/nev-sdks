@@ -15,10 +15,10 @@ function stateEvent(seq: number, state: 'BOT_ACTIVE' | 'ESCALATED_WAITING' | 'AG
     occurredAt: '2026-07-17T14:04:00Z', type: 'conversation.state_changed', payload: { state },
   }
 }
-function agentJoined(seq: number, name: string): WidgetEvent {
+function agentJoined(seq: number, name: string, avatarUrl: string | null = null): WidgetEvent {
   return {
     eventId: `evt_v1_conv_demo_01_${seq}`, schemaVersion: 1, conversationId: 'conv_demo_01',
-    occurredAt: '2026-07-17T14:09:00Z', type: 'agent.joined', payload: { agentName: name, agentAvatarUrl: null },
+    occurredAt: '2026-07-17T14:09:00Z', type: 'agent.joined', payload: { agentName: name, agentAvatarUrl: avatarUrl },
   }
 }
 
@@ -124,6 +124,50 @@ describe('message store — durable core', () => {
     expect(s.getState().agentName).toBe('Laura')
   })
 
+  // Foto del agente: el backend añade avatarUrl EN PARALELO al bloque agent
+  // del snapshot (misma CDN propia que agent.joined) — se hidrata con el
+  // MISMO watermark que agentName, no uno independiente.
+  it('applySnapshot with an agent.avatarUrl hydrates agentAvatarUrl like agent.joined would', () => {
+    const s = createMessageStore()
+    const snap = { ...fixtureSnapshot(), agent: { name: 'Ana', avatarUrl: 'https://res.dev.nevent.es/agents/ana.jpg' } }
+    s.applySnapshot(snap)
+    expect(s.getState().agentAvatarUrl).toBe('https://res.dev.nevent.es/agents/ana.jpg')
+  })
+
+  it('applySnapshot with an agent block but no avatarUrl leaves agentAvatarUrl null (agent without a photo)', () => {
+    const s = createMessageStore()
+    const snap = { ...fixtureSnapshot(), agent: { name: 'Ana' } }
+    s.applySnapshot(snap)
+    expect(s.getState().agentName).toBe('Ana')
+    expect(s.getState().agentAvatarUrl).toBeNull()
+  })
+
+  it('applySnapshot with NO agent block clears a previously-set avatarUrl (resolve+reconcile)', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(agentJoined(3, 'Laura', 'https://res.nevent.es/agents/laura.jpg'))
+    expect(s.getState().agentAvatarUrl).toBe('https://res.nevent.es/agents/laura.jpg')
+    const snap = { messages: [], state: 'RESOLVED' as const, snapshotCursor: 'evt_v1_conv_demo_01_5' }
+    s.applySnapshot(snap)
+    expect(s.getState().agentAvatarUrl).toBeNull()
+  })
+
+  it('a snapshot older than the last live agent.joined does not regress agentAvatarUrl either', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(agentJoined(9, 'Laura', 'https://res.nevent.es/agents/laura.jpg'))
+    const staleSnap = { messages: [], state: 'AGENT_ACTIVE' as const, snapshotCursor: 'evt_v1_conv_demo_01_4', agent: { name: 'Pedro', avatarUrl: 'https://res.nevent.es/agents/pedro.jpg' } }
+    s.applySnapshot(staleSnap) // seq 4 < lastAgentSeq 9 — must not clobber Laura's avatar
+    expect(s.getState().agentAvatarUrl).toBe('https://res.nevent.es/agents/laura.jpg')
+  })
+
+  it('a live agent.joined newer than the snapshot cursor refines the avatarUrl set by the snapshot', () => {
+    const s = createMessageStore()
+    const snap = { messages: [], state: 'AGENT_ACTIVE' as const, snapshotCursor: 'evt_v1_conv_demo_01_4', agent: { name: 'Ana', avatarUrl: 'https://res.nevent.es/agents/ana.jpg' } }
+    s.applySnapshot(snap)
+    expect(s.getState().agentAvatarUrl).toBe('https://res.nevent.es/agents/ana.jpg')
+    s.applyDurableEvent(agentJoined(9, 'Laura', 'https://res.nevent.es/agents/laura.jpg'))
+    expect(s.getState().agentAvatarUrl).toBe('https://res.nevent.es/agents/laura.jpg')
+  })
+
   it('mergeSnapshotMessages carries authorName per message, defaulting to null when absent', () => {
     const s = createMessageStore()
     const snap = {
@@ -176,6 +220,31 @@ describe('message store — durable core', () => {
     const snap = { ...fixtureSnapshot(), agent: { name: 'Ana' } }
     s.replaceSnapshot(snap)
     expect(s.getState().agentName).toBe('Ana')
+  })
+
+  // Foto del agente: replaceSnapshot (hard reset, 409 recovery) ya no debe
+  // pisar el avatar a null incondicionalmente — el snapshot fresco es la
+  // fuente directa, igual que agentName.
+  it('replaceSnapshot with an agent.avatarUrl hydrates agentAvatarUrl directly — no replay needed', () => {
+    const s = createMessageStore()
+    const snap = { ...fixtureSnapshot(), agent: { name: 'Ana', avatarUrl: 'https://res.dev.nevent.es/agents/ana.jpg' } }
+    s.replaceSnapshot(snap)
+    expect(s.getState().agentAvatarUrl).toBe('https://res.dev.nevent.es/agents/ana.jpg')
+  })
+
+  it('replaceSnapshot with an agent block but no avatarUrl leaves agentAvatarUrl null', () => {
+    const s = createMessageStore()
+    const snap = { ...fixtureSnapshot(), agent: { name: 'Ana' } }
+    s.replaceSnapshot(snap)
+    expect(s.getState().agentAvatarUrl).toBeNull()
+  })
+
+  it('replaceSnapshot with NO agent block clears a previously-set avatarUrl', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(agentJoined(8, 'Laura', 'https://res.nevent.es/agents/laura.jpg'))
+    expect(s.getState().agentAvatarUrl).toBe('https://res.nevent.es/agents/laura.jpg')
+    s.replaceSnapshot(fixtureSnapshot()) // hard reset, no agent block
+    expect(s.getState().agentAvatarUrl).toBeNull()
   })
 
   it('advanceCursorTo moves the cursor forward monotonically only', () => {

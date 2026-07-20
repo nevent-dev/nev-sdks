@@ -10,6 +10,7 @@ export interface MessageListProps {
   config: WidgetConfig
   messages: readonly StoredMessage[]
   agentName: string | null
+  agentAvatarUrl: string | null
   onRetry: (clientId: string) => void
   onQuickReply: (text: string) => void
   trailing?: ComponentChildren
@@ -50,7 +51,7 @@ function useBottomAnchoredScroll(containerRef: RefObject<HTMLDivElement>, innerR
   }, [])
 }
 
-export function MessageList({ config, messages, agentName, onRetry, onQuickReply, trailing, showWelcome }: MessageListProps) {
+export function MessageList({ config, messages, agentName, agentAvatarUrl, onRetry, onQuickReply, trailing, showWelcome }: MessageListProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const innerRef = useRef<HTMLDivElement | null>(null)
   useBottomAnchoredScroll(containerRef, innerRef)
@@ -62,7 +63,7 @@ export function MessageList({ config, messages, agentName, onRetry, onQuickReply
         {showWelcome && <Welcome config={config} onChip={onQuickReply} />}
         {messages.length > 0 && <div class="day">Hoy</div>}
         {messages.map((m, i) => (
-          <MessageBubble key={m.id} message={m} agentName={agentName} onRetry={onRetry}
+          <MessageBubble key={m.id} message={m} agentName={agentName} agentAvatarUrl={agentAvatarUrl} onRetry={onRetry}
             compact={i > 0 && messages[i - 1]?.role === m.role} />
         ))}
         {trailing}

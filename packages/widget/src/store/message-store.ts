@@ -196,7 +196,15 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     // event that landed after this snapshot's cutoff is never clobbered. An
     // absent block (resolved / unassigned) clears the identity — this is what
     // returns the header to the assistant name after a resolve+reconcile.
-    if (snapSeq >= lastAgentSeq) { agentName = snap.agent ? snap.agent.name : null; lastAgentSeq = snapSeq }
+    if (snapSeq >= lastAgentSeq) {
+      agentName = snap.agent ? snap.agent.name : null
+      // Foto del agente: mismo watermark que agentName arriba — la snapshot
+      // trae avatarUrl EN PARALELO al name (backend, misma CDN propia que
+      // agent.joined). `?? null` normaliza tanto la ausencia del campo
+      // (backend sin desplegar) como un `null` explícito (agente sin foto).
+      agentAvatarUrl = snap.agent ? (snap.agent.avatarUrl ?? null) : null
+      lastAgentSeq = snapSeq
+    }
     advanceCursor(snap.snapshotCursor)
     notify()
   }
@@ -216,9 +224,11 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     // entirely on a hard reset. The watermark moves to snapSeq (NOT reset to
     // -1): any FUTURE agent.joined in the new cursor space (seq > snapSeq)
     // still refines it — there is no more need to wait for a replay the
-    // lowered cursor might never receive.
+    // lowered cursor might never receive. Foto del agente: mismo criterio —
+    // la snapshot fresca es la fuente directa de avatarUrl, no un null
+    // incondicional (`?? null` normaliza campo ausente y `null` explícito).
     agentName = snap.agent ? snap.agent.name : null
-    agentAvatarUrl = null
+    agentAvatarUrl = snap.agent?.avatarUrl ?? null
     lastAgentSeq = snapSeq
     assignMessages(mergeSnapshotMessages(keep, snap))
     notify()

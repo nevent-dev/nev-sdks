@@ -8,7 +8,7 @@ afterEach(cleanupMounted)
 describe('Header', () => {
   it('estado idle: nombre/estado del assistant, sin pulse, icono de bot (no avatar de agente)', async () => {
     const viewState = computeViewState({
-      conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null,
+      conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false,
     })
     const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
@@ -20,9 +20,9 @@ describe('Header', () => {
     expect(root.querySelector('.state-ribbon')?.getAttribute('data-ribbon')).toBe('idle')
   })
 
-  it('estado agent: avatar de iniciales del agente (nunca <img>, spec §8), punto "en línea" y nombre solo (gap #1)', async () => {
+  it('estado agent sin avatarUrl: avatar de iniciales del agente, punto "en línea" y nombre solo (gap #1)', async () => {
     const viewState = computeViewState({
-      conversationState: 'AGENT_ACTIVE', connection: 'live', agentName: 'Laura',
+      conversationState: 'AGENT_ACTIVE', connection: 'live', agentName: 'Laura', agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false,
     })
     const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
@@ -33,9 +33,24 @@ describe('Header', () => {
     expect(root.querySelector('.name')?.textContent).toBe('Laura')
   })
 
+  // Foto del agente: cuando el store trae agentAvatarUrl (nuestra CDN), la
+  // cabecera pinta la foto real en vez de las iniciales.
+  it('estado agent con avatarUrl: pinta la foto real del agente en la cabecera', async () => {
+    const viewState = computeViewState({
+      conversationState: 'AGENT_ACTIVE', connection: 'live', agentName: 'Laura', agentAvatarUrl: 'https://res.nevent.es/agents/laura.jpg',
+      assistantName: 'Asistente de DEMO FEST', isStreaming: false,
+    })
+    const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
+    const img = root.querySelector('.avatar img.agent-avatar-img')
+    expect(img).not.toBeNull()
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/agents/laura.jpg')
+    expect(root.querySelector('.initials-avatar')).toBeNull()
+    expect(root.querySelector('.dot-live')).not.toBeNull()
+  })
+
   it('minimizar y cerrar disparan sus callbacks', async () => {
     const viewState = computeViewState({
-      conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null,
+      conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false,
     })
     const onMinimize = vi.fn()

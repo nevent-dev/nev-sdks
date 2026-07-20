@@ -70,13 +70,13 @@ const demoCards: CardItem[] = [
 // construye la MISMA estructura a mano con los componentes reales.
 async function mountRichPreview(): Promise<HTMLElement> {
   const config = fixtureConfig()
-  const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, assistantName: config.assistantName ?? 'Asistente', isStreaming: false })
+  const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null, assistantName: config.assistantName ?? 'Asistente', isStreaming: false })
   return mount(
     <section class="panel" role="dialog" aria-label="Vista previa: contenido rico">
       <Header viewState={viewState} onMinimize={() => {}} onClose={() => {}} />
       <ConnectionBanner kind={null} />
       <MessageList config={config} messages={[idleMsg({ text: '¡Hecho! El cambio de titular es gratuito. Y ya que estás, quedan pocas unidades 👇' })]}
-        agentName={null} onRetry={() => {}} onQuickReply={() => {}} showWelcome={false}
+        agentName={null} agentAvatarUrl={null} onRetry={() => {}} onQuickReply={() => {}} showWelcome={false}
         trailing={<CardCarousel items={demoCards} onAction={() => {}} />} />
       <Composer viewState={viewState} onSend={() => {}} onStop={() => {}} />
     </section>,
@@ -85,13 +85,13 @@ async function mountRichPreview(): Promise<HTMLElement> {
 
 async function mountUploadPreview(): Promise<HTMLElement> {
   const config = fixtureConfig()
-  const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, assistantName: config.assistantName ?? 'Asistente', isStreaming: false })
+  const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null, assistantName: config.assistantName ?? 'Asistente', isStreaming: false })
   return mount(
     <section class="panel" role="dialog" aria-label="Vista previa: subida de archivo">
       <Header viewState={viewState} onMinimize={() => {}} onClose={() => {}} />
       <ConnectionBanner kind={null} />
       <MessageList config={config} messages={[idleMsg({ role: 'user', text: 'Aquí tienes mi entrada' })]}
-        agentName={null} onRetry={() => {}} onQuickReply={() => {}} showWelcome={false}
+        agentName={null} agentAvatarUrl={null} onRetry={() => {}} onQuickReply={() => {}} showWelcome={false}
         trailing={<FileBubble fileName="entrada-demofest.pdf" fileSizeLabel="184 KB · subiendo…" progressPercent={64} variant="user" />} />
       <Composer viewState={viewState} onSend={() => {}} onStop={() => {}} />
     </section>,
@@ -174,7 +174,7 @@ describe('a11y — los 10 estados del mock, componentes reales (Important #9)', 
   })
 
   it('11. AgentJoinedSysline — Important (ronda 3): el componente vive SOLO aquí (harness) y en su test unitario aislado (Task 10), NUNCA dentro del Panel integrado (gap #4 revertido) — se monta de verdad, no solo se afirma en el Self-Review', async () => {
-    const root = await mount(<AgentJoinedSysline agentName="Laura" />)
+    const root = await mount(<AgentJoinedSysline agentName="Laura" agentAvatarUrl={null} />)
     expect(await axe(root)).toHaveNoViolations()
   })
 
