@@ -1,0 +1,46 @@
+:root {
+  --ink: #101319; --ink-2: #3d4451; --muted: #667085; --faint: #98a2b3;
+  --surface: #ffffff; --surface-2: #f6f7f9; --surface-3: #eef0f4;
+  --line: #e6e8ee;
+  --brand-a: #6d4aff; --brand-b: #975cf8; --brand-ink: #ffffff;
+  --brand-grad: linear-gradient(135deg, var(--brand-a), var(--brand-b));
+  --brand-soft: #f2eeff;
+  --wait: #d97706; --wait-soft: #fdf2e3;
+  --live: #0e9384; --live-soft: #e6f4f2;
+  --danger: #d92d20; --danger-soft: #feeceb;
+  --accent-sun-a: #f59e0b; --accent-sun-b: #ef4444;
+  --bubble-user: var(--brand-a); --bubble-user-ink: var(--brand-ink);
+  --bubble-bot: var(--surface-2); --bubble-bot-ink: var(--ink);
+  /* Superficies derivadas del rich content — invariantes al tema (scrim siempre oscuro) */
+  --scrim: rgba(12, 13, 16, .75); --on-scrim: #fff;
+  --file-user-bg: color-mix(in srgb, #fff 14%, var(--brand-a));
+  --glass: rgba(255, 255, 255, .2); --glass-strong: rgba(255, 255, 255, .28);
+  --shadow-panel: 0 24px 64px rgba(16, 19, 25, .16), 0 4px 16px rgba(16, 19, 25, .08);
+  --shadow-bubble: 0 8px 24px rgba(109, 74, 255, .35);
+  --r-panel: 20px; --r-bubble: 14px;
+  --font-display: 'Poppins', sans-serif; --font-body: 'Inter', system-ui, sans-serif;
+}
+
+[data-theme="dark"] {
+  --ink: #f2f4f8; --ink-2: #c6ccd8; --muted: #8b93a3; --faint: #5d6575;
+  --surface: #171a21; --surface-2: #1f232d; --surface-3: #272c38;
+  --line: #2b303c;
+  --brand-soft: #28224a;
+  --wait-soft: #332512; --live-soft: #12312d; --danger-soft: #361b19;
+  --bubble-bot: var(--surface-2); --bubble-bot-ink: var(--ink);
+  --shadow-panel: 0 24px 64px rgba(0, 0, 0, .5), 0 4px 16px rgba(0, 0, 0, .4);
+}
+
+/* theme.mode === 'auto' (Task 2 no fija [data-theme] en ese caso): mismos
+   valores que [data-theme="dark"], solo si nadie los fijó explícitamente. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    --ink: #f2f4f8; --ink-2: #c6ccd8; --muted: #8b93a3; --faint: #5d6575;
+    --surface: #171a21; --surface-2: #1f232d; --surface-3: #272c38;
+    --line: #2b303c;
+    --brand-soft: #28224a;
+    --wait-soft: #332512; --live-soft: #12312d; --danger-soft: #361b19;
+    --bubble-bot: var(--surface-2); --bubble-bot-ink: var(--ink);
+    --shadow-panel: 0 24px 64px rgba(0, 0, 0, .5), 0 4px 16px rgba(0, 0, 0, .4);
+  }
+}

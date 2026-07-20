@@ -1,0 +1,197 @@
+import { describe, it, expect } from 'vitest'
+import { createMessageStore } from '../message-store'
+import type { WidgetEvent } from '../../contract/types'
+
+const clock = () => '2026-07-17T15:00:00Z'
+function msgEvent(seq: number, messageId: string, role: 'bot' | 'agent' | 'user', text: string): WidgetEvent {
+  return {
+    eventId: `evt_v1_conv_demo_01_${seq}`, schemaVersion: 1, conversationId: 'conv_demo_01',
+    occurredAt: '2026-07-17T15:00:01Z', type: 'message.created', payload: { messageId, role, text },
+  }
+}
+
+describe('message store — optimistic + streaming', () => {
+  it('optimistic user message goes pending → sent on ack', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    expect(s.getState().messages[0]).toMatchObject({ id: 'cid_1', role: 'user', status: 'pending', text: 'Hola' })
+    s.ackOptimistic('cid_1', 'msg_srv_1')
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv_1', status: 'sent', clientId: 'cid_1' })
+  })
+
+  it('durable-before-ack: the durable and the ack do not duplicate', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.applyDurableEvent(msgEvent(2, 'msg_srv', 'user', 'Hola')) // durable wins the race
+    s.ackOptimistic('cid_1', 'msg_srv')
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', seq: 2 })
+  })
+
+  it('degraded ack (messageId falls back to clientId, e.g. non-streaming response with no userMessageId) resolves to sent, not stuck pending', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.ackOptimistic('cid_1', 'cid_1') // degraded: server response carried no real id
+    expect(s.getState().messages[0]).toMatchObject({ id: 'cid_1', status: 'sent', clientId: 'cid_1' })
+  })
+
+  it('degraded ack then a later durable twin reconciles to the real id (no duplicate)', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.ackOptimistic('cid_1', 'cid_1') // degraded ack: stuck on the provisional clientId
+    s.applyDurableEvent(msgEvent(2, 'msg_srv', 'user', 'Hola')) // durable carries the real id
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', status: 'sent', seq: 2 })
+  })
+
+  it('durable twin before the degraded ack (reverse order) also reconciles, no duplicate', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.applyDurableEvent(msgEvent(2, 'msg_srv', 'user', 'Hola')) // durable wins the race
+    s.ackOptimistic('cid_1', 'cid_1') // degraded ack arrives after: already reconciled, no-op
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', status: 'sent', seq: 2 })
+  })
+
+  it('failOptimistic then retryOptimistic flips failed → pending', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.failOptimistic('cid_1')
+    expect(s.getState().messages[0]?.status).toBe('failed')
+    s.retryOptimistic('cid_1')
+    expect(s.getState().messages[0]?.status).toBe('pending')
+  })
+
+  it('durable-before-failOptimistic: the send actually succeeded, so the placeholder is dropped, not failed', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.applyDurableEvent(msgEvent(2, 'msg_srv', 'user', 'Hola')) // durable wins the race (send succeeded server-side)
+    s.failOptimistic('cid_1') // the client's HTTP call itself timed out
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_srv', status: 'sent' })
+  })
+
+  it('failOptimistic with NO durable twin still marks failed (regression)', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    s.failOptimistic('cid_1')
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ id: 'cid_1', status: 'failed' })
+  })
+
+  it('streams a bot turn: begin → deltas accumulate → done finalizes with messageId', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1')
+    expect(s.getState().messages[0]).toMatchObject({ role: 'bot', streaming: true, text: '' })
+    s.appendBotDelta('t1', 'Sí, ')
+    s.appendBotDelta('t1', 'claro.')
+    expect(s.getState().messages[0]?.text).toBe('Sí, claro.')
+    s.finishBotTurn('t1', 'msg_bot_1')
+    expect(s.getState().messages[0]).toMatchObject({ id: 'msg_bot_1', streaming: false })
+  })
+
+  it('finishBotTurn does NOT advance the durable cursor', () => {
+    const s = createMessageStore(clock)
+    s.applyDurableEvent(msgEvent(2, 'm2', 'user', 'q')) // cursor = 2
+    s.beginBotTurn('t1'); s.appendBotDelta('t1', 'x')
+    s.finishBotTurn('t1', 'm_bot')
+    expect(s.getState().cursor).toBe('evt_v1_conv_demo_01_2') // unchanged
+  })
+
+  it('durable-before-finish: the durable bot message and finishBotTurn do not duplicate', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1')
+    s.appendBotDelta('t1', 'parcial')
+    s.applyDurableEvent(msgEvent(5, 'msg_bot', 'bot', 'texto final')) // durable arrives first
+    s.finishBotTurn('t1', 'msg_bot')
+    const bots = s.getState().messages.filter((m) => m.role === 'bot')
+    expect(bots).toHaveLength(1)
+    expect(bots[0]?.text).toBe('texto final') // durable is authoritative
+  })
+
+  it('finish-before-durable: the durable replay updates, does not duplicate', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1'); s.appendBotDelta('t1', 'texto')
+    s.finishBotTurn('t1', 'msg_bot')
+    s.applyDurableEvent(msgEvent(5, 'msg_bot', 'bot', 'texto'))
+    expect(s.getState().messages.filter((m) => m.role === 'bot')).toHaveLength(1)
+    expect(s.getState().messages[0]?.seq).toBe(5) // reconciled with the durable seq
+  })
+
+  it('failBotTurn removes an empty placeholder but keeps a partial one', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t_empty'); s.failBotTurn('t_empty')
+    expect(s.getState().messages).toHaveLength(0)
+    s.beginBotTurn('t_partial'); s.appendBotDelta('t_partial', 'a medias'); s.failBotTurn('t_partial')
+    expect(s.getState().messages[0]).toMatchObject({ streaming: false, text: 'a medias' })
+  })
+
+  it('durable-before-failBotTurn: the turn actually completed, so the placeholder is dropped, not failed', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1')
+    s.appendBotDelta('t1', 'texto final') // all deltas landed before the disconnect
+    s.applyDurableEvent(msgEvent(5, 'msg_bot', 'bot', 'texto final')) // durable replay beats the stream teardown
+    s.failBotTurn('t1') // the stream disconnected after the durable replay
+    const bots = s.getState().messages.filter((m) => m.role === 'bot')
+    expect(bots).toHaveLength(1)
+    expect(bots[0]).toMatchObject({ id: 'msg_bot', status: 'sent' })
+  })
+
+  it('failBotTurn with NO durable twin still marks failed / drops empty (regression)', () => {
+    const s = createMessageStore(clock)
+    s.beginBotTurn('t1'); s.appendBotDelta('t1', 'a medias'); s.failBotTurn('t1')
+    expect(s.getState().messages).toHaveLength(1)
+    expect(s.getState().messages[0]).toMatchObject({ streaming: false, text: 'a medias' })
+  })
+
+  it('never mutates a previously published snapshot (copy-on-write)', () => {
+    const s = createMessageStore(clock)
+    s.addOptimistic('cid_1', 'Hola')
+    const snapA = s.getState()
+    const msgA = snapA.messages[0]!
+    s.ackOptimistic('cid_1', 'msg_1')
+    expect(s.getState()).not.toBe(snapA)
+    expect(snapA.messages[0]).toBe(msgA)    // old snapshot object untouched
+    expect(msgA.id).toBe('cid_1')            // still the original value
+    expect(s.getState().messages[0]?.id).toBe('msg_1')
+  })
+
+  it('setAgentTyping and setConnection update reactive flags', () => {
+    const s = createMessageStore(clock)
+    s.setAgentTyping(true)
+    expect(s.getState().agentTyping).toBe(true)
+    s.setConnection('polling')
+    expect(s.getState().connection).toBe('polling')
+  })
+
+  // Nit W4 review (Task W3c): newConversationNotice era permanente — una vez
+  // activado por un re-bootstrap silencioso (ver message-store.ts#resetForNewConversation),
+  // nunca se apagaba, así que la tarjeta seguía viva bajo los mensajes NUEVOS
+  // que el visitante fuera mandando en la conversación de verdad. One-shot:
+  // se apaga en el próximo turno de usuario que se confirma de verdad
+  // (ackOptimistic), no solo por escribir.
+  describe('newConversationNotice — one-shot (Task W3c)', () => {
+    it('se limpia sola en el próximo ackOptimistic exitoso', () => {
+      const s = createMessageStore(clock)
+      s.resetForNewConversation(true)
+      expect(s.getState().newConversationNotice).toBe(true)
+      s.addOptimistic('cid_1', 'Hola de nuevo')
+      s.ackOptimistic('cid_1', 'msg_srv_1')
+      expect(s.getState().newConversationNotice).toBe(false)
+    })
+
+    it('NO se limpia solo por escribir (addOptimistic) — hace falta que el turno se confirme', () => {
+      const s = createMessageStore(clock)
+      s.resetForNewConversation(true)
+      s.addOptimistic('cid_1', 'Hola de nuevo')
+      expect(s.getState().newConversationNotice).toBe(true) // sigue activo: aún no hubo ack
+    })
+
+    it('sin newConversationNotice activo, un ackOptimistic normal no hace nada raro (no-op)', () => {
+      const s = createMessageStore(clock)
+      s.addOptimistic('cid_1', 'Hola')
+      s.ackOptimistic('cid_1', 'msg_srv_1')
+      expect(s.getState().newConversationNotice).toBe(false)
+    })
+  })
+})

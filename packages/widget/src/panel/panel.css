@@ -1,0 +1,258 @@
+/* ===== Estructura raíz del shell =====
+   El padding de "aire" respecto al borde de pantalla vive en [data-part="root"]
+   (el div que App.tsx renderiza), NUNCA en .launcher/.panel — así
+   useResizeReport (Step 3) puede medirlo con getBoundingClientRect() en un
+   único elemento, y el modo (launcher/panel) se decide declarativamente en
+   App.tsx (Task 17) sin necesitar un efecto en este componente. */
+html, body { margin: 0; font-family: var(--font-body); }
+/* Los controles de formulario no heredan la fuente del body por defecto */
+button, input, textarea, select { font-family: inherit; }
+[data-part="root"] { display: inline-flex; padding: 24px; box-sizing: border-box; }
+
+/* ===== Launcher ===== */
+.launcher {
+  width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer;
+  background: var(--brand-grad); box-shadow: var(--shadow-bubble); color: var(--brand-ink);
+  display: grid; place-items: center; transition: transform .18s ease; position: relative;
+}
+.launcher:hover { transform: scale(1.06); }
+.launcher:focus-visible { outline: 2px solid var(--brand-ink); outline-offset: 2px; }
+.launcher svg { width: 26px; height: 26px; }
+.launcher .badge {
+  position: absolute; top: -2px; right: -2px; min-width: 19px; height: 19px; padding: 0 5px;
+  border-radius: 99px; background: var(--danger); color: #fff; font: 600 11px/19px var(--font-body);
+  text-align: center; border: 2px solid var(--surface);
+}
+@media (prefers-reduced-motion: reduce) { .launcher { transition: none; } }
+
+/* ===== Panel =====
+   Alto fijo (640px) en desktop en vez de un min(640px, 100vh) real como el
+   mock: el iframe no puede leer el viewport del anfitrión de forma fiable
+   (cross-origin) sin ampliar el handshake INIT de Plan 1 — fuera de scope,
+   documentado como limitación conocida en el Self-Review. `box-sizing:
+   border-box` (Important safe-area, ronda 2) para que Task 14 pueda sumar
+   `padding-bottom: env(safe-area-inset-bottom)` en móvil SIN que la caja
+   exterior crezca por encima de `--viewport-h` — si creciera, el iframe
+   (dimensionado exactamente a esa altura por el loader) recortaría la
+   protección inferior justo donde más falta hace. */
+.panel {
+  width: 382px; height: 640px; background: var(--surface); border-radius: var(--r-panel);
+  box-shadow: var(--shadow-panel); display: flex; flex-direction: column; overflow: hidden;
+  box-sizing: border-box;
+  transform-origin: calc(100% - 28px) calc(100% - 28px);
+  animation: pop .28s cubic-bezier(.21, 1.02, .55, 1) both;
+}
+@keyframes pop { from { opacity: 0; transform: scale(.92) translateY(10px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .panel { animation: none; } }
+
+/* ===== Cabecera + cinta de estado (elemento firma, spec §6) ===== */
+.head { display: flex; align-items: center; gap: 11px; padding: 10px 12px 10px 16px; }
+.avatar { position: relative; width: 38px; height: 38px; border-radius: 50%; background: var(--brand-grad); color: var(--brand-ink); display: grid; place-items: center; flex-shrink: 0; }
+.avatar svg { width: 19px; height: 19px; }
+.avatar .dot-live { position: absolute; right: -1px; bottom: -1px; width: 11px; height: 11px; border-radius: 50%; background: var(--live); border: 2px solid var(--surface); }
+
+/* Avatar de iniciales (spec §8: sin imágenes de terceros en v1). Fondo
+   --brand-a SÓLIDO, nunca --brand-grad (Important, ronda 3): esto pinta
+   TEXTO real (la inicial del agente) — el modelo de contraste de theme.ts
+   (Task 2) solo garantiza 4.5:1 real contra el color sólido, no contra el
+   degradado. .avatar (arriba) sí puede quedarse en --brand-grad porque ahí
+   dentro solo hay un icono SVG decorativo (BotIcon) cuando no hay iniciales
+   — WCAG 2.2 SC 1.4.11 le exige ≥3:1, no 4.5:1. */
+.initials-avatar { width: 100%; height: 100%; border-radius: 50%; display: grid; place-items: center; font: 600 14px var(--font-display); color: var(--brand-ink); background: var(--brand-a); }
+
+.head .id { flex: 1; min-width: 0; }
+.head .name { font: 600 14.5px/1.2 var(--font-display); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.head .state { font-size: 12px; color: var(--muted); margin-top: 1px; display: flex; align-items: center; gap: 5px; }
+.head .pulse { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.head .pulse-wait { background: var(--wait); }
+.head .pulse-live { background: var(--live); }
+.iconbtn { width: 32px; height: 32px; border-radius: 9px; border: none; background: transparent; color: var(--muted); cursor: pointer; display: grid; place-items: center; }
+.iconbtn:hover { background: var(--surface-2); color: var(--ink); }
+.iconbtn:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 1px; }
+.iconbtn svg { width: 17px; height: 17px; }
+
+.state-ribbon { height: 2px; flex-shrink: 0; background: var(--line); position: relative; overflow: hidden; }
+.state-ribbon[data-ribbon="idle"] { background: var(--brand-grad); }
+.state-ribbon[data-ribbon="bot-streaming"] { background: var(--brand-soft); }
+.state-ribbon[data-ribbon="bot-streaming"]::after {
+  content: ""; position: absolute; inset: 0; background: var(--brand-grad); animation: sweep 1.4s ease-in-out infinite;
+}
+@keyframes sweep { 0% { transform: translateX(-100%); } 55%, 100% { transform: translateX(100%); } }
+.state-ribbon[data-ribbon="waiting"] { background: var(--wait); animation: breathe 2s ease-in-out infinite; }
+@keyframes breathe { 50% { opacity: .35; } }
+.state-ribbon[data-ribbon="agent"] { background: var(--live); }
+.state-ribbon[data-ribbon="reconnect"] { background: repeating-linear-gradient(90deg, var(--faint) 0 8px, transparent 8px 16px); }
+.state-ribbon[data-ribbon="offline"] { background: var(--faint); }
+.state-ribbon[data-ribbon="resolved"] { background: var(--line); }
+
+@media (prefers-reduced-motion: reduce) {
+  .state-ribbon[data-ribbon="bot-streaming"]::after,
+  .state-ribbon[data-ribbon="waiting"] { animation: none !important; }
+}
+
+/* ===== Zona de mensajes ===== */
+.msgs { flex: 1; overflow-y: auto; padding: 18px 16px 8px; display: flex; flex-direction: column; gap: 3px; background: var(--surface); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.msgs::-webkit-scrollbar { width: 5px; }
+.msgs::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.day { align-self: center; font-size: 11px; color: var(--faint); margin: 2px 0 10px; }
+.m { display: flex; gap: 8px; max-width: 86%; }
+.m + .m { margin-top: 10px; }
+.m.compact { margin-top: 2px; }
+.m .b-avatar { width: 26px; height: 26px; border-radius: 50%; background: var(--brand-grad); color: var(--brand-ink); display: grid; place-items: center; flex-shrink: 0; align-self: flex-end; }
+.m .b-avatar svg { width: 13px; height: 13px; }
+.m .b-avatar .initials-avatar { font-size: 11px; }
+.m .b-avatar.ghost { visibility: hidden; }
+.bubble { padding: 9px 13px; border-radius: var(--r-bubble); font-size: 13.8px; line-height: 1.5; color: var(--bubble-bot-ink); background: var(--bubble-bot); border-bottom-left-radius: 5px; white-space: pre-wrap; word-break: break-word; }
+.m.user { align-self: flex-end; flex-direction: row-reverse; }
+.m.user .bubble { background: var(--bubble-user); color: var(--bubble-user-ink); border-radius: var(--r-bubble); border-bottom-right-radius: 5px; }
+.meta { font-size: 10.5px; color: var(--faint); margin-top: 3px; display: flex; gap: 4px; align-items: center; font-variant-numeric: tabular-nums; }
+.m.user .meta { justify-content: flex-end; }
+.meta svg { width: 12px; height: 12px; }
+.meta .fail { color: var(--danger); font-weight: 500; }
+.meta .retry { background: none; border: none; padding: 0; margin: 0; font: inherit; color: var(--brand-a); font-weight: 500; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.meta .retry:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+
+.stream-caret { display: inline-block; width: 7px; height: 14px; background: var(--brand-a); border-radius: 2px; vertical-align: -2px; animation: blink .9s steps(2) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .stream-caret { animation: none !important; opacity: 1; } }
+
+.thinking { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); padding: 9px 13px; }
+.thinking .spark { width: 14px; height: 14px; animation: spin 2.4s linear infinite; }
+/* @keyframes spin: también la usa/declara Task 10 (ConnectionBanner) — CSS
+   resuelve @keyframes por nombre en toda la hoja sin importar el orden. */
+@media (prefers-reduced-motion: reduce) { .thinking .spark { animation: none !important; } }
+
+.msgs-inner { display: flex; flex-direction: column; gap: 3px; }
+
+/* ===== Bienvenida + quick replies ===== */
+.welcome { padding: 6px 4px 14px; }
+.welcome h3 { font: 600 19px/1.25 var(--font-display); color: var(--ink); letter-spacing: -.01em; }
+.welcome p { font-size: 13.5px; color: var(--muted); margin-top: 5px; }
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; }
+.chip {
+  font: 500 12.5px var(--font-body); color: var(--brand-a); background: transparent;
+  border: 1px solid color-mix(in srgb, var(--brand-a) 35%, transparent);
+  padding: 7px 13px; border-radius: 99px; cursor: pointer; transition: background .15s;
+}
+.chip:hover { background: var(--brand-soft); }
+.chip:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+/* ===== Composer ===== */
+.composer { flex-shrink: 0; padding: 10px 12px 8px; border-top: 1px solid var(--line); background: var(--surface); }
+.c-row { display: flex; align-items: flex-end; gap: 6px; background: var(--surface-2); border: 1.5px solid transparent; border-radius: 14px; padding: 6px 6px 6px 14px; transition: border-color .15s; }
+.c-row:focus-within { border-color: var(--brand-a); background: var(--surface); }
+.c-row textarea { flex: 1; border: none; background: transparent; resize: none; font: 400 13.8px/1.45 var(--font-body); color: var(--ink); outline: none; max-height: 96px; padding: 6px 0; }
+.c-row textarea::placeholder { color: var(--faint); }
+.c-row textarea:disabled { opacity: .6; }
+.send { width: 34px; height: 34px; border-radius: 11px; border: none; background: var(--brand-grad); color: var(--brand-ink); cursor: pointer; display: grid; place-items: center; flex-shrink: 0; }
+.send svg { width: 16px; height: 16px; }
+.send:disabled { background: var(--surface-3); color: var(--faint); cursor: default; }
+.iconbtn:disabled { opacity: .45; cursor: default; }
+.stopbtn { display: flex; align-items: center; gap: 6px; margin: 0 auto 8px; font: 500 12px var(--font-body); color: var(--muted); background: var(--surface); border: 1px solid var(--line); border-radius: 99px; padding: 6px 14px; cursor: pointer; }
+.stopbtn:hover { border-color: var(--danger); color: var(--danger); }
+.stopbtn i { width: 8px; height: 8px; background: currentColor; border-radius: 2px; display: block; }
+.powered { text-align: center; font-size: 10.5px; color: var(--faint); padding: 5px 0 3px; }
+.powered b { font-weight: 600; color: var(--muted); }
+
+/* ===== Divider y tarjetas de sistema (handoff) ===== */
+.sysline { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; }
+.sysline::before, .sysline::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.sysline .who { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.sysline .who .initials-avatar { width: 22px; height: 22px; font-size: 10px; }
+.sysline .who b { color: var(--ink); font-weight: 600; }
+.syscard { align-self: center; text-align: center; max-width: 270px; border-radius: 14px; padding: 14px 18px; margin: 10px auto; }
+.syscard.waiting { background: var(--wait-soft); }
+.syscard.waiting .ttl { color: var(--wait); }
+.syscard.resolved { background: var(--surface-2); }
+.syscard.new-conversation { background: var(--surface-2); }
+.syscard .ttl { font: 600 13px var(--font-display); color: var(--ink); }
+.syscard .dsc { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.45; }
+.feedback { display: flex; gap: 8px; justify-content: center; margin-top: 11px; }
+.feedback button { width: 38px; height: 34px; border-radius: 9px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 15px; }
+.feedback button:hover { border-color: var(--brand-a); background: var(--brand-soft); }
+.feedback button[aria-pressed="true"] { border-color: var(--brand-a); background: var(--brand-soft); }
+
+.dots { display: inline-flex; gap: 4px; padding: 4px 0; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--faint); animation: hop 1.2s ease-in-out infinite; }
+.dot:nth-child(2) { animation-delay: .15s; }
+.dot:nth-child(3) { animation-delay: .3s; }
+@keyframes hop { 30% { transform: translateY(-4px); opacity: .5; } }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none !important; } }
+
+/* ===== Banners de conexión ===== */
+.conn { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; padding: 7px; flex-shrink: 0; }
+.conn.reconnect { background: var(--wait-soft); color: var(--wait); }
+.conn.offline { background: var(--surface-3); color: var(--muted); }
+.conn .spin { width: 12px; height: 12px; border: 2px solid currentColor; border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .conn .spin { animation: none !important; } }
+
+/* ===== Rich content: carrusel de cards ===== */
+.cards { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 6px; scroll-snap-type: x mandatory; max-width: 100%; scrollbar-width: none; }
+.cards::-webkit-scrollbar { display: none; }
+.card { scroll-snap-align: start; flex: 0 0 200px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.card .img { height: 78px; background: var(--brand-grad); position: relative; }
+.card .img.sun { background: linear-gradient(135deg, var(--accent-sun-a), var(--accent-sun-b)); }
+.card .img .price { position: absolute; right: 8px; bottom: 8px; background: var(--scrim); color: var(--on-scrim); font: 600 11.5px var(--font-body); padding: 3px 8px; border-radius: 99px; }
+.card .bd { padding: 10px 12px 12px; }
+.card .bd .t { font: 600 13px var(--font-display); color: var(--ink); }
+.card .bd .d { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.card .bd .act {
+  margin-top: 9px; display: block; width: 100%; text-align: center; font: 600 12px var(--font-body);
+  color: var(--brand-a); background: transparent; border: 1px solid color-mix(in srgb, var(--brand-a) 35%, transparent);
+  border-radius: 8px; padding: 6px 0; cursor: pointer;
+}
+.card .bd .act:hover { background: var(--brand-soft); }
+.card .bd .act:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+
+/* ===== Adjuntos / upload =====
+   Variante por CLASE PROPIA (`.file-user`, fijada por el componente vía la
+   prop `variant`) — no por selector dependiente de un padre `.m.user` (el
+   mock lo hacía así, pero FileBubble no vive anidado en una burbuja real en
+   este plan; era CSS muerto — Important #8, ronda 2). */
+.file { display: flex; align-items: center; gap: 9px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 11px; padding: 9px 11px; min-width: 210px; }
+.file-meta { flex: 1; }
+.file-user { background: var(--file-user-bg); border-color: transparent; color: var(--brand-ink); }
+.file .fi { width: 32px; height: 32px; border-radius: 8px; background: var(--brand-soft); color: var(--brand-a); display: grid; place-items: center; flex-shrink: 0; }
+.file-user .fi { background: var(--glass); color: var(--brand-ink); }
+.file .fi svg { width: 15px; height: 15px; }
+.file .fn { font: 500 12.5px var(--font-body); color: inherit; }
+.file .fs { font-size: 11px; opacity: .72; margin-top: 1px; font-variant-numeric: tabular-nums; }
+.file .bar { height: 3px; border-radius: 2px; background: var(--glass-strong); margin-top: 5px; overflow: hidden; }
+.file .bar i { display: block; height: 100%; width: var(--progress, 0%); background: var(--brand-ink); border-radius: 2px; transition: width .2s; }
+
+/* ===== Responsive real (spec §9: 100dvh + safe-area + VisualViewport —
+   NO una media query de ancho dentro del iframe, ver cabecera de Task 14).
+   [data-viewport] y [data-mode] los fija App.tsx declarativamente en
+   [data-part="root"] (Task 17) — Panel/Launcher no los tocan. ===== */
+[data-part="root"][data-viewport="mobile"][data-mode="launcher"] {
+  padding: 16px;
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+}
+[data-part="root"][data-viewport="mobile"][data-mode="panel"] { padding: 0; }
+
+[data-viewport="mobile"] .panel {
+  width: 100vw;
+  height: var(--viewport-h, 100dvh);
+  border-radius: 0;
+  animation: none;
+  /* box-sizing:border-box (Task 13, .panel base) incluye este padding DENTRO
+     de --viewport-h en vez de sumarlo por encima (Important safe-area, ronda
+     2) — si sumara, la caja exterior superaría la altura que el loader dio
+     al iframe y la protección inferior quedaría recortada justo donde más
+     falta hace. Idéntico razonamiento se aplica a left/right (Important
+     safe-area landscape, ronda 3): 100vw ya es el ancho exacto del CSS
+     viewport, así que sumar padding lateral DENTRO de la caja (border-box)
+     nunca desborda — un móvil apaisado con notch lateral (p.ej. iPhone en
+     landscape) necesita esa reserva para que el contenido no quede debajo
+     del recorte físico de la pantalla. */
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+[data-viewport="mobile"] .head { padding-top: calc(10px + env(safe-area-inset-top)); }
