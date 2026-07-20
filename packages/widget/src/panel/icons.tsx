@@ -37,3 +37,13 @@ export function AgentAvatar({ name, avatarUrl }: { name: string | undefined; ava
   if (!avatarUrl || failed) return <AgentInitialsAvatar name={name} />
   return <img class="agent-avatar-img" src={avatarUrl} referrerpolicy="no-referrer" alt="" onError={() => setFailed(true)} />
 }
+
+// Chevron para la píldora "ir al fondo" de MessageList — mismo estilo de
+// trazo (stroke, sin relleno) que los iconos de Header, no el relleno de BotIcon.
+export function ChevronDownIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-icon="chevron-down">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  )
+}

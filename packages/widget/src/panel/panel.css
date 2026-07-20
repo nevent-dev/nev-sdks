@@ -97,8 +97,16 @@ button, input, textarea, select { font-family: inherit; }
   .state-ribbon[data-ribbon="waiting"] { animation: none !important; }
 }
 
-/* ===== Zona de mensajes ===== */
-.msgs { flex: 1; overflow-y: auto; padding: 18px 16px 8px; display: flex; flex-direction: column; gap: 3px; background: var(--surface); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+/* ===== Zona de mensajes =====
+   .msgs-wrap es quien ahora ocupa el flex:1 dentro de .panel; .msgs se
+   dimensiona a su caja entera con inset:0. Necesario para que la píldora
+   "ir al fondo" (más abajo) pueda vivir COMO HERMANA de .msgs en vez de
+   dentro: un descendiente de un ancestro con overflow-y:auto (el propio
+   .msgs) se desplaza junto con su contenido al hacer scroll aunque sea
+   position:absolute — solo queda fija si su containing block (aquí
+   .msgs-wrap) está FUERA de la caja que scrollea. */
+.msgs-wrap { position: relative; flex: 1; min-height: 0; }
+.msgs { position: absolute; inset: 0; overflow-y: auto; padding: 18px 16px 8px; display: flex; flex-direction: column; gap: 3px; background: var(--surface); scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .msgs::-webkit-scrollbar { width: 5px; }
 .msgs::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
 .day { align-self: center; font-size: 11px; color: var(--faint); margin: 2px 0 10px; }
@@ -130,6 +138,24 @@ button, input, textarea, select { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) { .thinking .spark { animation: none !important; } }
 
 .msgs-inner { display: flex; flex-direction: column; gap: 3px; }
+
+/* Píldora "ir al fondo" (patrón Slack/WhatsApp/Stream/Sendbird). --scrim/
+   --on-scrim (mismo par que usa el precio del carrusel de cards) son
+   invariantes al tema — siempre oscura sobre la lista, tanto en claro como
+   en oscuro, en vez de --ink/--surface que se invierten con [data-theme]. */
+.scroll-pill {
+  position: absolute; left: 50%; bottom: 12px; transform: translateX(-50%);
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 34px; min-width: 34px; padding: 0 10px; border: none; border-radius: 99px; cursor: pointer;
+  background: var(--scrim); color: var(--on-scrim); box-shadow: var(--shadow-panel);
+  font: 600 12px var(--font-body); opacity: .94; transition: opacity .15s ease;
+}
+.scroll-pill:not(.has-count) { width: 34px; padding: 0; }
+.scroll-pill:hover { opacity: 1; }
+.scroll-pill:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+.scroll-pill svg { width: 16px; height: 16px; flex-shrink: 0; }
+.scroll-pill-count { white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .scroll-pill { transition: none; } }
 
 /* ===== Bienvenida + quick replies ===== */
 .welcome { padding: 6px 4px 14px; }
