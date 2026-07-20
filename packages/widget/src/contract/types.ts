@@ -75,6 +75,14 @@ export interface WidgetMessage {
   // en eventos legacy y en mensajes bot/user. Nunca se confía en el shape
   // tal cual llega de red (mismo criterio que assistantName/welcome arriba).
   authorName?: string
+  // Identidad de autor POR MENSAJE, resuelta en lectura al snapshot (backend
+  // en paralelo a W5b): ya no depende del matching authorName===agentName
+  // para decidir de quién es la foto (ese matching no distinguía "otro
+  // agente" de "el mismo agente renombrado"). SOLO snapshot — el contrato de
+  // eventos vivos (message.created) no lo lleva. El wire puede omitirlo
+  // (backend aún no desplegado) o mandarlo null (agente sin foto); nunca se
+  // confía en el shape tal cual llega de red.
+  authorAvatarUrl?: string | null
 }
 
 // GET /widget/v1/conversations/current/messages?limit=N

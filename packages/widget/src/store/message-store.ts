@@ -20,6 +20,12 @@ export interface StoredMessage {
   // optimistic/streaming placeholders carry null. MessageBubble falls back
   // to the conversation-level agentName, then a neutral glyph, when null.
   readonly authorName: string | null
+  // Foto de autor POR MENSAJE, resuelta en lectura al snapshot (backend en
+  // paralelo a W5b) — mismo criterio que authorName arriba: solo presente en
+  // mensajes role:'agent' hidratados desde snapshot; los caminos vivos
+  // (durable message.created, optimistic, streaming) llevan null. MANDA
+  // sobre agentAvatarUrl en MessageBubble cuando está presente.
+  readonly authorAvatarUrl: string | null
 }
 
 export interface StoreState {
@@ -134,6 +140,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
         id: m.messageId, role: m.role, text: m.text, status: 'sent',
         seq: null, streaming: false, createdAt: m.createdAt, clientId: null, turnId: null,
         authorName: m.authorName ?? null,
+        authorAvatarUrl: m.authorAvatarUrl ?? null,
       })
     }
     return next
@@ -172,6 +179,8 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
             // arriving this way relies on the conversation-level agentName
             // (set by agent.joined) for its avatar, same as before W5b.
             authorName: null,
+            // Same reasoning: authorAvatarUrl is snapshot-only too.
+            authorAvatarUrl: null,
           })
         }
         setMessages(next)
@@ -269,7 +278,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   const addOptimistic = (clientId: string, text: string): void => {
     setMessages([...messages, {
       id: clientId, role: 'user', text, status: 'pending', seq: null,
-      streaming: false, createdAt: now(), clientId, turnId: null, authorName: null,
+      streaming: false, createdAt: now(), clientId, turnId: null, authorName: null, authorAvatarUrl: null,
     }])
   }
   const ackOptimistic = (clientId: string, messageId: string): void => {
@@ -323,7 +332,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   const beginBotTurn = (turnId: string): void => {
     setMessages([...messages, {
       id: `turn:${turnId}`, role: 'bot', text: '', status: 'sent', seq: null,
-      streaming: true, createdAt: now(), clientId: null, turnId, authorName: null,
+      streaming: true, createdAt: now(), clientId: null, turnId, authorName: null, authorAvatarUrl: null,
     }])
   }
   const appendBotDelta = (turnId: string, delta: string): void => {

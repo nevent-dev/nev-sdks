@@ -185,6 +185,41 @@ describe('message store — durable core', () => {
     expect(messages.find((m) => m.id === 'm2')?.authorName).toBeNull()
   })
 
+  // Backend en paralelo: authorAvatarUrl por mensaje, RESUELTO EN LECTURA al
+  // snapshot (mismo criterio que authorName, que ahora también viaja
+  // resuelto al nombre ACTUAL del autor) — cubre el caso agente renombrado /
+  // multi-agente que authorName===agentName no podía distinguir.
+  it('mergeSnapshotMessages carries authorAvatarUrl per message, defaulting to null when absent', () => {
+    const s = createMessageStore()
+    const snap = {
+      messages: [
+        { messageId: 'm1', role: 'agent' as const, text: 'Hola, soy Ana', createdAt: '2026-07-18T10:00:00Z', authorName: 'Ana', authorAvatarUrl: 'https://res.nevent.es/agents/ana.jpg' },
+        { messageId: 'm2', role: 'bot' as const, text: 'Hola', createdAt: '2026-07-18T09:59:00Z' },
+      ],
+      state: 'AGENT_ACTIVE' as const,
+      snapshotCursor: 'evt_v1_conv_demo_01_2',
+      agent: { name: 'Ana' },
+    }
+    s.applySnapshot(snap)
+    const messages = s.getState().messages
+    expect(messages.find((m) => m.id === 'm1')?.authorAvatarUrl).toBe('https://res.nevent.es/agents/ana.jpg')
+    expect(messages.find((m) => m.id === 'm2')?.authorAvatarUrl).toBeNull()
+  })
+
+  // Los mensajes VIVOS (durable message.created, optimistic, placeholder de
+  // streaming) no traen identidad por-mensaje — igual que authorName, heredan
+  // la identidad de la CONVERSACIÓN (agentAvatarUrl), no una propia.
+  it('live message paths (durable message.created, optimistic, streaming placeholder) carry a null authorAvatarUrl', () => {
+    const s = createMessageStore()
+    s.applyDurableEvent(msgEvent(2, 'm2', 'agent', 'hola'))
+    s.addOptimistic('c1', 'hola')
+    s.beginBotTurn('t1')
+    const messages = s.getState().messages
+    expect(messages.find((m) => m.id === 'm2')?.authorAvatarUrl).toBeNull()
+    expect(messages.find((m) => m.id === 'c1')?.authorAvatarUrl).toBeNull()
+    expect(messages.find((m) => m.id === 'turn:t1')?.authorAvatarUrl).toBeNull()
+  })
+
   it('applySnapshot after events keeps the max cursor and merges (no rewind, no dup)', () => {
     const s = createMessageStore()
     s.applyDurableEvent(msgEvent(5, 'm5', 'bot', 'live'))

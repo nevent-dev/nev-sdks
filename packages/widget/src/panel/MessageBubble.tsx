@@ -25,16 +25,16 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
   // AgentInitialsAvatar renders as a neutral '?' glyph. An agent-role message
   // NEVER falls back to BotIcon, whatever the identity resolution yields.
   const agentAvatarName = message.authorName ?? agentName ?? undefined
-  // Foto del agente: el contrato NO trae un authorAvatarUrl por mensaje (solo
-  // authorName, backend W5a) — la única foto disponible es la del agente
-  // ACTUAL de la conversación. Se pinta cuando el mensaje es atribuible a él:
-  // sin autor histórico propio (mensaje vivo) O con un authorName que
-  // coincide con el agente actual (mensaje rehidratado por snapshot tras una
-  // recarga — sin esta rama, un F5 degradaría todas sus burbujas a iniciales
-  // mientras la cabecera sí muestra la foto). Un authorName DISTINTO jamás
-  // hereda la foto del actual: sería fabricar identidad de otro agente.
+  // Foto del agente: con identidad POR-MENSAJE resuelta en lectura al
+  // snapshot (backend en paralelo a W5b) ya no dependemos del matching por
+  // nombre para decidir de quién es la foto — authorAvatarUrl, cuando está
+  // presente, MANDA sin más preguntas (cubre el caso agente renombrado /
+  // multi-agente que authorName===agentName no podía distinguir). El
+  // fallback por nombre de abajo queda solo para mensajes VIVOS (el
+  // contrato de eventos no lleva authorAvatarUrl) y backends aún sin
+  // desplegar con el campo.
   const bubbleAvatarUrl =
-    message.authorName === null || message.authorName === agentName ? agentAvatarUrl : null
+    message.authorAvatarUrl ?? (message.authorName === null || message.authorName === agentName ? agentAvatarUrl : null)
 
   return (
     <div class={`m${isUser ? ' user' : ''}${compact ? ' compact' : ''}`}>

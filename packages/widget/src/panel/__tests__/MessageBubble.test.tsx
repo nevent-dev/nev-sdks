@@ -6,7 +6,7 @@ import { mount, cleanupMounted } from './test-utils'
 function msg(overrides: Partial<StoredMessage> = {}): StoredMessage {
   return {
     id: 'm1', role: 'bot', text: 'Hola', status: 'sent', seq: 1, streaming: false,
-    createdAt: '2026-07-18T14:02:00.000Z', clientId: null, turnId: null, authorName: null, ...overrides,
+    createdAt: '2026-07-18T14:02:00.000Z', clientId: null, turnId: null, authorName: null, authorAvatarUrl: null, ...overrides,
   }
 }
 
@@ -130,6 +130,34 @@ describe('MessageBubble', () => {
       <MessageBubble message={msg({ role: 'agent', authorName: null })} agentName="Laura" agentAvatarUrl={null} onRetry={vi.fn()} compact={false} />,
     )
     expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
+  })
+
+  // Backend en paralelo: authorAvatarUrl por mensaje, resuelto en lectura al
+  // snapshot — MANDA sobre el fallback por nombre. Cubre el caso renombrado /
+  // multi-agente: authorName !== agentName ya no importa si el mensaje trae
+  // su propia foto.
+  it('mensaje con authorAvatarUrl propio: pinta ESA foto aunque authorName sea distinto del agente actual (renombrado/multi-agente)', async () => {
+    const root = await mount(
+      <MessageBubble
+        message={msg({ role: 'agent', authorName: 'Ana', authorAvatarUrl: 'https://res.nevent.es/agents/ana-actual.jpg' })}
+        agentName="Laura" agentAvatarUrl="https://res.nevent.es/agents/laura.jpg" onRetry={vi.fn()} compact={false}
+      />,
+    )
+    const img = root.querySelector('.b-avatar img.agent-avatar-img')
+    expect(img).not.toBeNull()
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/agents/ana-actual.jpg')
+    expect(root.querySelector('.initials-avatar')).toBeNull()
+  })
+
+  it('mensaje sin authorAvatarUrl propio: mantiene el fallback actual por nombre (backend sin desplegar / mensaje vivo)', async () => {
+    const root = await mount(
+      <MessageBubble
+        message={msg({ role: 'agent', authorName: 'Ana', authorAvatarUrl: null })}
+        agentName="Laura" agentAvatarUrl="https://res.nevent.es/agents/laura.jpg" onRetry={vi.fn()} compact={false}
+      />,
+    )
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.querySelector('.initials-avatar')?.textContent).toBe('A')
   })
 
   it('compact:true oculta el avatar visualmente (ghost) para agrupar burbujas consecutivas', async () => {
