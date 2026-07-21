@@ -9,13 +9,36 @@ import '../panel/panel.css'
 import { render } from 'preact'
 import { App, type ShellBus } from './app'
 import { open as openEnvelope, seal, isCommand, LOADER_TO_SHELL } from '../protocol/envelope'
-import { createSessionClient as realCreateSessionClient } from './session'
+import { createSessionClient as realCreateSessionClient, type SessionClient } from './session'
 import { applyTheme } from '../panel/theme'
 import type { LastSeen } from '../panel/use-unread-count'
+import { createBackoff, type Backoff } from '../transport/backoff'
+import type { Scheduler } from '../transport/events-channel'
 
 interface ShellOptions {
   apiBase: string
   createClient?: typeof realCreateSessionClient
+  scheduler?: Scheduler
+  backoff?: Backoff
+}
+
+// Clasifica un fallo de arranque (config o sesión) en TRANSITORIO
+// (reintentable: la ventana de rate limit se libera sola, un despliegue en
+// curso se resuelve solo) o DELIBERADO (morir cerrado sin reintentar —
+// reintentar no cambiaría el resultado y solo martillearía al backend).
+// session.ts lanza `config_failed:<status>` / `session_failed:<status>` (ver
+// session.ts); un fallo de red (el fetch nunca llega al servidor: offline,
+// DNS, conexión reseteada) lanza un TypeError nativo, nunca uno de esos dos
+// formatos — de ahí el chequeo aparte. Por defecto (formato irreconocible,
+// o cualquier status no listado como transitorio) se considera DELIBERADO:
+// nunca asumir que un error desconocido es seguro de reintentar.
+export function isRetriableBootError(err: unknown): boolean {
+  if (err instanceof TypeError) return true
+  if (!(err instanceof Error)) return false
+  const match = /^(?:config_failed|session_failed):(\d+)$/.exec(err.message)
+  if (!match) return false
+  const status = Number(match[1])
+  return status === 429 || (status >= 500 && status < 600)
 }
 
 interface ViewportPayload { kind: 'mobile' | 'desktop'; height: number }
@@ -39,6 +62,16 @@ function parseLastSeenPayload(raw: unknown): LastSeen | null {
 export function startShell(w: Window, opts: ShellOptions): void {
   const instanceId = w.location.hash.slice(1)
   const createClient = opts.createClient ?? realCreateSessionClient
+  const scheduler: Scheduler = opts.scheduler ?? {
+    setTimeout: (fn, ms) => w.setTimeout(fn, ms),
+    clearTimeout: (id) => w.clearTimeout(id),
+  }
+  // Base 5s / factor 2 / tope 60s: la ventana de rate limit del backend es de
+  // 60s (10 POST /sessions por IP), así que el primer reintento ya espera
+  // algo razonable y el tope garantiza que, pasada esa ventana, el visitante
+  // legítimo entra en el primer o segundo intento útil sin martillear al
+  // backend mientras tanto.
+  const backoff: Backoff = opts.backoff ?? createBackoff({ baseMs: 5000, factor: 2, maxMs: 60000 })
   let parent: { post: (env: unknown) => void; origin: string; source: Window } | null = null
   let commandCb: ((type: string, payload: unknown) => void) | null = null
   let latchedViewport: ViewportPayload | null = null
@@ -81,26 +114,58 @@ export function startShell(w: Window, opts: ShellOptions): void {
       // solo cambia el resumeSecret que se le pasa.
       const buildClient = (secret: string | null) =>
         createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin, resumeSecret: secret })
-      void buildClient(resumeSecret)
-        .then((client) => {
-          // Reenvía al loader lo que el backend acaba de emitir (mismo
-          // resumeSecret en un resume genuino, uno nuevo en una sesión
-          // fresca) para que sobreviva al próximo reload/pestaña — el loader
-          // es quien puede escribirlo en el storage del anfitrión, el shell
-          // (iframe) no. Task W3c: el VIGENTE (getCurrentResumeSecret()), no
-          // el snapshot inmutable de getSession() — ver shell/session.ts.
-          // Payload completo SIEMPRE (ver diseño de la task): si el init trajo
-          // un lastSeen, se re-emite igual aquí — el loader escribe el blob
-          // entero sin merge, así que omitirlo borraría el watermark que el
-          // propio init acaba de traer.
-          bus.emit('session_persist', { resumeSecret: client.getCurrentResumeSecret(), ...(initialLastSeen ? { lastSeen: initialLastSeen } : {}) })
-          applyTheme(document.documentElement, client.getConfig().theme)
-          const root = w.document.getElementById('root')
-          if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} createSession={buildClient} initialLastSeen={initialLastSeen} />, root)
-        })
-        .catch((err: unknown) => {
-          console.error('[nevent-widget] fallo al arrancar la sesión', err)
-        })
+
+      const mountFromClient = (client: SessionClient): void => {
+        // Reenvía al loader lo que el backend acaba de emitir (mismo
+        // resumeSecret en un resume genuino, uno nuevo en una sesión
+        // fresca) para que sobreviva al próximo reload/pestaña — el loader
+        // es quien puede escribirlo en el storage del anfitrión, el shell
+        // (iframe) no. Task W3c: el VIGENTE (getCurrentResumeSecret()), no
+        // el snapshot inmutable de getSession() — ver shell/session.ts.
+        // Payload completo SIEMPRE (ver diseño de la task): si el init trajo
+        // un lastSeen, se re-emite igual aquí — el loader escribe el blob
+        // entero sin merge, así que omitirlo borraría el watermark que el
+        // propio init acaba de traer.
+        bus.emit('session_persist', { resumeSecret: client.getCurrentResumeSecret(), ...(initialLastSeen ? { lastSeen: initialLastSeen } : {}) })
+        applyTheme(document.documentElement, client.getConfig().theme)
+        const root = w.document.getElementById('root')
+        if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} createSession={buildClient} initialLastSeen={initialLastSeen} />, root)
+      }
+
+      // Bug real: un visitante que hace ~10 hard-reloads rápidos agota el
+      // rate limit del backend (10 POST /sessions por IP/60s) → 429 → antes
+      // de este fix el catch de abajo solo logueaba y el shell quedaba
+      // MUERTO en silencio (sin launcher) hasta una recarga manual posterior
+      // a la ventana. attemptBootstrap reintenta el MISMO flujo completo
+      // (config + sesión) desde cero ante un fallo TRANSITORIO — nunca un
+      // fetch a medias — así que un éxito tardío monta la App exactamente
+      // por el mismo camino que el arranque feliz (mountFromClient), sin
+      // registrar nada nuevo en el bus ni volver a esperar otro init:
+      // installationId/origin ya están capturados en el closure de ESTE
+      // init, que es el único que se llega a aceptar (`if (parent) return`
+      // de arriba bloquea cualquier init posterior).
+      // Sin tope de reintentos a propósito: la ventana de rate limit se
+      // libera sola en 60s y cualquier otro fallo transitorio (backend
+      // reiniciándose) es cuestión de tiempo — un visitante legítimo debe
+      // acabar entrando solo, sin quedar atrapado por un número mágico de
+      // intentos agotados. El backoff (tope 60s) evita que ese reintento
+      // indefinido martillee al backend mientras tanto.
+      const attemptBootstrap = (): void => {
+        void buildClient(resumeSecret)
+          .then(mountFromClient)
+          .catch((err: unknown) => {
+            if (isRetriableBootError(err)) {
+              scheduler.setTimeout(attemptBootstrap, backoff.nextDelay())
+              return
+            }
+            // Fallo DELIBERADO (403 origen no permitido, 404 instalación
+            // apagada/inexistente, 401, o cualquier otro no reconocido):
+            // morir cerrado sin reintentar — comportamiento preexistente
+            // intacto (mismo criterio fail-closed que W8).
+            console.error('[nevent-widget] fallo al arrancar la sesión', err)
+          })
+      }
+      attemptBootstrap()
       return
     }
     // Comandos post-init: exigir el MISMO source y el MISMO origin que el
