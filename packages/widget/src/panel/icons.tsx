@@ -45,12 +45,15 @@ export function AgentAvatar({ name, avatarUrl }: { name: string | undefined; ava
 
 // Logo del tenant en el hueco de identidad del BOT (Launcher, Header sin
 // agente humano, burbujas de mensaje del bot) — spec del widget-rewrite,
-// theme.logoUrl en contract/types.ts. A diferencia de AgentAvatar, el fallo
-// de carga es PERMANENTE: sin useEffect que reintente al recibir el mismo
-// logoUrl en un re-render, porque el logo del tenant no se reasigna a mitad
-// de sesión como sí puede pasar con el agente asignado a una conversación.
+// theme.logoUrl en contract/types.ts. El fallo de carga es permanente PARA
+// ESA URL (la misma imagen rota no se reintenta en re-renders), pero una
+// URL NUEVA recupera su oportunidad: App puede reconstruir el SessionClient
+// sin desmontar el árbol (rebuild de sesión) y traer un logo distinto —
+// sin este reset, un fallo antiguo dejaría pegado el glifo por defecto
+// aunque el logo nuevo cargue perfectamente.
 export function BotLogo({ logoUrl }: { logoUrl: string | null | undefined }) {
   const [failed, setFailed] = useState(false)
+  useEffect(() => { setFailed(false) }, [logoUrl])
   if (!logoUrl || failed) return <BotIcon />
   return <img class="bot-logo-img" src={logoUrl} referrerpolicy="no-referrer" alt="" onError={() => setFailed(true)} />
 }

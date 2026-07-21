@@ -150,10 +150,23 @@ export function startShell(w: Window, opts: ShellOptions): void {
       // acabar entrando solo, sin quedar atrapado por un número mágico de
       // intentos agotados. El backoff (tope 60s) evita que ese reintento
       // indefinido martillee al backend mientras tanto.
+      // then de DOS brazos a propósito: el clasificador de reintentos solo
+      // ve rechazos de buildClient (red/config/sesión). Un throw DENTRO de
+      // mountFromClient (render, tema, datos malformados) también sería
+      // TypeError muchas veces — con .then(f).catch(g) entraría al
+      // clasificador y reintentaría el bootstrap entero en bucle, creando
+      // una sesión nueva por intento sin arreglar nada. El fallo de montaje
+      // muere logueado, sin reintento.
       const attemptBootstrap = (): void => {
-        void buildClient(resumeSecret)
-          .then(mountFromClient)
-          .catch((err: unknown) => {
+        void buildClient(resumeSecret).then(
+          client => {
+            try {
+              mountFromClient(client)
+            } catch (err) {
+              console.error('[nevent-widget] fallo al montar el widget', err)
+            }
+          },
+          (err: unknown) => {
             if (isRetriableBootError(err)) {
               scheduler.setTimeout(attemptBootstrap, backoff.nextDelay())
               return
@@ -163,7 +176,8 @@ export function startShell(w: Window, opts: ShellOptions): void {
             // morir cerrado sin reintentar — comportamiento preexistente
             // intacto (mismo criterio fail-closed que W8).
             console.error('[nevent-widget] fallo al arrancar la sesión', err)
-          })
+          },
+        )
       }
       attemptBootstrap()
       return
