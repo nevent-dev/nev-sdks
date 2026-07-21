@@ -1,10 +1,15 @@
 import { useEffect, useState } from 'preact/hooks'
 
-// Icono de "spark" del bot, reutilizado por Header, Launcher y MessageBubble.
+// Glifo de identidad del bot (burbuja de chat con cola), reutilizado por
+// Header, Launcher y MessageBubble. El spark queda solo como indicador de
+// estado "Pensando…" en MessageBubble — no es el logo.
 export function BotIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" data-icon="bot">
-      <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4L12 3z" fill="currentColor" />
+      <path
+        d="M12 3.3c-5.1 0-9.2 3.3-9.2 7.4 0 1.9.9 3.6 2.3 4.9-.2 1.1-.7 2.1-1.5 3-.2.2-.1.6.2.6 1.8 0 3.3-.6 4.4-1.3 1.2.4 2.4.6 3.8.6 5.1 0 9.2-3.3 9.2-7.4S17.1 3.3 12 3.3z"
+        fill="currentColor"
+      />
     </svg>
   )
 }
