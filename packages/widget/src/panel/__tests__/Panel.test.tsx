@@ -39,6 +39,13 @@ describe('Panel', () => {
     expect(root.querySelector('.welcome')).not.toBeNull()
   })
 
+  it('config.theme.logoUrl llega hasta la cabecera (mismo canal que assistantName): pinta el logo del tenant, no el BotIcon', async () => {
+    const config = { ...fixtureConfig(), theme: { ...fixtureConfig().theme, logoUrl: 'https://res.nevent.es/tenants/demo-fest/logo.png' } }
+    const { root } = await mountPanel({ config })
+    const img = root.querySelector('.avatar img.bot-logo-img')
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
+  })
+
   it('Critical #1 — fase ESCALATED_WAITING: pinta WaitingCard aunque la conexión esté offline (no depende de ribbon)', async () => {
     const store = createMessageStore(() => '2026-07-18T14:00:00.000Z')
     store.applySnapshot({ messages: [], state: 'ESCALATED_WAITING', snapshotCursor: 'evt_v1_c_1' })

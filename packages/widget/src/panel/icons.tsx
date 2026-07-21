@@ -43,6 +43,18 @@ export function AgentAvatar({ name, avatarUrl }: { name: string | undefined; ava
   return <img class="agent-avatar-img" src={avatarUrl} referrerpolicy="no-referrer" alt="" onError={() => setFailed(true)} />
 }
 
+// Logo del tenant en el hueco de identidad del BOT (Launcher, Header sin
+// agente humano, burbujas de mensaje del bot) — spec del widget-rewrite,
+// theme.logoUrl en contract/types.ts. A diferencia de AgentAvatar, el fallo
+// de carga es PERMANENTE: sin useEffect que reintente al recibir el mismo
+// logoUrl en un re-render, porque el logo del tenant no se reasigna a mitad
+// de sesión como sí puede pasar con el agente asignado a una conversación.
+export function BotLogo({ logoUrl }: { logoUrl: string | null | undefined }) {
+  const [failed, setFailed] = useState(false)
+  if (!logoUrl || failed) return <BotIcon />
+  return <img class="bot-logo-img" src={logoUrl} referrerpolicy="no-referrer" alt="" onError={() => setFailed(true)} />
+}
+
 // Chevron para la píldora "ir al fondo" de MessageList — mismo estilo de
 // trazo (stroke, sin relleno) que los iconos de Header, no el relleno de BotIcon.
 export function ChevronDownIcon() {

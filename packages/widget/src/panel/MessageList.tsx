@@ -159,7 +159,7 @@ export function MessageList({ config, messages, agentName, agentAvatarUrl, onRet
           {messages.length > 0 && <div class="day">Hoy</div>}
           {messages.map((m, i) => (
             <MessageBubble key={m.id} message={m} agentName={agentName} agentAvatarUrl={agentAvatarUrl} onRetry={onRetry}
-              compact={i > 0 && messages[i - 1]?.role === m.role} />
+              compact={i > 0 && messages[i - 1]?.role === m.role} logoUrl={config.theme.logoUrl ?? null} />
           ))}
           {trailing}
         </div>

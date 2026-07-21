@@ -114,4 +114,14 @@ describe('computeViewState — conversationPhase es SIEMPRE la fase dictada por 
     const v = computeViewState({ ...base, conversationState: null })
     expect(v.conversationPhase).toBe('idle')
   })
+
+  it('logoUrl del input se expone tal cual en el viewState (sin transformar, igual que el resto de campos de red)', () => {
+    const v = computeViewState({ ...base, logoUrl: 'https://res.nevent.es/tenants/demo-fest/logo.png' })
+    expect(v.logoUrl).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
+  })
+
+  it('logoUrl ausente del input (drift de contrato / tenant sin logo): el viewState expone null, nunca undefined', () => {
+    const v = computeViewState(base)
+    expect(v.logoUrl).toBeNull()
+  })
 })

@@ -34,4 +34,19 @@ describe('Launcher', () => {
     await mount(<Launcher unreadCount={0} autofocus={false} onOpen={vi.fn()} onResize={vi.fn()} />)
     expect(document.activeElement).not.toBe(document.querySelector('[data-part=launcher]'))
   })
+
+  it('con logoUrl: pinta el logo del tenant en vez del BotIcon', async () => {
+    const root = await mount(
+      <Launcher unreadCount={0} autofocus={false} onOpen={vi.fn()} onResize={vi.fn()} logoUrl="https://res.nevent.es/tenants/demo-fest/logo.png" />,
+    )
+    const img = root.querySelector('img.bot-logo-img')
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
+    expect(root.querySelector('svg[data-icon=bot]')).toBeNull()
+  })
+
+  it('sin logoUrl: sigue mostrando el BotIcon por defecto (protege el default)', async () => {
+    const root = await mount(<Launcher unreadCount={0} autofocus={false} onOpen={vi.fn()} onResize={vi.fn()} />)
+    expect(root.querySelector('svg[data-icon=bot]')).not.toBeNull()
+    expect(root.querySelector('img')).toBeNull()
+  })
 })

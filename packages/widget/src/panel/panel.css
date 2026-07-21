@@ -65,7 +65,10 @@ button, input, textarea, select { font-family: inherit; }
    hueco circular que .initials-avatar, con object-fit para no deformar
    fotos que no sean cuadradas. display:block quita el hueco de línea base
    que un <img> inline deja bajo sí mismo. */
-.agent-avatar-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
+/* .bot-logo-img (BotLogo en icons.tsx) comparte la misma regla: mismo hueco
+   circular que dan .launcher/.avatar/.b-avatar (ya son círculos de tamaño
+   fijo), solo recortando/centrando la imagen del tenant dentro. */
+.agent-avatar-img, .bot-logo-img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; display: block; }
 
 .head .id { flex: 1; min-width: 0; }
 .head .name { font: 600 14.5px/1.2 var(--font-display); color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

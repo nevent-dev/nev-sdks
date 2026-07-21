@@ -529,3 +529,28 @@ describe("App — bus.onCommand: 'update'/'consent' (comandos públicos del host
     expect(root.querySelector('[data-part="root"]')?.getAttribute('data-mode')).toBe('panel')
   })
 })
+
+describe('App — config.theme.logoUrl llega hasta el Launcher (mismo canal que el resto de config, ver Panel)', () => {
+  it('con logoUrl en config: el Launcher pinta el logo del tenant en vez del BotIcon', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus } = fakeBus()
+    const config = { ...fixtureConfig(), theme: { ...fixtureConfig().theme, logoUrl: 'https://res.nevent.es/tenants/demo-fest/logo.png' } }
+    const root = await mount(<App client={fakeClient({ getConfig: () => config })} bus={bus} />)
+
+    const img = root.querySelector('img.bot-logo-img')
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
+  })
+
+  it('sin logoUrl en config: el Launcher sigue mostrando el BotIcon por defecto', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    const { bus } = fakeBus()
+    const root = await mount(<App client={fakeClient()} bus={bus} />)
+
+    expect(root.querySelector('svg[data-icon=bot]')).not.toBeNull()
+    expect(root.querySelector('img.bot-logo-img')).toBeNull()
+  })
+})

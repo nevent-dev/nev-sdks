@@ -217,7 +217,7 @@ export function App({ client: initialClient, bus, resumedSession = false, create
         <Panel config={config} transport={transport} onMinimize={close} onClose={close} onResize={onResize}
           viewportKind={viewport.kind} viewportHeight={viewport.height} />
       ) : (
-        <Launcher unreadCount={unread} autofocus={openedBeforeRef.current} onOpen={() => setOpen(true)} onResize={onResize} />
+        <Launcher unreadCount={unread} autofocus={openedBeforeRef.current} onOpen={() => setOpen(true)} onResize={onResize} logoUrl={config.theme.logoUrl ?? null} />
       )}
     </div>
   )

@@ -1,5 +1,5 @@
 import type { PanelViewState } from './view-state'
-import { AgentAvatar, BotIcon } from './icons'
+import { AgentAvatar, BotLogo } from './icons'
 
 export interface HeaderProps {
   viewState: PanelViewState
@@ -12,7 +12,7 @@ export function Header({ viewState, onMinimize, onClose }: HeaderProps) {
     <>
       <header class="head">
         <div class="avatar">
-          {viewState.showAgentAvatar ? <AgentAvatar name={viewState.headerName} avatarUrl={viewState.headerAvatarUrl} /> : <BotIcon />}
+          {viewState.showAgentAvatar ? <AgentAvatar name={viewState.headerName} avatarUrl={viewState.headerAvatarUrl} /> : <BotLogo logoUrl={viewState.logoUrl} />}
           {viewState.showAgentAvatar && <span class="dot-live" aria-hidden="true" />}
         </div>
         <div class="id">

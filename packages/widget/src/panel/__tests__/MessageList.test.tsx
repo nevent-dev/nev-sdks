@@ -56,6 +56,16 @@ describe('MessageList', () => {
     expect(root.querySelector('.day')).toBeNull()
   })
 
+  it('config.theme.logoUrl llega hasta la burbuja del bot (mismo canal que Welcome, que ya recibe config completo)', async () => {
+    const config = { ...fixtureConfig(), theme: { ...fixtureConfig().theme, logoUrl: 'https://res.nevent.es/tenants/demo-fest/logo.png' } }
+    const root = await mount(
+      <MessageList config={config} messages={[msg({ id: 'a', role: 'bot' })]} agentName={null} agentAvatarUrl={null}
+        onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,
+    )
+    const img = root.querySelector('.b-avatar img.bot-logo-img')
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
+  })
+
   it('Important #9 — showWelcome:false aunque no haya mensajes (p.ej. fase waiting recién escalada sin historial visible): NO muestra Welcome', async () => {
     const root = await mount(
       <MessageList config={fixtureConfig()} messages={[]} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} onQuickReply={vi.fn()} showWelcome={false} />,

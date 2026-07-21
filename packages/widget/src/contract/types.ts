@@ -14,6 +14,12 @@ export interface WidgetConfig {
     primaryColor?: string
     position: 'right' | 'left'
     mode: 'light' | 'dark' | 'auto'
+    // Logo del tenant que sustituye al glifo BotIcon por defecto (Launcher,
+    // Header sin agente humano, burbujas de mensaje del bot). Ausente o null
+    // (tenant sin logo configurado) son ambos casos legítimos — tal cual
+    // llega de red, sin transformar, igual que el resto de campos opcionales
+    // de este bloque.
+    logoUrl?: string | null
   }
   features: { upload: boolean; handoff: boolean }
   // Opcional: normalizado en runtime en shell/session.ts (Task 15) — nunca

@@ -48,6 +48,27 @@ describe('Header', () => {
     expect(root.querySelector('.dot-live')).not.toBeNull()
   })
 
+  it('sin agente humano + logoUrl: pinta el logo del tenant en vez del BotIcon', async () => {
+    const viewState = computeViewState({
+      conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
+      assistantName: 'Asistente de DEMO FEST', isStreaming: false, logoUrl: 'https://res.nevent.es/tenants/demo-fest/logo.png',
+    })
+    const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
+    const img = root.querySelector('.avatar img.bot-logo-img')
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
+    expect(root.querySelector('svg[data-icon=bot]')).toBeNull()
+  })
+
+  it('con agente humano + logoUrl seteado: sigue pintando AgentAvatar, el logo del bot no se cuela', async () => {
+    const viewState = computeViewState({
+      conversationState: 'AGENT_ACTIVE', connection: 'live', agentName: 'Laura', agentAvatarUrl: null,
+      assistantName: 'Asistente de DEMO FEST', isStreaming: false, logoUrl: 'https://res.nevent.es/tenants/demo-fest/logo.png',
+    })
+    const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
+    expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
+    expect(root.querySelector('img.bot-logo-img')).toBeNull()
+  })
+
   it('minimizar y cerrar disparan sus callbacks', async () => {
     const viewState = computeViewState({
       conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,

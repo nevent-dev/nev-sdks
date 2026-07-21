@@ -41,6 +41,7 @@ export function Panel({ config, transport, onMinimize, onClose, onResize, viewpo
     agentAvatarUrl: state.agentAvatarUrl,
     assistantName,
     isStreaming,
+    logoUrl: config.theme.logoUrl ?? null,
   })
 
   // Foco inicial SOLO en desktop (Important #5 / Global Constraints) — el

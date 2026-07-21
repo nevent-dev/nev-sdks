@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { act } from 'preact/test-utils'
-import { BotIcon, AgentInitialsAvatar, AgentAvatar } from '../icons'
-import { mount, cleanupMounted } from './test-utils'
+import { BotIcon, AgentInitialsAvatar, AgentAvatar, BotLogo } from '../icons'
+import { mount, rerender, cleanupMounted } from './test-utils'
 
 afterEach(cleanupMounted)
 
@@ -71,5 +71,52 @@ describe('AgentAvatar', () => {
     await act(() => { img.dispatchEvent(new Event('error')) })
     expect(root.querySelector('img')).toBeNull()
     expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
+  })
+})
+
+describe('BotLogo', () => {
+  it('con logoUrl: pinta el logo del tenant, no el glifo BotIcon', async () => {
+    const root = await mount(<BotLogo logoUrl="https://res.nevent.es/tenants/demo-fest/logo.png" />)
+    const img = root.querySelector('img.bot-logo-img')
+    expect(img).not.toBeNull()
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
+    expect(root.querySelector('svg[data-icon=bot]')).toBeNull()
+  })
+
+  it('la <img> lleva referrerpolicy=no-referrer y alt vacío (decorativa, mismo criterio que AgentAvatar)', async () => {
+    const root = await mount(<BotLogo logoUrl="https://res.nevent.es/tenants/demo-fest/logo.png" />)
+    const img = root.querySelector('img')
+    expect(img?.getAttribute('referrerpolicy')).toBe('no-referrer')
+    expect(img?.getAttribute('alt')).toBe('')
+  })
+
+  it('logoUrl null: cae a BotIcon (protege el default, tenant sin logo configurado)', async () => {
+    const root = await mount(<BotLogo logoUrl={null} />)
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.querySelector('svg[data-icon=bot]')).not.toBeNull()
+  })
+
+  it('logoUrl undefined (drift de contrato, backend sin desplegar el campo): también cae a BotIcon', async () => {
+    const root = await mount(<BotLogo logoUrl={undefined} />)
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.querySelector('svg[data-icon=bot]')).not.toBeNull()
+  })
+
+  it('si la imagen falla al cargar, cae a BotIcon en vez de dejar un hueco roto', async () => {
+    const root = await mount(<BotLogo logoUrl="https://res.nevent.es/tenants/demo-fest/broken.png" />)
+    const img = root.querySelector('img')!
+    await act(() => { img.dispatchEvent(new Event('error')) })
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.querySelector('svg[data-icon=bot]')).not.toBeNull()
+  })
+
+  it('el fallo es PERMANENTE: a diferencia de AgentAvatar, un re-render con el MISMO logoUrl no vuelve a intentar la <img>', async () => {
+    const root = await mount(<BotLogo logoUrl="https://res.nevent.es/tenants/demo-fest/broken.png" />)
+    const img = root.querySelector('img')!
+    await act(() => { img.dispatchEvent(new Event('error')) })
+    expect(root.querySelector('img')).toBeNull()
+    await rerender(<BotLogo logoUrl="https://res.nevent.es/tenants/demo-fest/broken.png" />, root)
+    expect(root.querySelector('img')).toBeNull()
+    expect(root.querySelector('svg[data-icon=bot]')).not.toBeNull()
   })
 })

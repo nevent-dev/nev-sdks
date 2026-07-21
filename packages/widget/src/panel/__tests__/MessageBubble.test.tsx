@@ -164,4 +164,29 @@ describe('MessageBubble', () => {
     const root = await mount(<MessageBubble message={msg({ role: 'bot' })} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} compact={true} />)
     expect(root.querySelector('.b-avatar.ghost')).not.toBeNull()
   })
+
+  it('burbuja de bot con logoUrl: pinta el logo del tenant en vez del BotIcon', async () => {
+    const root = await mount(
+      <MessageBubble message={msg({ role: 'bot' })} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} compact={false}
+        logoUrl="https://res.nevent.es/tenants/demo-fest/logo.png" />,
+    )
+    const img = root.querySelector('.b-avatar img.bot-logo-img')
+    expect(img?.getAttribute('src')).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
+    expect(root.querySelector('svg[data-icon=bot]')).toBeNull()
+  })
+
+  it('burbuja de bot sin logoUrl: BotIcon por defecto (protege el default)', async () => {
+    const root = await mount(<MessageBubble message={msg({ role: 'bot' })} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} compact={false} />)
+    expect(root.querySelector('svg[data-icon=bot]')).not.toBeNull()
+    expect(root.querySelector('.b-avatar img')).toBeNull()
+  })
+
+  it('burbuja de agente con logoUrl del bot seteado: el logo no se cuela, sigue la identidad del agente (iniciales)', async () => {
+    const root = await mount(
+      <MessageBubble message={msg({ role: 'agent' })} agentName="Laura" agentAvatarUrl={null} onRetry={vi.fn()} compact={false}
+        logoUrl="https://res.nevent.es/tenants/demo-fest/logo.png" />,
+    )
+    expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
+    expect(root.querySelector('img.bot-logo-img')).toBeNull()
+  })
 })

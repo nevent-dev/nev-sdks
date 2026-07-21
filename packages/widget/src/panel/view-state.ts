@@ -12,6 +12,10 @@ export interface ViewStateInput {
   agentAvatarUrl: string | null
   assistantName: string
   isStreaming: boolean
+  // Logo del tenant (config.theme.logoUrl) — opcional porque llamadores
+  // existentes (tests, callers previos a esta feature) no lo conocen; ver
+  // PanelViewState.logoUrl para el valor ya normalizado que consume Header.
+  logoUrl?: string | null
 }
 
 export interface PanelViewState {
@@ -28,10 +32,11 @@ export interface PanelViewState {
   connectionBanner: ConnectionBanner
   showAgentAvatar: boolean
   headerAvatarUrl: string | null
+  logoUrl: string | null
 }
 
 export function computeViewState(input: ViewStateInput): PanelViewState {
-  const { conversationState, connection, agentName, agentAvatarUrl, assistantName, isStreaming } = input
+  const { conversationState, connection, agentName, agentAvatarUrl, assistantName, isStreaming, logoUrl } = input
 
   // 1) Fase — dictada EXCLUSIVAMENTE por el servidor (spec §5). Nunca se
   // recalcula ni se oculta por conexión o streaming (Critical #1).
@@ -102,5 +107,6 @@ export function computeViewState(input: ViewStateInput): PanelViewState {
     connectionBanner: connection === 'offline' ? 'offline' : (connection === 'reconnecting' || connection === 'polling') ? 'reconnect' : null,
     showAgentAvatar: hasAgent,
     headerAvatarUrl,
+    logoUrl: logoUrl ?? null,
   }
 }

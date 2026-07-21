@@ -1,5 +1,5 @@
 import type { StoredMessage } from '../store/message-store'
-import { AgentAvatar, BotIcon } from './icons'
+import { AgentAvatar, BotLogo } from './icons'
 
 export interface MessageBubbleProps {
   message: StoredMessage
@@ -7,6 +7,9 @@ export interface MessageBubbleProps {
   agentAvatarUrl: string | null
   onRetry: (clientId: string) => void
   compact: boolean
+  // Logo del tenant (config.theme.logoUrl) — opcional: llamadores previos a
+  // esta feature no lo conocen y deben seguir cayendo al BotIcon por defecto.
+  logoUrl?: string | null
 }
 
 function formatTime(iso: string): string {
@@ -15,7 +18,7 @@ function formatTime(iso: string): string {
   return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
 }
 
-export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, compact }: MessageBubbleProps) {
+export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, compact, logoUrl }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const isAgent = message.role === 'agent'
   // Fix W5b: per-message authorName (snapshot-only, backend W5a) wins over
@@ -40,7 +43,7 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
     <div class={`m${isUser ? ' user' : ''}${compact ? ' compact' : ''}`}>
       {!isUser && (
         <div class={`b-avatar${compact ? ' ghost' : ''}`}>
-          {isAgent ? <AgentAvatar name={agentAvatarName} avatarUrl={bubbleAvatarUrl} /> : <BotIcon />}
+          {isAgent ? <AgentAvatar name={agentAvatarName} avatarUrl={bubbleAvatarUrl} /> : <BotLogo logoUrl={logoUrl} />}
         </div>
       )}
       <div>
