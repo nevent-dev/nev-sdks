@@ -561,8 +561,18 @@ describe('events channel — watchdog must survive the backend idle heartbeat', 
   // shape of a healthy idle connection.
   const sseFirstFrameAfter = (firstFrameDelayMs: number, frame: string): Response => {
     const enc = new TextEncoder()
+    // The watchdog (or ch.close()) can cancel this stream's reader before the
+    // delayed frame fires — that's the exact scenario the "torn down" test
+    // below exercises. Without a `cancel()` here, the pending real setTimeout
+    // survives the stream's teardown and later calls `c.enqueue()` on an
+    // already-closed controller, throwing an unhandled `ERR_INVALID_STATE`
+    // that surfaces during whatever test happens to be running when the timer
+    // eventually fires (up to `firstFrameDelayMs` later) — a leaked timer
+    // masquerading as a failure in an unrelated test.
+    let timer: ReturnType<typeof setTimeout> | undefined
     const body = new ReadableStream<Uint8Array>({
-      start(c) { setTimeout(() => c.enqueue(enc.encode(frame)), firstFrameDelayMs) },
+      start(c) { timer = setTimeout(() => c.enqueue(enc.encode(frame)), firstFrameDelayMs) },
+      cancel() { clearTimeout(timer) },
     })
     return new Response(body, { status: 200, headers: { 'Content-Type': 'text/event-stream' } })
   }

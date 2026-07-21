@@ -75,8 +75,18 @@ describe('shell', () => {
     await vi.waitFor(() => expect(document.querySelector('[data-part=launcher]')).not.toBeNull())
     sendCommand('open', 'nevw_test1', parentSource)
     await vi.waitFor(() => expect(document.querySelector('[data-part=panel]')).not.toBeNull())
-    const sent = parentPost.mock.calls.map((c) => (c[0] as { type: string }).type)
-    expect(sent).toContain('opened')
+    // El DOM refleja isOpen=true de forma síncrona con el commit (render), pero
+    // el useEffect que emite 'opened'/'closed' al bus ([isOpen, bus]) se
+    // dispara en un ciclo posterior — un vi.waitFor que solo espera el DOM
+    // puede resolver ANTES de que ese efecto corra, dejando 'opened' fuera de
+    // parentPost.mock.calls en el instante exacto de la comprobación (carrera
+    // de la misma familia que Task W4, ver deathClient arriba). Esperar la
+    // condición real (el mensaje ya enviado), no el DOM, mismo idiom que el
+    // resto del fichero usa para session_persist.
+    await vi.waitFor(() => {
+      const sent = parentPost.mock.calls.map((c) => (c[0] as { type: string }).type)
+      expect(sent).toContain('opened')
+    })
   })
   it('ignora init de un source/instanceId inválido', async () => {
     const createClient = vi.fn(async () => fakeClient())
@@ -358,15 +368,30 @@ describe('shell', () => {
   // instante — y, desde Task W3c (nit W4 review: close() ahora se
   // desuscribe de onSessionDead, ver events-channel.ts), esa desuscripción
   // deja SOLO el listener de App vivo en régimen estable.
-  function deathClient(overrides: Partial<SessionClient> = {}): { client: SessionClient; kill: () => void; listenerCount: () => number } {
+  function deathClient(overrides: Partial<SessionClient> = {}): { client: SessionClient; kill: () => void; listenerCount: () => number; sawDip: () => boolean } {
     const listeners = new Set<() => void>()
-    const client = fakeClient({ onSessionDead: (fn) => { listeners.add(fn); return () => { listeners.delete(fn) } }, ...overrides })
-    return { client, kill: () => { for (const l of listeners) l() }, listenerCount: () => listeners.size }
+    // El canal (createTransport(), suscrito síncronamente en el render/useMemo
+    // de App) sube el conteo a 1 ANTES de que D7 lo cierre y lo desuscriba —
+    // esa desuscripción es la ÚNICA forma de que el conteo pase por 0 antes de
+    // que App suba su propio listener a 1 (su efecto está declarado DESPUÉS
+    // de D7, así que el orden channel→0→App es fijo aunque el tiempo real que
+    // tarde en asentarse no lo sea). `sawZero` deja constancia de ese tránsito
+    // para poder esperar la CONDICIÓN real (ver más abajo) en vez de un
+    // retraso de reloj fijo que una máquina cargada puede no respetar.
+    let sawZero = false
+    const client = fakeClient({
+      onSessionDead: (fn) => {
+        listeners.add(fn)
+        return () => { listeners.delete(fn); if (listeners.size === 0) sawZero = true }
+      },
+      ...overrides,
+    })
+    return { client, kill: () => { for (const l of listeners) l() }, listenerCount: () => listeners.size, sawDip: () => sawZero }
   }
 
   describe('recuperación de sesión muerta (Task W4)', () => {
     it('al morir la sesión, reconstruye vía la MISMA fábrica createClient, con el resumeSecret vigente, y emite un session_persist nuevo', async () => {
-      const { client: oldClient, kill, listenerCount } = deathClient({
+      const { client: oldClient, kill, listenerCount, sawDip } = deathClient({
         getCurrentResumeSecret: () => 'resume_vigente',
       })
       const newClient = fakeClient({
@@ -387,21 +412,27 @@ describe('shell', () => {
       // el commit del DOM síncronamente, pero useEffect se dispara en un
       // ciclo posterior; sin esto, kill() dispararía sobre un `cb` aún null.
       await vi.waitFor(() => expect(document.querySelector('[data-part=root]')).not.toBeNull())
-      // Deja pasar un tick real: entre el commit y que TODOS los efectos
-      // posteriores terminen de asentarse hay un hueco transitorio en el que
-      // el canal de eventos (createTransport, subscrito al crearse) YA está
-      // suscrito pero D7 (que lo cierra al no haber conversación ni panel
-      // abierto) todavía no ha corrido — un vi.waitFor(listenerCount===1) en
-      // ESE instante pillaría el listener EQUIVOCADO (el del canal, a punto
-      // de desuscribirse, no el de App). Un `setTimeout` real, no una
-      // promesa/microtask, dado el mismo motivo documentado en el helper
-      // `immediate()` de events-channel.test.ts.
-      await new Promise((r) => setTimeout(r, 20))
-      // UN solo suscriptor en régimen estable: el canal se suscribe al
-      // crearse pero D7 lo cierra casi al instante (sin conversación, panel
-      // cerrado) — con el fix de Task W3c, close() se desuscribe (nit W4
-      // review), así que en régimen estable solo queda el listener de App.
-      expect(listenerCount()).toBe(1)
+      // Entre el commit y que TODOS los efectos posteriores terminen de
+      // asentarse hay un hueco transitorio en el que el canal de eventos
+      // (createTransport, subscrito al crearse) YA está suscrito pero D7 (que
+      // lo cierra al no haber conversación ni panel abierto) todavía no ha
+      // corrido — un simple listenerCount()===1 es AMBIGUO: es cierto tanto
+      // en ese hueco transitorio (el listener del canal, a punto de
+      // desuscribirse) como en el régimen estable (el de App). Un retraso de
+      // reloj fijo (p.ej. 20ms) es una carrera real bajo carga (CI, suite
+      // completa con muchos ficheros/threads): si el efecto de App aún no ha
+      // corrido cuando expira el retraso, kill() dispara SOLO el listener del
+      // canal (un no-op de limpieza) y createClient nunca se vuelve a llamar.
+      // sawDip() (ver deathClient) elimina la ambigüedad esperando la
+      // TRANSICIÓN real 1→0→1 en vez de una cantidad de tiempo: el conteo
+      // solo pasa por 0 cuando D7 desuscribe al canal (Task W3c), y ese 0 solo
+      // puede ir seguido por el listener de App (su efecto está declarado
+      // DESPUÉS de D7) — así que "sawDip() && listenerCount()===1" identifica
+      // el régimen estable sin importar cuánto tarde en asentarse de verdad.
+      await vi.waitFor(() => {
+        expect(sawDip()).toBe(true)
+        expect(listenerCount()).toBe(1)
+      })
 
       kill()
 
