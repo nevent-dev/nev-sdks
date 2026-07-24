@@ -26,45 +26,46 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-          registry-url: 'https://registry.npmjs.org/'
-
-      - name: Get npm cache directory
-        id: npm-cache-dir
-        shell: bash
-        run: echo "dir=$(npm config get cache)" >> ${GITHUB_OUTPUT}
-
-      - name: Cache npm dependencies
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.npm-cache-dir.outputs.dir }}
-          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-npm-
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: |
-          npm ci --no-audit --no-fund
-          npm ls --depth=0 || true
+        run: pnpm install --frozen-lockfile
 
       - name: Build packages
-        run: npm run build
+        run: pnpm run build
+
+      # El build del monorepo (core/subs/chatbot) NO compila el widget: su
+      # toolchain (Vite 6 + Preact) vive en pnpm-lock.yaml y se construye
+      # aparte, igual que en deploy-dev.yml. El shell.html generado ya emite
+      # los defaults de producción (api.nevent.es en meta nevw-api y CSP
+      # connect-src), así que aquí NO se parchea el shell (a diferencia de dev).
+      - name: Build widget
+        run: pnpm --filter @nevent/widget build
 
       - name: Generate SRI hashes
-        run: npm run sri
+        run: pnpm run sri
 
       - name: Extract versions
         id: version
         run: |
           SUBS_VERSION=$(node -p "require('./packages/subscriptions/package.json').version")
           CHATBOT_VERSION=$(node -p "require('./packages/chatbot/package.json').version")
+          WIDGET_VERSION=$(node -p "require('./packages/widget/package.json').version")
           echo "subs_version=$SUBS_VERSION" >> ${GITHUB_OUTPUT}
           echo "chatbot_version=$CHATBOT_VERSION" >> ${GITHUB_OUTPUT}
+          echo "widget_version=$WIDGET_VERSION" >> ${GITHUB_OUTPUT}
           echo "Extracted subscriptions version: $SUBS_VERSION"
           echo "Extracted chatbot version: $CHATBOT_VERSION"
+          echo "Extracted widget version: $WIDGET_VERSION"
 
       - name: Check if versions already exist in production
         id: check-version
@@ -131,12 +132,34 @@ jobs:
             --delete \
             --cache-control "public, max-age=300"
 
+      # ── Widget (chat embebible) ──────────────────────────────────────────────
+      # El snippet que emite nev-api (widget.embed.cdn-base-url) carga
+      # {cdn}/widget/v1/loader.js, y el loader resuelve ./shell.html relativo a
+      # su propio src (new URL('./shell.html', currentScript.src)); shell.html
+      # a su vez referencia ./assets/* de forma relativa (Vite base:'./'). Subir
+      # dist/ entero a widget/v1/ reproduce ese layout: loader.js, shell.html y
+      # assets/ quedan juntos bajo la misma ruta y todo resuelve.
+      #
+      # Ruta ESTABLE (no versionada por semver): /widget/v1/ es el contrato con
+      # el snippet, así que se sobrescribe SIEMPRE en cada release (sin guard
+      # "skip if version exists") con cache corta + invalidación de CloudFront,
+      # a diferencia de subs/chatbot (rutas versionadas inmutables).
+      - name: Upload widget to S3 (widget/v1)
+        run: |
+          aws s3 sync packages/widget/dist/ \
+            s3://prd-nevent-sdks/widget/v1/ \
+            --region eu-west-1 \
+            --delete \
+            --cache-control "public, max-age=300"
+
       # ── CloudFront Invalidation ──────────────────────────────────────────────
 
       - name: Invalidate CloudFront cache
-        if: steps.check-version.outputs.subs_exists == 'false' || steps.check-version.outputs.chatbot_exists == 'false'
         run: |
-          PATHS=""
+          # El widget se re-publica en cada release sobre la ruta estable
+          # /widget/v1/, así que su invalidación va SIEMPRE. subs/chatbot solo
+          # cuando su versión era nueva (alias /latest/ mutable).
+          PATHS="/widget/v1/*"
           if [[ "${{ steps.check-version.outputs.subs_exists }}" == "false" ]]; then
             PATHS="$PATHS /subs/latest/*"
           fi
@@ -275,3 +298,17 @@ jobs:
             echo "</script>" >> $GITHUB_STEP_SUMMARY
             echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
           fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### @nevent/widget v${{ steps.version.outputs.widget_version }} (chat embebible)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Ruta estable (re-publicada en cada release):" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "https://neventapps.com/widget/v1/loader.js" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "El snippet completo lo genera el admin en Chatbot → Canal web" >> $GITHUB_STEP_SUMMARY
+          echo "(POST /admin/widget/installations/{id}/embed-code). Requiere en nev-api prod:" >> $GITHUB_STEP_SUMMARY
+          echo "WIDGET_EMBED_CDN_BASE_URL=https://neventapps.com y" >> $GITHUB_STEP_SUMMARY
+          echo "WIDGET_CORS_SHELL_ORIGINS=https://neventapps.com" >> $GITHUB_STEP_SUMMARY
