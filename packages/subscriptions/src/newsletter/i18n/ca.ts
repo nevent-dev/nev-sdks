@@ -38,4 +38,8 @@ export const ca: NewsletterLabels = {
   statusRegionLabel: 'Estat del formulari',
   errorPrefix: 'Error:',
   successPrefix: 'Exit:',
+
+  // Widget unavailable (HTTP 422 from /config — tenant legal incomplete)
+  widgetUnavailable:
+    "Formulari no disponible. Contacta amb l'organitzador de l'esdeveniment.",
 };

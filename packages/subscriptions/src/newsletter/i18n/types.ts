@@ -47,4 +47,7 @@ export interface NewsletterLabels extends Record<string, string> {
   statusRegionLabel: string;
   errorPrefix: string;
   successPrefix: string;
+
+  // Widget unavailable (HTTP 422 from /config — tenant legal incomplete)
+  widgetUnavailable: string;
 }
