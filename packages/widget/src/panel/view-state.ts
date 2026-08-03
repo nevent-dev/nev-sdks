@@ -1,5 +1,6 @@
 import type { ConversationState } from '../contract/types'
 import type { ConnectionStatus } from '../store/message-store'
+import { STRINGS, type WidgetStrings } from './strings'
 
 export type ConversationPhase = 'idle' | 'waiting' | 'agent' | 'resolved'
 export type RibbonKind = 'idle' | 'bot-streaming' | 'waiting' | 'agent' | 'resolved' | 'reconnect' | 'offline'
@@ -16,6 +17,12 @@ export interface ViewStateInput {
   // existentes (tests, callers previos a esta feature) no lo conocen; ver
   // PanelViewState.logoUrl para el valor ya normalizado que consume Header.
   logoUrl?: string | null
+  // Plan 4 (locale): opcional con default STRINGS.es — computeViewState es
+  // función PURA (no un componente), así que recibe el diccionario como
+  // parámetro en vez de leerlo de StringsContext. El default mantiene verde
+  // toda la suite existente que no lo pasa (mismo criterio de compat que
+  // logoUrl arriba).
+  strings?: WidgetStrings
 }
 
 export interface PanelViewState {
@@ -36,7 +43,7 @@ export interface PanelViewState {
 }
 
 export function computeViewState(input: ViewStateInput): PanelViewState {
-  const { conversationState, connection, agentName, agentAvatarUrl, assistantName, isStreaming, logoUrl } = input
+  const { conversationState, connection, agentName, agentAvatarUrl, assistantName, isStreaming, logoUrl, strings = STRINGS.es } = input
 
   // 1) Fase — dictada EXCLUSIVAMENTE por el servidor (spec §5). Nunca se
   // recalcula ni se oculta por conexión o streaming (Critical #1).
@@ -59,15 +66,15 @@ export function computeViewState(input: ViewStateInput): PanelViewState {
   // (gap #1 de contrato: sin campo de tenant separado de assistantName;
   // reutilizarlo ahí producía "Laura · Asistente de X" — rechazado en revisión).
   const headerName =
-    conversationPhase === 'agent' ? (hasAgent ? (agentName as string) : 'El equipo') :
-    conversationPhase === 'waiting' || conversationPhase === 'resolved' ? 'El equipo' :
+    conversationPhase === 'agent' ? (hasAgent ? (agentName as string) : strings.team) :
+    conversationPhase === 'waiting' || conversationPhase === 'resolved' ? strings.team :
     assistantName
 
   const phaseStatus =
-    conversationPhase === 'waiting' ? 'El equipo te atenderá en breve' :
-    conversationPhase === 'agent' ? 'En línea ahora' :
-    conversationPhase === 'resolved' ? 'Conversación resuelta' :
-    isStreaming ? 'Escribiendo…' : 'Respuesta al instante'
+    conversationPhase === 'waiting' ? strings.stateTeamSoon :
+    conversationPhase === 'agent' ? strings.stateOnline :
+    conversationPhase === 'resolved' ? strings.stateResolved :
+    isStreaming ? strings.stateTyping : strings.stateInstant
 
   const headerPulse: 'wait' | 'live' | null =
     conversationPhase === 'waiting' ? 'wait' : conversationPhase === 'agent' ? 'live' : null
@@ -75,8 +82,8 @@ export function computeViewState(input: ViewStateInput): PanelViewState {
   // 3) La conexión SOLO se superpone al texto de estado y al banner — nunca
   // sustituye nombre/avatar ni fase.
   const connectionOverlayStatus =
-    connection === 'offline' ? 'Sin conexión' :
-    connection === 'reconnecting' || connection === 'polling' ? 'Reconectando…' : null
+    connection === 'offline' ? strings.connShortOffline :
+    connection === 'reconnecting' || connection === 'polling' ? strings.connReconnecting : null
 
   // 4) Ribbon — PURAMENTE visual (color/animación de la cinta de 2px).
   // Ningún consumidor debe usar este valor para decidir qué contenido de
@@ -90,8 +97,8 @@ export function computeViewState(input: ViewStateInput): PanelViewState {
     conversationPhase === 'resolved' ? 'resolved' : 'idle'
 
   const composerPlaceholder =
-    conversationPhase === 'agent' ? (hasAgent ? `Escribe a ${agentName}…` : 'Escribe al equipo…') :
-    conversationPhase === 'waiting' ? 'Escribe al equipo…' : 'Escribe tu pregunta…'
+    conversationPhase === 'agent' ? (hasAgent ? strings.placeholderAgent(agentName as string) : strings.placeholderTeam) :
+    conversationPhase === 'waiting' ? strings.placeholderTeam : strings.placeholderIdle
 
   return {
     conversationPhase,

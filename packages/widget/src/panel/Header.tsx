@@ -1,5 +1,6 @@
 import type { PanelViewState } from './view-state'
 import { AgentAvatar, BotLogo } from './icons'
+import { useStrings } from './strings'
 
 export interface HeaderProps {
   viewState: PanelViewState
@@ -8,6 +9,7 @@ export interface HeaderProps {
 }
 
 export function Header({ viewState, onMinimize, onClose }: HeaderProps) {
+  const strings = useStrings()
   return (
     <>
       <header class="head">
@@ -22,12 +24,12 @@ export function Header({ viewState, onMinimize, onClose }: HeaderProps) {
             {viewState.headerStatus}
           </div>
         </div>
-        <button class="iconbtn" aria-label="Minimizar" onClick={onMinimize}>
+        <button class="iconbtn" aria-label={strings.headerMinimize} onClick={onMinimize}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
             <path d="M5 12h14" />
           </svg>
         </button>
-        <button class="iconbtn" aria-label="Cerrar" onClick={onClose}>
+        <button class="iconbtn" aria-label={strings.headerClose} onClick={onClose}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
             <path d="M6 6l12 12M18 6L6 18" />
           </svg>

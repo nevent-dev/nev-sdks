@@ -1,6 +1,18 @@
 import { installGlobalStub, drainQueue, type ApiStub } from './api-queue'
 import { seal, open as openEnvelope, isCommand, SHELL_TO_LOADER } from '../protocol/envelope'
 import { readSessionBlob, writeSessionBlob, parseLastSeen } from './session-storage'
+import { resolveLocale, type WidgetLocale } from '../contract/locale'
+
+// Mapa MÍNIMO propio de títulos para iframe.title (Plan 4) — deliberadamente
+// NO importa panel/strings.ts: ese módulo trae los diccionarios completos de
+// las 4 traducciones y engordaría el bundle IIFE del loader (vite.loader.config.ts)
+// para una única clave que el loader necesita fuera de la propia shell.
+const LOADER_TITLES: Record<WidgetLocale, string> = {
+  es: 'Chat de ayuda',
+  en: 'Help chat',
+  ca: "Xat d'ajuda",
+  pt: 'Chat de ajuda',
+}
 
 interface LoaderOptions { shellUrl: string }
 
@@ -120,11 +132,21 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
     const instanceId = `nevw_${Math.random().toString(36).slice(2, 10)}`
     const container = w.document.createElement('div')
     const iframe = w.document.createElement('iframe')
-    iframe.title = 'Chat de ayuda'
+    // Idioma de la página anfitriona (document.documentElement.lang, p.ej.
+    // "en" o "en-US") — se propaga a la shell vía ?lang= en la URL del
+    // iframe (Plan 4) para que resuelva el locale efectivo ANTES de montar
+    // App, sin depender solo de config.locale (que no llega hasta que
+    // termina el fetch de red). null si el host no declaró lang o no es uno
+    // de los 4 soportados: la shell cae a config.locale/'es', igual que
+    // antes de esta task.
+    const hostLocale = resolveLocale(w.document.documentElement.lang)
+    iframe.title = LOADER_TITLES[hostLocale ?? 'es']
     // allow-popups(+escape): el powered-by y los enlaces http(s) del bot abren
     // en pestaña nueva; sin escape heredarían el sandbox y quedarían en blanco.
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox')
-    iframe.src = `${opts.shellUrl}#${instanceId}`
+    // El hash (#instanceId) tiene que sobrevivir intacto — es lo que el shell
+    // lee para saber su propia identidad de instancia (ver shell/main.tsx).
+    iframe.src = hostLocale ? `${opts.shellUrl}?lang=${hostLocale}#${instanceId}` : `${opts.shellUrl}#${instanceId}`
     container.appendChild(iframe)
     // Fallback a documentElement: un <script> clásico en <head> puede ejecutarse
     // antes de que exista document.body.

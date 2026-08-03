@@ -6,6 +6,7 @@ import { MessageBubble } from './MessageBubble'
 import { Welcome } from './Welcome'
 import { useAnnouncement } from './use-announcements'
 import { ChevronDownIcon } from './icons'
+import { useStrings, type WidgetStrings } from './strings'
 
 export interface MessageListProps {
   config: WidgetConfig
@@ -140,12 +141,13 @@ function useBottomAnchoredScroll(
   return { atBottom, newBelowCount, jumpToBottom, clear }
 }
 
-function pillLabel(count: number): string {
-  if (count <= 0) return 'Ir al último mensaje'
-  return `${count} ${count === 1 ? 'mensaje nuevo' : 'mensajes nuevos'}, ir al último`
+function pillLabel(count: number, strings: WidgetStrings): string {
+  if (count <= 0) return strings.jumpLatest
+  return strings.pill(count)
 }
 
 export function MessageList({ config, messages, agentName, agentAvatarUrl, onRetry, onQuickReply, trailing, showWelcome }: MessageListProps) {
+  const strings = useStrings()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const innerRef = useRef<HTMLDivElement | null>(null)
   const { atBottom, newBelowCount, jumpToBottom } = useBottomAnchoredScroll(containerRef, innerRef, messages)
@@ -156,7 +158,7 @@ export function MessageList({ config, messages, agentName, agentAvatarUrl, onRet
       <div class="msgs" ref={containerRef}>
         <div class="msgs-inner" ref={innerRef}>
           {showWelcome && <Welcome config={config} onChip={onQuickReply} />}
-          {messages.length > 0 && <div class="day">Hoy</div>}
+          {messages.length > 0 && <div class="day">{strings.today}</div>}
           {messages.map((m, i) => (
             <MessageBubble key={m.id} message={m} agentName={agentName} agentAvatarUrl={agentAvatarUrl} onRetry={onRetry}
               compact={i > 0 && messages[i - 1]?.role === m.role} logoUrl={config.theme.logoUrl ?? null} />
@@ -170,12 +172,10 @@ export function MessageList({ config, messages, agentName, agentAvatarUrl, onRet
           flotar fija — ver comentario de .msgs-wrap en panel.css. */}
       {!atBottom && (
         <button type="button" class={`scroll-pill${newBelowCount > 0 ? ' has-count' : ''}`}
-          onClick={jumpToBottom} aria-label={pillLabel(newBelowCount)}>
+          onClick={jumpToBottom} aria-label={pillLabel(newBelowCount, strings)}>
           <ChevronDownIcon />
           {newBelowCount > 0 && (
-            <span class="scroll-pill-count">
-              {newBelowCount} {newBelowCount === 1 ? 'mensaje nuevo' : 'mensajes nuevos'}
-            </span>
+            <span class="scroll-pill-count">{strings.pill(newBelowCount)}</span>
           )}
         </button>
       )}

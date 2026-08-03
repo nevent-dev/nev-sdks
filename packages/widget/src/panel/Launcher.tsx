@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'preact/hooks'
 import { BotLogo } from './icons'
 import { useResizeReport } from './use-resize-report'
+import { useStrings } from './strings'
 
 export interface LauncherProps {
   unreadCount: number
@@ -13,6 +14,7 @@ export interface LauncherProps {
 }
 
 export function Launcher({ unreadCount, autofocus, onOpen, onResize, logoUrl }: LauncherProps) {
+  const strings = useStrings()
   const ref = useRef<HTMLButtonElement | null>(null)
   useResizeReport(onResize)
 
@@ -22,7 +24,7 @@ export function Launcher({ unreadCount, autofocus, onOpen, onResize, logoUrl }: 
   }, [])
 
   return (
-    <button type="button" class="launcher" data-part="launcher" ref={ref} aria-label="Abrir chat de ayuda" onClick={onOpen}>
+    <button type="button" class="launcher" data-part="launcher" ref={ref} aria-label={strings.launcherOpen} onClick={onOpen}>
       <BotLogo logoUrl={logoUrl} />
       {unreadCount > 0 && <span class="badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
     </button>

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'preact/hooks'
 import type { PanelViewState } from './view-state'
+import { useStrings } from './strings'
 
 export interface ComposerProps {
   viewState: PanelViewState
@@ -8,6 +9,7 @@ export interface ComposerProps {
 }
 
 export function Composer({ viewState, onSend, onStop }: ComposerProps) {
+  const strings = useStrings()
   const [draft, setDraft] = useState('')
   // Se lee del DOM (no del cierre sobre `draft`) porque el `setState` del
   // `onInput` se aplica en un microtask (fuera de `act()`, Preact difiere
@@ -37,7 +39,7 @@ export function Composer({ viewState, onSend, onStop }: ComposerProps) {
     <div class="composer">
       {viewState.showStopButton && (
         <button type="button" class="stopbtn" onClick={onStop}>
-          <i aria-hidden="true" /> Detener respuesta
+          <i aria-hidden="true" /> {strings.stop}
         </button>
       )}
       <div class="c-row">
@@ -50,24 +52,24 @@ export function Composer({ viewState, onSend, onStop }: ComposerProps) {
           rows={1}
           value={draft}
           placeholder={viewState.composerPlaceholder}
-          aria-label="Escribe tu mensaje"
+          aria-label={strings.composerAria}
           disabled={viewState.composerDisabled}
           onInput={(e) => setDraft((e.target as HTMLTextAreaElement).value)}
           onKeyDown={onKeyDown}
         />
-        <button type="button" class="iconbtn" aria-label="Adjuntar archivo" title="Próximamente" disabled>
+        <button type="button" class="iconbtn" aria-label={strings.attach} title={strings.attachSoon} disabled>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M21 12.5l-8.5 8.5a6 6 0 0 1-8.5-8.5L12.5 4a4 4 0 0 1 5.7 5.7L9.7 18.2a2 2 0 0 1-2.9-2.9l8-8" />
           </svg>
         </button>
-        <button type="button" class="send" aria-label="Enviar" disabled={sendDisabled} onClick={trySend}>
+        <button type="button" class="send" aria-label={strings.send} disabled={sendDisabled} onClick={trySend}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M4 12l16-7-4.5 14L11 13z" /><path d="M20 5L11 13" />
           </svg>
         </button>
       </div>
       <div class="powered">
-        Con la tecnología de{' '}
+        {strings.poweredPrefix}{' '}
         <a href="https://nevent.ai" target="_blank" rel="noopener noreferrer">Nevent</a>
       </div>
     </div>

@@ -1,10 +1,5 @@
 import type { WidgetConfig } from '../contract/types'
-
-const DEFAULT_WELCOME = {
-  title: 'Hola 👋 ¿en qué te ayudamos?',
-  subtitle: 'Escríbenos y te respondemos al momento.',
-  quickReplies: [] as string[],
-}
+import { useStrings } from './strings'
 
 export interface WelcomeProps {
   config: WidgetConfig
@@ -12,7 +7,11 @@ export interface WelcomeProps {
 }
 
 export function Welcome({ config, onChip }: WelcomeProps) {
-  const welcome = config.welcome ?? DEFAULT_WELCOME
+  const strings = useStrings()
+  // Defaults localizados (Plan 4) — el welcome PERSONALIZADO de la
+  // instalación (config.welcome) sigue mandando sobre estos; solo se
+  // localiza la copia genérica cuando el tenant no configuró la suya.
+  const welcome = config.welcome ?? { title: strings.welcomeTitle, subtitle: strings.welcomeSubtitle, quickReplies: [] as string[] }
   return (
     <div class="welcome">
       <h3>{welcome.title}</h3>
