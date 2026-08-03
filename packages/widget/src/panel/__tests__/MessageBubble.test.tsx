@@ -20,12 +20,24 @@ describe('MessageBubble', () => {
     expect(root.querySelector('.meta')?.textContent).toContain('14:02')
   })
 
-  it('renderiza el texto como nodo de texto plano — nunca interpreta HTML/markdown embebido (XSS)', async () => {
+  it('nunca interpreta HTML embebido (XSS) — el HTML en el texto del bot queda literal', async () => {
     const hostile = '<img src=x onerror="window.__pwned=true">'
     const root = await mount(<MessageBubble message={msg({ role: 'bot', text: hostile })} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} compact={false} />)
     expect(root.querySelector('.bubble img')).toBeNull()
     expect(root.querySelector('.bubble')?.textContent).toBe(hostile)
     expect((window as unknown as { __pwned?: boolean }).__pwned).toBeUndefined()
+  })
+
+  it('mensaje del bot: renderiza el subconjunto de markdown (negrita, lista)', async () => {
+    const root = await mount(<MessageBubble message={msg({ role: 'bot', text: 'Las **puertas** abren:\n- viernes\n- sábado' })} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} compact={false} />)
+    expect(root.querySelector('.bubble strong')?.textContent).toBe('puertas')
+    expect(root.querySelectorAll('.bubble li').length).toBe(2)
+  })
+
+  it('mensaje del USUARIO: el markdown queda como texto plano, sin interpretar', async () => {
+    const root = await mount(<MessageBubble message={msg({ role: 'user', text: '**hola**' })} agentName={null} agentAvatarUrl={null} onRetry={vi.fn()} compact={false} />)
+    expect(root.querySelector('.bubble strong')).toBeNull()
+    expect(root.querySelector('.bubble')?.textContent).toBe('**hola**')
   })
 
   it('bot en streaming CON texto: añade el cursor parpadeante marcado aria-hidden', async () => {

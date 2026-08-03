@@ -1,5 +1,6 @@
 import type { StoredMessage } from '../store/message-store'
 import { AgentAvatar, BotLogo } from './icons'
+import { renderMarkdown } from './markdown'
 
 export interface MessageBubbleProps {
   message: StoredMessage
@@ -47,8 +48,10 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
         </div>
       )}
       <div>
-        {/* `{message.text}` es un hijo de texto JSX: Preact lo asigna como
-            nodo de texto (no innerHTML) — sin markdown en v1 (Global Constraints). */}
+        {/* El texto del USUARIO va como hijo de texto JSX (nodo de texto, no
+            innerHTML): lo que escribió se muestra tal cual. El del bot/agente
+            pasa por renderMarkdown, que solo construye nodos vía JSX — el HTML
+            embebido sigue siendo texto literal (misma garantía anti-XSS). */}
         {message.streaming && message.text === '' ? (
           <div class="thinking">
             <svg class="spark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -58,7 +61,7 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
           </div>
         ) : (
           <div class="bubble">
-            {message.text}
+            {isUser ? message.text : renderMarkdown(message.text)}
             {message.streaming && <span class="stream-caret" aria-hidden="true" />}
           </div>
         )}
