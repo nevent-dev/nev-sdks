@@ -66,7 +66,10 @@ export function Composer({ viewState, onSend, onStop }: ComposerProps) {
           </svg>
         </button>
       </div>
-      <div class="powered">Con la tecnología de <b>Nevent</b></div>
+      <div class="powered">
+        Con la tecnología de{' '}
+        <a href="https://nevent.ai" target="_blank" rel="noopener noreferrer">Nevent</a>
+      </div>
     </div>
   )
 }

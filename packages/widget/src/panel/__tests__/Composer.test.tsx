@@ -21,6 +21,15 @@ describe('Composer', () => {
     expect(textarea.placeholder).toBe('Escribe tu pregunta…')
   })
 
+  it('el powered-by enlaza a nevent.ai en pestaña nueva con rel noopener', async () => {
+    const { root } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn() })
+    const a = root.querySelector('.powered a')
+    expect(a?.getAttribute('href')).toBe('https://nevent.ai')
+    expect(a?.getAttribute('target')).toBe('_blank')
+    expect(a?.getAttribute('rel')).toContain('noopener')
+    expect(root.querySelector('.powered')?.textContent).toContain('Nevent')
+  })
+
   it('Enter sin Shift envía el texto recortado y limpia el textarea', async () => {
     const onSend = vi.fn()
     const { textarea } = await mountComposer({ viewState: idleViewState, onSend, onStop: vi.fn() })

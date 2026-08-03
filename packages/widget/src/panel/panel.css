@@ -193,7 +193,21 @@ button, input, textarea, select { font-family: inherit; }
 .stopbtn:hover { border-color: var(--danger); color: var(--danger); }
 .stopbtn i { width: 8px; height: 8px; background: currentColor; border-radius: 2px; display: block; }
 .powered { text-align: center; font-size: 10.5px; color: var(--faint); padding: 5px 0 3px; }
-.powered b { font-weight: 600; color: var(--muted); }
+.powered a { font-weight: 600; color: var(--muted); text-decoration: none; }
+.powered a:hover { text-decoration: underline; }
+
+/* ===== Markdown del bot (subconjunto seguro, ver markdown.tsx) ===== */
+.bubble ul, .bubble ol { margin: 4px 0; padding-left: 18px; }
+.bubble li { margin: 2px 0; }
+.bubble code {
+  background: rgba(127, 127, 127, 0.16);
+  border-radius: 4px;
+  padding: 0 4px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.92em;
+}
+.bubble a { color: inherit; text-decoration: underline; }
+.bubble .md-h { display: block; margin: 2px 0; }
 
 /* ===== Divider y tarjetas de sistema (handoff) ===== */
 .sysline { display: flex; align-items: center; gap: 10px; margin: 16px 0 10px; }
