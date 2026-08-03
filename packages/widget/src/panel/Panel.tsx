@@ -5,6 +5,7 @@ import { useFocusTrap } from './focus-trap'
 import { useResizeReport } from './use-resize-report'
 import { useViewportHeight } from './use-viewport-height'
 import { computeViewState } from './view-state'
+import { useStrings } from './strings'
 import { Header } from './Header'
 import { ConnectionBanner } from './ConnectionBanner'
 import { MessageList } from './MessageList'
@@ -27,13 +28,16 @@ export interface PanelProps {
 }
 
 export function Panel({ config, transport, onMinimize, onClose, onResize, viewportKind, viewportHeight }: PanelProps) {
+  const strings = useStrings()
   const state = useStoreState(transport.store)
   const isStreaming = state.messages.some((m) => m.streaming)
-  // session.ts ya normaliza assistantName con fallback 'Asistente' en la
-  // frontera de red — este `?? ` es el guard de TIPOS que exige el propio
-  // contrato (WidgetConfig.assistantName es opcional, Task 17), no una
-  // segunda normalización de datos.
-  const assistantName = config.assistantName ?? 'Asistente'
+  // session.ts ya normaliza assistantName con fallback locale-aware
+  // (STRINGS[locale].assistantFallback, Plan 4) en la frontera de red — este
+  // `?? ` es el guard de TIPOS que exige el propio contrato
+  // (WidgetConfig.assistantName es opcional, Task 17), no una segunda
+  // normalización de datos. Usa strings.assistantFallback (no un literal) por
+  // coherencia con ESE mismo locale, no porque se espere que dispare en la práctica.
+  const assistantName = config.assistantName ?? strings.assistantFallback
   const viewState = computeViewState({
     conversationState: state.conversationState,
     connection: state.connection,
@@ -42,6 +46,7 @@ export function Panel({ config, transport, onMinimize, onClose, onResize, viewpo
     assistantName,
     isStreaming,
     logoUrl: config.theme.logoUrl ?? null,
+    strings,
   })
 
   // Foco inicial SOLO en desktop (Important #5 / Global Constraints) — el

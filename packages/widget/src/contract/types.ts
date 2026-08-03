@@ -1,12 +1,17 @@
+import type { WidgetLocale } from './locale'
+
+export type { WidgetLocale } from './locale'
+
 export interface WidgetConfig {
   schemaVersion: 1
   installationId: string
   // Opcional: el backend real (GET /widget/v1/installations/{id}/config) NO
   // siempre lo envía (drift de contrato cazado en integración E2E, Task 17 —
-  // fixtures/mocks previos siempre lo incluían). Normalizado con fallback
-  // 'Asistente' en runtime en shell/session.ts, igual que welcome.
+  // fixtures/mocks previos siempre lo incluían). Normalizado en runtime con
+  // fallback locale-aware (STRINGS[locale].assistantFallback, Plan 4) en
+  // shell/session.ts, igual que welcome.
   assistantName?: string
-  locale: 'es' | 'en' | 'ca' | 'pt'
+  locale: WidgetLocale
   theme: {
     // Opcional por el mismo motivo: el backend real puede omitirlo (drift
     // cazado en integración E2E, Task 17). applyTheme (panel/theme.ts) trata

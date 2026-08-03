@@ -1,5 +1,7 @@
 import type { WidgetConfig, WidgetSession } from '../contract/types'
 import { normalizeWelcome } from '../contract/normalize-welcome'
+import { resolveLocale } from '../contract/locale'
+import { STRINGS } from '../panel/strings'
 
 export interface SessionClient {
   getConfig(): WidgetConfig
@@ -48,6 +50,13 @@ interface Options {
   // loader/session-storage.ts). null/ausente = visitante nuevo o sin nada
   // recuperable — se crea sesión fresca igual que antes de esta task.
   resumeSecret?: string | null
+  // Plan 4 (locale): idioma de la página anfitriona (document.documentElement.lang,
+  // detectado por el loader y propagado vía ?lang= hasta shell/main.tsx#startShell)
+  // — PRIORITARIO sobre config.locale a la hora de elegir el fallback
+  // localizado de assistantName, misma prioridad que usa app.tsx para el
+  // resto del copy (host > config.locale > 'es'). null/ausente si el host no
+  // declaró lang o no es uno de los 4 soportados: cae a config.locale.
+  hostLocale?: string | null
 }
 
 export async function createSessionClient(opts: Options): Promise<SessionClient> {
@@ -64,10 +73,17 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
   // integración E2E, Task 17: el backend real puede omitirlo por completo).
   // A diferencia de welcome (que puede estar legítimamente ausente), todo
   // consumidor aguas abajo (cabecera, aria-label) necesita SIEMPRE un nombre
-  // — se normaliza aquí, en la frontera, con el mismo fallback 'Asistente'
-  // que ya usa el resto del shell para "sin nombre de agente todavía".
+  // — se normaliza aquí, en la frontera, con el mismo fallback que ya usa el
+  // resto del shell para "sin nombre de agente todavía", ahora localizado
+  // (Plan 4): misma prioridad host > config.locale > 'es' que app.tsx, para
+  // que este fallback nunca quede en español cuando el resto del copy ya
+  // resolvió a otro idioma.
+  const rawLocale = rawConfig['locale']
+  const effectiveLocale = resolveLocale(opts.hostLocale) ?? resolveLocale(typeof rawLocale === 'string' ? rawLocale : undefined) ?? 'es'
   const rawAssistantName = rawConfig['assistantName']
-  const assistantName = typeof rawAssistantName === 'string' && rawAssistantName.trim().length > 0 ? rawAssistantName : 'Asistente'
+  const assistantName = typeof rawAssistantName === 'string' && rawAssistantName.trim().length > 0
+    ? rawAssistantName
+    : STRINGS[effectiveLocale].assistantFallback
   const config: WidgetConfig = { ...(rawConfigWithoutWelcome as unknown as WidgetConfig), assistantName, ...(welcome ? { welcome } : {}) }
 
   const sessionRes = await fetchFn(`${installationBase}/sessions`, {

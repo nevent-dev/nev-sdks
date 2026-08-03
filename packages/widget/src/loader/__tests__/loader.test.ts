@@ -570,6 +570,48 @@ describe('loader', () => {
     cssTextSetter.mockRestore()
   })
 
+  describe('locale (Plan 4) — lang de la página anfitriona propagado al shell', () => {
+    afterEach(() => {
+      document.documentElement.lang = ''
+    })
+
+    it("document.documentElement.lang='en': el iframe.src lleva ?lang=en (conserva el #instanceId) y el title se localiza a 'Help chat'", () => {
+      document.documentElement.lang = 'en'
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const url = new URL(iframe.src)
+      expect(url.searchParams.get('lang')).toBe('en')
+      expect(url.hash).toBe(`#${bootedInstanceId()}`)
+      expect(iframe.title).toBe('Help chat')
+    })
+
+    it("document.documentElement.lang='en-US' (con región): normaliza igual a ?lang=en", () => {
+      document.documentElement.lang = 'en-US'
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      expect(new URL(iframe.src).searchParams.get('lang')).toBe('en')
+    })
+
+    it('sin lang en el host: el iframe.src NO lleva parámetro lang y el title cae a "Chat de ayuda"', () => {
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      expect(new URL(iframe.src).searchParams.has('lang')).toBe(false)
+      expect(iframe.title).toBe('Chat de ayuda')
+    })
+
+    it('lang del host no soportado (p.ej. "fr"): igual que sin lang — nunca se inventa un idioma soportado más cercano', () => {
+      document.documentElement.lang = 'fr'
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      expect(new URL(iframe.src).searchParams.has('lang')).toBe(false)
+      expect(iframe.title).toBe('Chat de ayuda')
+    })
+  })
+
   describe('persistencia de sesión (Task W3)', () => {
     function clearSessionCookie(installationId: string): void {
       document.cookie = `nevw_session_${installationId}=; path=/; max-age=0`

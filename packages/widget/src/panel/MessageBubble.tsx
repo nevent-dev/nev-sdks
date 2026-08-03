@@ -1,6 +1,7 @@
 import type { StoredMessage } from '../store/message-store'
 import { AgentAvatar, BotLogo } from './icons'
 import { renderMarkdown } from './markdown'
+import { useStrings } from './strings'
 
 export interface MessageBubbleProps {
   message: StoredMessage
@@ -13,13 +14,14 @@ export interface MessageBubbleProps {
   logoUrl?: string | null
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, timeLocale: string): string {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  return d.toLocaleTimeString(timeLocale, { hour: '2-digit', minute: '2-digit' })
 }
 
 export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, compact, logoUrl }: MessageBubbleProps) {
+  const strings = useStrings()
   const isUser = message.role === 'user'
   const isAgent = message.role === 'agent'
   // Fix W5b: per-message authorName (snapshot-only, backend W5a) wins over
@@ -57,7 +59,7 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
             <svg class="spark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M12 3l1.9 4.6L18.5 9l-4.6 1.9L12 15.5l-1.9-4.6L5.5 9l4.6-1.4L12 3z" fill="currentColor" />
             </svg>
-            Pensando…
+            {strings.thinking}
           </div>
         ) : (
           <div class="bubble">
@@ -67,7 +69,7 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
         )}
         {isUser && (
           <div class="meta">
-            {formatTime(message.createdAt)}
+            {formatTime(message.createdAt, strings.timeLocale)}
             {message.status === 'sent' && (
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M3 13l4 4L15 7" /><path d="M9 13l4 4 8-10" />
@@ -75,16 +77,16 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
             )}
             {message.status === 'failed' && message.clientId !== null && (
               <>
-                <span class="fail">No enviado</span>
+                <span class="fail">{strings.notSent}</span>
                 <button type="button" class="retry" onClick={() => onRetry(message.clientId as string)}>
-                  Reintentar
+                  {strings.retry}
                 </button>
               </>
             )}
           </div>
         )}
         {!isUser && !message.streaming && (
-          <div class="meta">{formatTime(message.createdAt)}</div>
+          <div class="meta">{formatTime(message.createdAt, strings.timeLocale)}</div>
         )}
       </div>
     </div>

@@ -7,6 +7,8 @@ import { useStoreState } from '../panel/use-store'
 import { useUnreadCount, type LastSeen } from '../panel/use-unread-count'
 import { Panel } from '../panel/Panel'
 import { Launcher } from '../panel/Launcher'
+import { resolveLocale } from '../contract/locale'
+import { STRINGS, StringsContext } from '../panel/strings'
 
 interface ViewportState {
   kind: 'mobile' | 'desktop'
@@ -49,11 +51,23 @@ export interface AppProps {
   // shell/main.tsx cuando había uno guardado de una visita anterior. null/
   // ausente: visitante nuevo, o nunca se llegó a abrir el panel.
   initialLastSeen?: LastSeen | null
+  // Plan 4 (locale): lang de la página anfitriona, leído por main.tsx de
+  // ?lang= (ver shell/main.tsx#startShell) — PRIORITARIO sobre
+  // config.locale al resolver el locale efectivo de toda la UI (mismo orden
+  // que el fallback de assistantName en session.ts). null/ausente si el host
+  // no lo declaró o no es uno de los 4 soportados: cae a config.locale.
+  hostLocale?: string | null
 }
 
-export function App({ client: initialClient, bus, resumedSession = false, createSession, initialLastSeen = null }: AppProps) {
+export function App({ client: initialClient, bus, resumedSession = false, createSession, initialLastSeen = null, hostLocale = null }: AppProps) {
   const [client, setClient] = useState(initialClient)
   const config: WidgetConfig = client.getConfig()
+  // Nunca se confía en el shape tal cual llega de red (mismo criterio que el
+  // resto del contrato, ver contract/types.ts): config.locale ya está tipado
+  // como WidgetLocale, pero resolveLocale() lo revalida igual por si un
+  // backend real lo mandase corrupto.
+  const locale = resolveLocale(hostLocale) ?? resolveLocale(config.locale) ?? 'es'
+  const strings = STRINGS[locale]
   const [isOpen, setOpen] = useState(false)
   // Último watermark conocido (el del init, o uno más nuevo emitido por
   // useUnreadCount al abrir el panel) — el rebuild W4 lo reutiliza para que
@@ -212,13 +226,15 @@ export function App({ client: initialClient, bus, resumedSession = false, create
     bus.emit('resize', { width, height, position: config.theme.position === 'left' ? 'left' : 'right', viewportKind: viewport.kind })
 
   return (
-    <div data-part="root" data-mode={isOpen ? 'panel' : 'launcher'} data-viewport={viewport.kind}>
-      {isOpen ? (
-        <Panel config={config} transport={transport} onMinimize={close} onClose={close} onResize={onResize}
-          viewportKind={viewport.kind} viewportHeight={viewport.height} />
-      ) : (
-        <Launcher unreadCount={unread} autofocus={openedBeforeRef.current} onOpen={() => setOpen(true)} onResize={onResize} logoUrl={config.theme.logoUrl ?? null} />
-      )}
-    </div>
+    <StringsContext.Provider value={strings}>
+      <div data-part="root" data-mode={isOpen ? 'panel' : 'launcher'} data-viewport={viewport.kind}>
+        {isOpen ? (
+          <Panel config={config} transport={transport} onMinimize={close} onClose={close} onResize={onResize}
+            viewportKind={viewport.kind} viewportHeight={viewport.height} />
+        ) : (
+          <Launcher unreadCount={unread} autofocus={openedBeforeRef.current} onOpen={() => setOpen(true)} onResize={onResize} logoUrl={config.theme.logoUrl ?? null} />
+        )}
+      </div>
+    </StringsContext.Provider>
   )
 }

@@ -61,6 +61,14 @@ function parseLastSeenPayload(raw: unknown): LastSeen | null {
 
 export function startShell(w: Window, opts: ShellOptions): void {
   const instanceId = w.location.hash.slice(1)
+  // Plan 4 (locale): lang detectado por el loader en la página anfitriona
+  // (document.documentElement.lang) y propagado como ?lang=<code> en la URL
+  // del propio shell (ver loader/index.ts) — se lee UNA VEZ al arrancar (no
+  // cambia durante la vida de este shell) y se reenvía tanto a createClient
+  // (fallback de assistantName, session.ts) como a <App> (locale efectivo de
+  // toda la UI, app.tsx) para que ambos resuelvan EXACTAMENTE el mismo
+  // locale, con la misma prioridad host > config.locale > 'es'.
+  const hostLocale = new URLSearchParams(w.location.search).get('lang')
   const createClient = opts.createClient ?? realCreateSessionClient
   const scheduler: Scheduler = opts.scheduler ?? {
     setTimeout: (fn, ms) => w.setTimeout(fn, ms),
@@ -113,7 +121,7 @@ export function startShell(w: Window, opts: ShellOptions): void {
       // se dispara) — el POST /sessions real es idéntico en ambos casos,
       // solo cambia el resumeSecret que se le pasa.
       const buildClient = (secret: string | null) =>
-        createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin, resumeSecret: secret })
+        createClient({ apiBase: opts.apiBase, installationId, embeddingOrigin: origin, resumeSecret: secret, hostLocale })
 
       const mountFromClient = (client: SessionClient): void => {
         // Reenvía al loader lo que el backend acaba de emitir (mismo
@@ -129,7 +137,7 @@ export function startShell(w: Window, opts: ShellOptions): void {
         bus.emit('session_persist', { resumeSecret: client.getCurrentResumeSecret(), ...(initialLastSeen ? { lastSeen: initialLastSeen } : {}) })
         applyTheme(document.documentElement, client.getConfig().theme)
         const root = w.document.getElementById('root')
-        if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} createSession={buildClient} initialLastSeen={initialLastSeen} />, root)
+        if (root) render(<App client={client} bus={bus} resumedSession={client.wasResumed()} createSession={buildClient} initialLastSeen={initialLastSeen} hostLocale={hostLocale} />, root)
       }
 
       // Bug real: un visitante que hace ~10 hard-reloads rápidos agota el
