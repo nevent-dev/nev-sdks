@@ -64,7 +64,7 @@ describe('loader', () => {
     getApi()('boot', 'inst_demo_festival_01')
     const iframes = document.querySelectorAll('iframe')
     expect(iframes).toHaveLength(1)
-    expect(iframes[0]!.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin')
+    expect(iframes[0]!.getAttribute('sandbox')).toBe('allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox')
     expect(iframes[0]!.src.startsWith(SHELL_URL)).toBe(true)
   })
   it('responde al ready del shell con init{installationId} hacia el origin exacto', () => {

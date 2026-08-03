@@ -121,7 +121,9 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
     const container = w.document.createElement('div')
     const iframe = w.document.createElement('iframe')
     iframe.title = 'Chat de ayuda'
-    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin')
+    // allow-popups(+escape): el powered-by y los enlaces http(s) del bot abren
+    // en pestaña nueva; sin escape heredarían el sandbox y quedarían en blanco.
+    iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox')
     iframe.src = `${opts.shellUrl}#${instanceId}`
     container.appendChild(iframe)
     // Fallback a documentElement: un <script> clásico en <head> puede ejecutarse
