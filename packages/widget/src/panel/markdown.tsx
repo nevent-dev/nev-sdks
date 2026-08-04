@@ -18,7 +18,26 @@ const UL_ITEM = /^\s*[-*•]\s+(.*)$/
 const OL_ITEM = /^\s*\d{1,3}[.)]\s+(.*)$/
 const HEADING = /^\s*#{1,6}\s+(.*)$/
 const INLINE_TOKEN =
-  /(`([^`]+)`)|(\[([^\]]+)\]\(([^\s)]+)\))|(\*\*([^*]+?)\*\*)|(\*([^*\s][^*]*?)\*)/
+  /(`([^`]+)`)|(\[([^\]]+)\]\(([^\s)]+)\))|(\*\*([^*]+?)\*\*)|(\*([^*\s][^*]*?)\*)|(https?:\/\/[^\s<>]+)/
+
+/**
+ * Separa la puntuación final pegada a una URL suelta ("…web: https://x.com.
+ * Recuerda…" — el punto es de la frase, no del enlace). Un ')' final solo se
+ * recorta si no cierra un '(' abierto DENTRO de la propia URL (wikis, etc.).
+ */
+function splitTrailingPunctuation(raw: string): { url: string; trailing: string } {
+  let url = raw
+  let trailing = ''
+  for (;;) {
+    const last = url[url.length - 1]
+    if (last === undefined) break
+    const unbalancedParen = last === ')' && url.split('(').length < url.split(')').length
+    if (!'.,;:!?…»”"\''.includes(last) && !unbalancedParen) break
+    trailing = last + trailing
+    url = url.slice(0, -1)
+  }
+  return { url, trailing }
+}
 
 function renderInline(text: string): ComponentChildren[] {
   const out: ComponentChildren[] = []
@@ -44,8 +63,19 @@ function renderInline(text: string): ComponentChildren[] {
       }
     } else if (m[6] !== undefined) {
       out.push(<strong>{renderInline(m[7]!)}</strong>)
-    } else {
+    } else if (m[8] !== undefined) {
       out.push(<em>{renderInline(m[9]!)}</em>)
+    } else {
+      // URL suelta sin sintaxis markdown — el formato en que el motor emite
+      // los enlaces en la práctica. El esquema ya viene garantizado http(s)
+      // por el propio token.
+      const { url, trailing } = splitTrailingPunctuation(m[10]!)
+      out.push(
+        <a href={url} target="_blank" rel="noopener noreferrer">
+          {url}
+        </a>,
+      )
+      if (trailing) out.push(trailing)
     }
     rest = rest.slice(m.index + m[0].length)
   }

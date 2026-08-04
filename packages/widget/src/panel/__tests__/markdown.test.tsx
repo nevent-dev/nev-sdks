@@ -76,4 +76,32 @@ describe('renderMarkdown', () => {
     expect(root.querySelector('strong')).toBeNull()
     expect(root.querySelector('#md')?.textContent).toBe('esto es **negri')
   })
+
+  it('una URL suelta (sin sintaxis markdown) se hipervincula — es como el motor las emite', async () => {
+    const root = await md('Compra en nuestra web oficial: https://demofest.nevent.ai. Recuerda que no hay taquillas.')
+    const a = root.querySelector('a')
+    expect(a?.getAttribute('href')).toBe('https://demofest.nevent.ai')
+    expect(a?.getAttribute('target')).toBe('_blank')
+    expect(a?.getAttribute('rel')).toContain('noopener')
+    expect(a?.textContent).toBe('https://demofest.nevent.ai')
+    expect(root.querySelector('#md')?.textContent).toContain('. Recuerda')
+  })
+
+  it('la puntuación pegada al final de una URL suelta queda FUERA del href', async () => {
+    const root = await md('entra en https://x.com/a?b=c, o llama.')
+    expect(root.querySelector('a')?.getAttribute('href')).toBe('https://x.com/a?b=c')
+    const root2 = await md('(más info en https://nevent.ai)')
+    expect(root2.querySelector('a')?.getAttribute('href')).toBe('https://nevent.ai')
+    expect(root2.querySelector('#md')?.textContent).toBe('(más info en https://nevent.ai)')
+  })
+
+  it('una URL suelta dentro de un ítem de lista también se hipervincula', async () => {
+    const root = await md('- Web: https://demofest.nevent.ai\n- Taquilla: no hay')
+    expect(root.querySelector('li a')?.getAttribute('href')).toBe('https://demofest.nevent.ai')
+  })
+
+  it('sin esquema http(s) no hay autolink — "www.x.com" queda como texto', async () => {
+    const root = await md('mira www.x.com y ftp://viejo.com')
+    expect(root.querySelectorAll('a').length).toBe(0)
+  })
 })
