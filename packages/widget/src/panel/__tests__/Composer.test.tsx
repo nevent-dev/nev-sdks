@@ -17,12 +17,24 @@ async function mountComposer(props: Parameters<typeof Composer>[0]): Promise<{ r
 
 describe('Composer', () => {
   it('usa el placeholder del viewState', async () => {
-    const { textarea } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn() })
+    const { textarea } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn(), uploadEnabled: false })
     expect(textarea.placeholder).toBe('Escribe tu pregunta…')
   })
 
+  it('el clip de adjuntar NO se pinta con uploadEnabled=false (affordance muerta fuera)', async () => {
+    const { root } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn(), uploadEnabled: false })
+    expect(root.querySelector('[aria-label="Adjuntar archivo"]')).toBeNull()
+  })
+
+  it('el clip aparece (aún deshabilitado, Próximamente) cuando la instalación activa upload', async () => {
+    const { root } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn(), uploadEnabled: true })
+    const clip = root.querySelector<HTMLButtonElement>('[aria-label="Adjuntar archivo"]')
+    expect(clip).not.toBeNull()
+    expect(clip!.disabled).toBe(true)
+  })
+
   it('el powered-by enlaza a nevent.ai en pestaña nueva con rel noopener', async () => {
-    const { root } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn() })
+    const { root } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn(), uploadEnabled: false })
     const a = root.querySelector('.powered a')
     expect(a?.getAttribute('href')).toBe('https://nevent.ai')
     expect(a?.getAttribute('target')).toBe('_blank')
@@ -32,7 +44,7 @@ describe('Composer', () => {
 
   it('Enter sin Shift envía el texto recortado y limpia el textarea', async () => {
     const onSend = vi.fn()
-    const { textarea } = await mountComposer({ viewState: idleViewState, onSend, onStop: vi.fn() })
+    const { textarea } = await mountComposer({ viewState: idleViewState, onSend, onStop: vi.fn(), uploadEnabled: false })
     textarea.value = '  hola  '
     textarea.dispatchEvent(new Event('input', { bubbles: true }))
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
@@ -42,7 +54,7 @@ describe('Composer', () => {
 
   it('Shift+Enter NO envía (deja insertar el salto de línea nativo)', async () => {
     const onSend = vi.fn()
-    const { textarea } = await mountComposer({ viewState: idleViewState, onSend, onStop: vi.fn() })
+    const { textarea } = await mountComposer({ viewState: idleViewState, onSend, onStop: vi.fn(), uploadEnabled: false })
     textarea.value = 'hola'
     textarea.dispatchEvent(new Event('input', { bubbles: true }))
     textarea.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true }))
@@ -51,7 +63,7 @@ describe('Composer', () => {
 
   it('texto vacío o solo espacios: el botón enviar está disabled y Enter no llama a onSend', async () => {
     const onSend = vi.fn()
-    const { root, textarea } = await mountComposer({ viewState: idleViewState, onSend, onStop: vi.fn() })
+    const { root, textarea } = await mountComposer({ viewState: idleViewState, onSend, onStop: vi.fn(), uploadEnabled: false })
     textarea.value = '   '
     textarea.dispatchEvent(new Event('input', { bubbles: true }))
     expect(root.querySelector<HTMLButtonElement>('.send')!.disabled).toBe(true)
@@ -79,14 +91,8 @@ describe('Composer', () => {
     withStop.querySelector<HTMLButtonElement>('.stopbtn')!.click()
     expect(onStop).toHaveBeenCalledTimes(1)
 
-    const { root: withoutStop } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn() })
+    const { root: withoutStop } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn(), uploadEnabled: false })
     expect(withoutStop.querySelector('.stopbtn')).toBeNull()
   })
 
-  it('el botón adjuntar está siempre disabled con tooltip "Próximamente" (subida real es Plan 4)', async () => {
-    const { root } = await mountComposer({ viewState: idleViewState, onSend: vi.fn(), onStop: vi.fn() })
-    const attach = root.querySelector<HTMLButtonElement>('[aria-label="Adjuntar archivo"]')!
-    expect(attach.disabled).toBe(true)
-    expect(attach.title).toBe('Próximamente')
-  })
 })

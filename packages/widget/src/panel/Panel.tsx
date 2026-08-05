@@ -92,7 +92,7 @@ export function Panel({ config, transport, onClose, onResize, viewportKind, view
         // cálculo de fase cambiara de criterio en el futuro.
         showWelcome={viewState.conversationPhase === 'idle' && state.messages.length === 0}
       />
-      <Composer viewState={viewState} onSend={(text) => transport.send(text)} onStop={() => transport.cancel()} />
+      <Composer viewState={viewState} onSend={(text) => transport.send(text)} onStop={() => transport.cancel()} uploadEnabled={config.features.upload} />
     </section>
   )
 }
