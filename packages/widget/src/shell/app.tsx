@@ -229,7 +229,7 @@ export function App({ client: initialClient, bus, resumedSession = false, create
     <StringsContext.Provider value={strings}>
       <div data-part="root" data-mode={isOpen ? 'panel' : 'launcher'} data-viewport={viewport.kind}>
         {isOpen ? (
-          <Panel config={config} transport={transport} onMinimize={close} onClose={close} onResize={onResize}
+          <Panel config={config} transport={transport} onClose={close} onResize={onResize}
             viewportKind={viewport.kind} viewportHeight={viewport.height} />
         ) : (
           <Launcher unreadCount={unread} autofocus={openedBeforeRef.current} onOpen={() => setOpen(true)} onResize={onResize} logoUrl={config.theme.logoUrl ?? null} />

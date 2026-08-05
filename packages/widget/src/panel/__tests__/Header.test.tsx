@@ -11,7 +11,7 @@ describe('Header', () => {
       conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false,
     })
-    const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
+    const root = await mount(<Header viewState={viewState} onClose={vi.fn()} />)
     expect(root.querySelector('.name')?.textContent).toBe('Asistente de DEMO FEST')
     expect(root.querySelector('.state')?.textContent).toBe('Respuesta al instante')
     expect(root.querySelector('.pulse')).toBeNull()
@@ -25,7 +25,7 @@ describe('Header', () => {
       conversationState: 'AGENT_ACTIVE', connection: 'live', agentName: 'Laura', agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false,
     })
-    const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
+    const root = await mount(<Header viewState={viewState} onClose={vi.fn()} />)
     expect(root.querySelector('img')).toBeNull()
     expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
     expect(root.querySelector('.dot-live')).not.toBeNull()
@@ -40,7 +40,7 @@ describe('Header', () => {
       conversationState: 'AGENT_ACTIVE', connection: 'live', agentName: 'Laura', agentAvatarUrl: 'https://res.nevent.es/agents/laura.jpg',
       assistantName: 'Asistente de DEMO FEST', isStreaming: false,
     })
-    const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
+    const root = await mount(<Header viewState={viewState} onClose={vi.fn()} />)
     const img = root.querySelector('.avatar img.agent-avatar-img')
     expect(img).not.toBeNull()
     expect(img?.getAttribute('src')).toBe('https://res.nevent.es/agents/laura.jpg')
@@ -53,7 +53,7 @@ describe('Header', () => {
       conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false, logoUrl: 'https://res.nevent.es/tenants/demo-fest/logo.png',
     })
-    const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
+    const root = await mount(<Header viewState={viewState} onClose={vi.fn()} />)
     const img = root.querySelector('.avatar img.bot-logo-img')
     expect(img?.getAttribute('src')).toBe('https://res.nevent.es/tenants/demo-fest/logo.png')
     expect(root.querySelector('svg[data-icon=bot]')).toBeNull()
@@ -64,7 +64,7 @@ describe('Header', () => {
       conversationState: 'AGENT_ACTIVE', connection: 'live', agentName: 'Laura', agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false, logoUrl: 'https://res.nevent.es/tenants/demo-fest/logo.png',
     })
-    const root = await mount(<Header viewState={viewState} onMinimize={vi.fn()} onClose={vi.fn()} />)
+    const root = await mount(<Header viewState={viewState} onClose={vi.fn()} />)
     expect(root.querySelector('.initials-avatar')?.textContent).toBe('L')
     expect(root.querySelector('img.bot-logo-img')).toBeNull()
   })
@@ -74,12 +74,11 @@ describe('Header', () => {
       conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null,
       assistantName: 'Asistente de DEMO FEST', isStreaming: false,
     })
-    const onMinimize = vi.fn()
     const onClose = vi.fn()
-    const root = await mount(<Header viewState={viewState} onMinimize={onMinimize} onClose={onClose} />)
-    root.querySelector<HTMLButtonElement>('[aria-label="Minimizar"]')!.click()
+    const root = await mount(<Header viewState={viewState} onClose={onClose} />)
+    // Un único control de salida (patrón messenger): la X colapsa; minimizar ya no existe.
+    expect(root.querySelector('[aria-label="Minimizar"]')).toBeNull()
     root.querySelector<HTMLButtonElement>('[aria-label="Cerrar"]')!.click()
-    expect(onMinimize).toHaveBeenCalledTimes(1)
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })

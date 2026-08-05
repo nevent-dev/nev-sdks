@@ -47,7 +47,7 @@ async function mountPanel(configure: (store: MessageStore) => void): Promise<HTM
   const store = createMessageStore(() => '2026-07-18T14:00:00.000Z')
   configure(store)
   return mount(
-    <Panel config={fixtureConfig()} transport={fakeTransport(store)} onMinimize={() => {}} onClose={() => {}} onResize={() => {}}
+    <Panel config={fixtureConfig()} transport={fakeTransport(store)} onClose={() => {}} onResize={() => {}}
       viewportKind="desktop" viewportHeight={900} />,
   )
 }
@@ -73,7 +73,7 @@ async function mountRichPreview(): Promise<HTMLElement> {
   const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null, assistantName: config.assistantName ?? 'Asistente', isStreaming: false })
   return mount(
     <section class="panel" role="dialog" aria-label="Vista previa: contenido rico">
-      <Header viewState={viewState} onMinimize={() => {}} onClose={() => {}} />
+      <Header viewState={viewState} onClose={() => {}} />
       <ConnectionBanner kind={null} />
       <MessageList config={config} messages={[idleMsg({ text: '¡Hecho! El cambio de titular es gratuito. Y ya que estás, quedan pocas unidades 👇' })]}
         agentName={null} agentAvatarUrl={null} onRetry={() => {}} onQuickReply={() => {}} showWelcome={false}
@@ -88,7 +88,7 @@ async function mountUploadPreview(): Promise<HTMLElement> {
   const viewState = computeViewState({ conversationState: 'BOT_ACTIVE', connection: 'live', agentName: null, agentAvatarUrl: null, assistantName: config.assistantName ?? 'Asistente', isStreaming: false })
   return mount(
     <section class="panel" role="dialog" aria-label="Vista previa: subida de archivo">
-      <Header viewState={viewState} onMinimize={() => {}} onClose={() => {}} />
+      <Header viewState={viewState} onClose={() => {}} />
       <ConnectionBanner kind={null} />
       <MessageList config={config} messages={[idleMsg({ role: 'user', text: 'Aquí tienes mi entrada' })]}
         agentName={null} agentAvatarUrl={null} onRetry={() => {}} onQuickReply={() => {}} showWelcome={false}

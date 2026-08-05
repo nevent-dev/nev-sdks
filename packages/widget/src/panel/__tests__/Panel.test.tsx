@@ -22,7 +22,7 @@ afterEach(cleanupMounted)
 async function mountPanel(overrides: Partial<Parameters<typeof Panel>[0]> = {}): Promise<{ root: HTMLElement; transport: Transport }> {
   const transport = overrides.transport ?? fakeTransport()
   const root = await mount(
-    <Panel config={fixtureConfig()} transport={transport} onMinimize={vi.fn()} onClose={vi.fn()} onResize={vi.fn()}
+    <Panel config={fixtureConfig()} transport={transport} onClose={vi.fn()} onResize={vi.fn()}
       viewportKind="desktop" viewportHeight={900} {...overrides} />,
   )
   return { root, transport }

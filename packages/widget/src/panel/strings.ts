@@ -11,7 +11,6 @@ import type { WidgetLocale } from '../contract/locale'
 export interface WidgetStrings {
   launcherOpen: string
   headerClose: string
-  headerMinimize: string
   stateOnline: string
   stateInstant: string
   stateTyping: string
@@ -56,7 +55,6 @@ export interface WidgetStrings {
 const es: WidgetStrings = {
   launcherOpen: 'Abrir chat de ayuda',
   headerClose: 'Cerrar',
-  headerMinimize: 'Minimizar',
   stateOnline: 'En línea ahora',
   stateInstant: 'Respuesta al instante',
   stateTyping: 'Escribiendo…',
@@ -101,7 +99,6 @@ const es: WidgetStrings = {
 const en: WidgetStrings = {
   launcherOpen: 'Open help chat',
   headerClose: 'Close',
-  headerMinimize: 'Minimize',
   stateOnline: 'Online now',
   stateInstant: 'Instant answers',
   stateTyping: 'Typing…',
@@ -146,7 +143,6 @@ const en: WidgetStrings = {
 const ca: WidgetStrings = {
   launcherOpen: "Obre el xat d'ajuda",
   headerClose: 'Tanca',
-  headerMinimize: 'Minimitza',
   stateOnline: 'En línia ara',
   stateInstant: "Resposta a l'instant",
   stateTyping: 'Escrivint…',
@@ -191,7 +187,6 @@ const ca: WidgetStrings = {
 const pt: WidgetStrings = {
   launcherOpen: 'Abrir o chat de ajuda',
   headerClose: 'Fechar',
-  headerMinimize: 'Minimizar',
   stateOnline: 'Online agora',
   stateInstant: 'Resposta imediata',
   stateTyping: 'A escrever…',
