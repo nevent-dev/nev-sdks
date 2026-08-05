@@ -15,7 +15,6 @@ import { WaitingCard, TypingDots, ResolvedCard, NewConversationCard } from './ha
 export interface PanelProps {
   config: WidgetConfig
   transport: Transport
-  onMinimize: () => void
   onClose: () => void
   onResize: (width: number, height: number) => void
   // Rellenados por App (Task 17) a partir del mensaje `viewport` del loader
@@ -27,7 +26,7 @@ export interface PanelProps {
   viewportHeight: number
 }
 
-export function Panel({ config, transport, onMinimize, onClose, onResize, viewportKind, viewportHeight }: PanelProps) {
+export function Panel({ config, transport, onClose, onResize, viewportKind, viewportHeight }: PanelProps) {
   const strings = useStrings()
   const state = useStoreState(transport.store)
   const isStreaming = state.messages.some((m) => m.streaming)
@@ -76,7 +75,7 @@ export function Panel({ config, transport, onMinimize, onClose, onResize, viewpo
 
   return (
     <section class="panel" data-part="panel" role="dialog" aria-label={assistantName} tabIndex={-1} ref={containerRef}>
-      <Header viewState={viewState} onMinimize={onMinimize} onClose={onClose} />
+      <Header viewState={viewState} onClose={onClose} />
       <ConnectionBanner kind={viewState.connectionBanner} />
       <MessageList
         config={config}
