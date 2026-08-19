@@ -312,3 +312,12 @@ jobs:
           echo "(POST /admin/widget/installations/{id}/embed-code). Requiere en nev-api prod:" >> $GITHUB_STEP_SUMMARY
           echo "WIDGET_EMBED_CDN_BASE_URL=https://neventapps.com y" >> $GITHUB_STEP_SUMMARY
           echo "WIDGET_CORS_SHELL_ORIGINS=https://neventapps.com" >> $GITHUB_STEP_SUMMARY
+
+  notify-release:
+    name: Pregonero
+    needs: [deploy]
+    if: success()
+    permissions:
+      contents: read
+    uses: nevent-dev/.github/.github/workflows/release-notes.yml@v1
+    secrets: inherit
