@@ -82,6 +82,19 @@ export function deriveInkColor(primaryColorHex: string): string | null {
   return bestContrast >= AA_NORMAL_TEXT ? best : null
 }
 
+// El color REAL de la superficie del panel tal y como quedó tras resolver el
+// tema completo (override de config vía data-theme + prefers-color-scheme,
+// cascada de tokens.css) — el loader lo pinta en su backplate opaco para que
+// no haya costura visible entre el iframe y el fondo que cubre el layout
+// viewport (los teclados/barras translúcidos de iOS 26 dejan ver lo que haya
+// debajo del visual viewport). Devuelve null si el valor computado no es un
+// hex validable (isSafeColor) — la frontera shell→loader es postMessage y el
+// loader aplica entonces su propio fallback, nunca un valor arbitrario.
+export function resolveSurfaceColor(w: Window, root: HTMLElement): string | null {
+  const value = w.getComputedStyle(root).getPropertyValue('--surface').trim()
+  return isSafeColor(value) ? value : null
+}
+
 // Config del anfitrión/backend es entrada NO CONFIABLE (spec §7): SIEMPRE vía
 // CSSStyleDeclaration.setProperty, JAMÁS interpolado en HTML/CSS. Se llama
 // desde main.tsx ANTES del primer render (Task 15), no desde un efecto de
