@@ -27,6 +27,21 @@ interface LoaderOptions { shellUrl: string }
 const LAUNCHER_SIZE = { width: 104, height: 104 }
 const DEFAULT_PANEL_SIZE = { width: 430, height: 688 }
 const MOBILE_QUERY = '(max-width: 480px)'
+const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)'
+
+// Validación PROPIA del surface que llega del shell por postMessage (frontera
+// no confiable, spec §7) — mismo allowlist hex3/hex6 que panel/theme.ts
+// #isSafeColor, duplicado a propósito: importar panel/ engordaría el bundle
+// IIFE del loader (mismo criterio que LOADER_TITLES arriba) y cada capa
+// valida su propio lado del contrato (mismo patrón que parseLastSeenPayload
+// en shell/main.tsx).
+const SAFE_HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
+
+// Espejo mínimo del --surface claro/oscuro de panel/tokens.css — SOLO el
+// fallback del backplate antes de que llegue el primer `opened{surface}` (o
+// si un shell antiguo no lo manda): el color autoritativo siempre es el que
+// reporta el shell, que resuelve el tema completo (config + data-theme).
+const SURFACE_FALLBACK = { light: '#ffffff', dark: '#171a21' }
 
 interface Instance {
   instanceId: string
@@ -42,13 +57,16 @@ interface Instance {
   position: 'left' | 'right'
   desktopPanelSize: { width: number; height: number } | null
   launcherSize: { width: number; height: number } | null
+  // --surface resuelto reportado por el shell en `opened` (ya validado por
+  // SAFE_HEX) — color del backplate móvil. null: usa SURFACE_FALLBACK.
+  panelSurface: string | null
   mobileQuery: MediaQueryList
   onMobileChange: () => void
   onVisualViewportChange: (() => void) | null
 }
 
 const RESET_STYLE: Record<string, string> = {
-  position: '', zIndex: '', inset: '', top: '', right: '', bottom: '', left: '', width: '', height: '',
+  position: '', zIndex: '', inset: '', top: '', right: '', bottom: '', left: '', width: '', height: '', background: '',
 }
 
 // Asigna geometría PROPIEDAD A PROPIEDAD — nunca `cssText`. Un host con CSP
@@ -76,32 +94,46 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
   // Pantalla completa SOLO con mode==='panel' && isMobile — el launcher
   // cerrado en móvil NUNCA ocupa toda la página (bug "104×104 en bucle" de
   // la ronda 2, cerrado moviendo la detección de móvil aquí, al host, en vez
-  // de dentro del iframe — ver sendViewport). El contenedor sigue la caja
-  // REAL de w.visualViewport (offsetTop/offsetLeft/width/height) — NUNCA un
-  // inset:0 fijo al viewport de LAYOUT completo: en iOS el teclado puede
-  // reducir Y desplazar lo visible sin mover el viewport de layout, y un
-  // inset:0 dejaría el panel tapado por el teclado o fuera de la zona
-  // visible (Critical, ronda 3 — WebKit documenta actualizaciones tardías de
-  // estos valores durante la animación del teclado:
-  // https://bugs.webkit.org/show_bug.cgi?id=265578). Sin VisualViewport
-  // (navegador sin soporte), el viewport de layout es la mejor aproximación
-  // disponible. En cualquier otro caso, ancla por `position` con el
+  // de dentro del iframe — ver sendViewport). Dos superficies con geometrías
+  // DISTINTAS a propósito:
+  //
+  // - El CONTENEDOR es un backplate opaco fixed inset:0 que cubre el layout
+  //   viewport COMPLETO. El visual viewport es por definición un
+  //   sub-rectángulo del layout viewport, así que el backplate tapa todo lo
+  //   visible — incluida la franja que queda detrás del teclado y las barras
+  //   translúcidas de iOS 26 (Liquid Glass), que de otro modo dejan ver la
+  //   página anfitriona a través. Su color es el --surface que reporta el
+  //   shell en `opened` (tema ya resuelto), con fallback por
+  //   prefers-color-scheme del host.
+  // - El IFRAME sigue la caja REAL de w.visualViewport
+  //   (offsetTop/offsetLeft/width/height) para quedar siempre encima del
+  //   teclado — NUNCA inset:0: en iOS el teclado puede reducir Y desplazar
+  //   lo visible sin mover el viewport de layout (Critical, ronda 3 — WebKit
+  //   documenta actualizaciones tardías de estos valores durante la
+  //   animación del teclado: https://bugs.webkit.org/show_bug.cgi?id=265578;
+  //   con el backplate detrás, ese retardo es solo cosmético: la anfitriona
+  //   nunca asoma).
+  //
+  // Sin VisualViewport (navegador sin soporte), el iframe rellena el
+  // backplate al 100%. En cualquier otro caso, ancla por `position` con el
   // `launcherSize`/`desktopPanelSize` reportado EN CADA MODO — nunca uno
   // contaminado por el otro.
   const applySizing = (): void => {
     if (!instance) return
     if (instance.mode === 'panel' && instance.isMobile) {
+      const surface = instance.panelSurface
+        ?? (w.matchMedia(DARK_SCHEME_QUERY).matches ? SURFACE_FALLBACK.dark : SURFACE_FALLBACK.light)
+      setBoxStyle(instance.container, { position: 'fixed', zIndex: '2147483647', inset: '0px', background: surface })
       const vv = w.visualViewport
       if (vv) {
-        setBoxStyle(instance.container, {
-          position: 'fixed', zIndex: '2147483647',
+        setBoxStyle(instance.iframe, {
+          position: 'absolute', border: '0',
           top: `${Math.round(vv.offsetTop)}px`, left: `${Math.round(vv.offsetLeft)}px`,
           width: `${Math.round(vv.width)}px`, height: `${Math.round(vv.height)}px`,
         })
       } else {
-        setBoxStyle(instance.container, { position: 'fixed', zIndex: '2147483647', inset: '0px', width: '100vw', height: '100dvh' })
+        setBoxStyle(instance.iframe, { border: '0', width: '100%', height: '100%' })
       }
-      setBoxStyle(instance.iframe, { border: '0', width: '100%', height: '100%' })
       return
     }
     const size = instance.mode === 'panel' ? (instance.desktopPanelSize ?? DEFAULT_PANEL_SIZE) : (instance.launcherSize ?? LAUNCHER_SIZE)
@@ -202,6 +234,12 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
         return
       }
       if (env.type === 'opened') {
+        // El shell manda su --surface resuelto para el backplate móvil (ver
+        // applySizing). Validación propia en esta capa (SAFE_HEX): un valor
+        // no-hex (o un shell antiguo que no lo manda) deja null → fallback.
+        const payload = env.payload as { surface?: unknown } | null | undefined
+        const surface = typeof payload?.surface === 'string' ? payload.surface.trim() : null
+        instance.panelSurface = surface !== null && SAFE_HEX.test(surface) ? surface : null
         instance.mode = 'panel'
         applySizing()
       } else if (env.type === 'closed') {
@@ -235,7 +273,7 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
     w.addEventListener('message', onMessage)
     instance = {
       instanceId, installationId, opts: bootOpts, container, iframe, shellOrigin, listeners: new Map(), onMessage,
-      mode: 'launcher', isMobile: mobileQuery.matches, position: 'right', desktopPanelSize: null, launcherSize: null,
+      mode: 'launcher', isMobile: mobileQuery.matches, position: 'right', desktopPanelSize: null, launcherSize: null, panelSurface: null,
       mobileQuery, onMobileChange, onVisualViewportChange: w.visualViewport ? onVisualViewportChange : null,
     }
     applySizing()

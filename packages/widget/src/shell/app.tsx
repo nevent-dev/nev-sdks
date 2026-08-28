@@ -8,6 +8,7 @@ import { useUnreadCount, type LastSeen } from '../panel/use-unread-count'
 import { Panel } from '../panel/Panel'
 import { Launcher } from '../panel/Launcher'
 import { resolveLocale } from '../contract/locale'
+import { resolveSurfaceColor } from '../panel/theme'
 import { STRINGS, StringsContext } from '../panel/strings'
 
 interface ViewportState {
@@ -125,7 +126,27 @@ export function App({ client: initialClient, bus, resumedSession = false, create
   }, [bus])
 
   useEffect(() => {
-    bus.emit(isOpen ? 'opened' : 'closed')
+    if (!isOpen) {
+      bus.emit('closed')
+      return
+    }
+    // `opened` lleva el --surface RESUELTO del documento del shell — el loader
+    // pinta con él su backplate opaco (la superficie que cubre el layout
+    // viewport completo mientras el iframe sigue al visual viewport; sin ella,
+    // el teclado translúcido de iOS 26 deja ver la página anfitriona). Se
+    // re-emite si el esquema claro/oscuro cambia con el panel abierto: los
+    // tokens del iframe cambian solos por prefers-color-scheme y el backplate
+    // del host no puede enterarse por su cuenta del --surface nuevo. Este
+    // matchMedia es de COLOR-SCHEME: la prohibición de la ronda 2 ("el shell
+    // nunca llama a matchMedia") era sobre detección de móvil por ANCHO, que
+    // dentro del iframe mide la caja del propio iframe y no la del host —
+    // prefers-color-scheme sí atraviesa el iframe con el valor real del SO.
+    const emitOpened = (): void =>
+      bus.emit('opened', { surface: resolveSurfaceColor(window, document.documentElement) })
+    emitOpened()
+    const scheme = window.matchMedia('(prefers-color-scheme: dark)')
+    scheme.addEventListener('change', emitOpened)
+    return () => scheme.removeEventListener('change', emitOpened)
   }, [isOpen, bus])
 
   useEffect(() => {
