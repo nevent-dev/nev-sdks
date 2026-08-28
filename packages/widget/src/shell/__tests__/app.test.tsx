@@ -554,3 +554,83 @@ describe('App — config.theme.logoUrl llega hasta el Launcher (mismo canal que 
     expect(root.querySelector('img.bot-logo-img')).toBeNull()
   })
 })
+
+describe("App — 'opened' lleva el --surface resuelto (backplate del loader, teclado translúcido iOS 26)", () => {
+  afterEach(() => {
+    document.documentElement.style.removeProperty('--surface')
+  })
+
+  it('abrir el panel emite opened{surface} con el --surface computado del documento del shell', async () => {
+    document.documentElement.style.setProperty('--surface', '#101319')
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    let handler: ((type: string, payload: unknown) => void) | null = null
+    const emit = vi.fn()
+    const bus: ShellBus = { onCommand: (cb) => { handler = cb }, emit, getLatchedViewport: () => null }
+
+    await mount(<App client={fakeClient()} bus={bus} />)
+    await act(() => { handler?.('open', null) })
+
+    expect(emit).toHaveBeenCalledWith('opened', { surface: '#101319' })
+  })
+
+  it('sin --surface resoluble (o con un valor no-hex): emite opened{surface:null} — el loader decide su propio fallback', async () => {
+    document.documentElement.style.setProperty('--surface', 'linear-gradient(red, blue)')
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    let handler: ((type: string, payload: unknown) => void) | null = null
+    const emit = vi.fn()
+    const bus: ShellBus = { onCommand: (cb) => { handler = cb }, emit, getLatchedViewport: () => null }
+
+    await mount(<App client={fakeClient()} bus={bus} />)
+    await act(() => { handler?.('open', null) })
+
+    expect(emit).toHaveBeenCalledWith('opened', { surface: null })
+  })
+
+  it('cambio de esquema claro/oscuro CON el panel abierto: re-emite opened con el --surface fresco (el backplate nunca se queda stale)', async () => {
+    document.documentElement.style.setProperty('--surface', '#ffffff')
+    let schemeHandler: (() => void) | null = null
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+      matches: false, media: query,
+      addEventListener: (type: string, cb: () => void) => { if (type === 'change') schemeHandler = cb },
+      removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn(), onchange: null, dispatchEvent: vi.fn(),
+    } as unknown as MediaQueryList))
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    let handler: ((type: string, payload: unknown) => void) | null = null
+    const emit = vi.fn()
+    const bus: ShellBus = { onCommand: (cb) => { handler = cb }, emit, getLatchedViewport: () => null }
+
+    await mount(<App client={fakeClient()} bus={bus} />)
+    await act(() => { handler?.('open', null) })
+    expect(emit).toHaveBeenCalledWith('opened', { surface: '#ffffff' })
+
+    // El SO cambia a oscuro con el panel abierto: los tokens del iframe ya
+    // cambiaron por prefers-color-scheme — el loader necesita el color nuevo.
+    document.documentElement.style.setProperty('--surface', '#171a21')
+    expect(schemeHandler).not.toBeNull()
+    await act(() => { schemeHandler!() })
+
+    expect(emit).toHaveBeenCalledWith('opened', { surface: '#171a21' })
+    matchMedia.mockRestore()
+  })
+
+  it('cerrar el panel sigue emitiendo closed (sin payload de surface)', async () => {
+    const store = createMessageStore(() => '2026-07-19T10:00:00.000Z')
+    const { transport } = fakeTransport(store)
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(transport)
+    let handler: ((type: string, payload: unknown) => void) | null = null
+    const emit = vi.fn()
+    const bus: ShellBus = { onCommand: (cb) => { handler = cb }, emit, getLatchedViewport: () => null }
+
+    await mount(<App client={fakeClient()} bus={bus} />)
+    await act(() => { handler?.('open', null) })
+    await act(() => { handler?.('close', null) })
+
+    expect(emit).toHaveBeenCalledWith('closed')
+  })
+})

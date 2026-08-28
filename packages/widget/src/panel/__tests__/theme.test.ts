@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { isSafeColor, isSafeHttpsUrl, deriveInkColor, applyTheme } from '../theme'
+import { isSafeColor, isSafeHttpsUrl, deriveInkColor, applyTheme, resolveSurfaceColor } from '../theme'
 import type { WidgetConfig } from '../../contract/types'
 
 describe('isSafeColor — v1 SOLO hex opaco de 3/6 dígitos (Important #6, ronda 2)', () => {
@@ -154,5 +154,25 @@ describe('applyTheme', () => {
     expect(() => applyTheme(root, realBackendTheme)).not.toThrow()
     expect(root.dataset['position']).toBe('right')
     expect(root.dataset['theme']).toBe('light')
+  })
+})
+
+describe('resolveSurfaceColor — el --surface computado que viaja al backplate del loader', () => {
+  function fakeWindow(surfaceValue: string): Window {
+    return {
+      getComputedStyle: () => ({ getPropertyValue: (prop: string) => (prop === '--surface' ? surfaceValue : '') }),
+    } as unknown as Window
+  }
+
+  it('devuelve el hex computado, con espacios recortados', () => {
+    expect(resolveSurfaceColor(fakeWindow('  #171a21  '), document.documentElement)).toBe('#171a21')
+  })
+  it('hex de 3 dígitos también es válido (mismo allowlist que isSafeColor)', () => {
+    expect(resolveSurfaceColor(fakeWindow('#fff'), document.documentElement)).toBe('#fff')
+  })
+  it('devuelve null si el valor computado no es hex (gradiente, rgb(), vacío) — el loader decide su fallback', () => {
+    expect(resolveSurfaceColor(fakeWindow('linear-gradient(red, blue)'), document.documentElement)).toBeNull()
+    expect(resolveSurfaceColor(fakeWindow('rgb(255, 255, 255)'), document.documentElement)).toBeNull()
+    expect(resolveSurfaceColor(fakeWindow(''), document.documentElement)).toBeNull()
   })
 })

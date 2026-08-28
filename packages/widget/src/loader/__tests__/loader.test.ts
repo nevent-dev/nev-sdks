@@ -379,7 +379,7 @@ describe('loader', () => {
     matchMedia.mockRestore()
   })
 
-  it('Critical (VisualViewport real) — SOLO con el panel abierto pasa a la caja REAL del VisualViewport (offsetTop/offsetLeft/width/height), nunca un inset:0 fijo al viewport de layout completo', () => {
+  it('Critical (VisualViewport real) — con el panel abierto, el CONTENEDOR cubre el layout viewport completo (backplate) y el IFRAME sigue la caja REAL del VisualViewport (offsetTop/offsetLeft/width/height)', () => {
     const matchMedia = vi.spyOn(window, 'matchMedia').mockReturnValue({
       matches: true, media: '(max-width: 480px)', addEventListener: vi.fn(), removeEventListener: vi.fn(),
       addListener: vi.fn(), removeListener: vi.fn(), onchange: null, dispatchEvent: vi.fn(),
@@ -396,11 +396,18 @@ describe('loader', () => {
     Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
 
     fakeShellMessage('opened', null, bootedInstanceId())
-    expect(container.style.inset).toBe('') // NUNCA inset:0 — cubriría el viewport de layout completo, incl. el área tapada por el teclado
-    expect(container.style.top).toBe('40px')
-    expect(container.style.left).toBe('0px')
-    expect(container.style.width).toBe('390px')
-    expect(container.style.height).toBe('500px')
+    // El contenedor es el backplate: cubre el layout viewport ENTERO, incluida
+    // la franja que queda detrás del teclado translúcido de iOS 26 — el visual
+    // viewport siempre es un sub-rectángulo del layout viewport, así que el
+    // backplate tapa todo lo visible sin necesidad de conocer el teclado.
+    expect(container.style.inset).toBe('0px')
+    // El iframe es la superficie interactiva: sigue la caja REAL del
+    // VisualViewport para quedar siempre por encima del teclado.
+    expect(iframe.style.position).toBe('absolute')
+    expect(iframe.style.top).toBe('40px')
+    expect(iframe.style.left).toBe('0px')
+    expect(iframe.style.width).toBe('390px')
+    expect(iframe.style.height).toBe('500px')
 
     matchMedia.mockRestore()
     Reflect.deleteProperty(window, 'visualViewport')
@@ -420,7 +427,8 @@ describe('loader', () => {
     const container = iframe.parentElement as HTMLElement
     Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
     fakeShellMessage('opened', null, bootedInstanceId())
-    expect(container.style.top).toBe('0px')
+    expect(iframe.style.top).toBe('0px')
+    expect(container.style.inset).toBe('0px') // el backplate no se mueve: cubre el layout viewport pase lo que pase
 
     // El teclado desplaza lo visible SIN disparar 'resize' (el layout
     // viewport no cambia, solo el scroll interno) — WebKit lo reporta vía
@@ -431,7 +439,8 @@ describe('loader', () => {
     // local mínimo, sin debilitar tsconfig.
     ;(vv as unknown as { offsetTop: number }).offsetTop = 120
     trigger('scroll')
-    expect(container.style.top).toBe('120px')
+    expect(iframe.style.top).toBe('120px')
+    expect(container.style.inset).toBe('0px')
 
     matchMedia.mockRestore()
     Reflect.deleteProperty(window, 'visualViewport')
@@ -568,6 +577,142 @@ describe('loader', () => {
     fakeShellMessage('closed', null, bootedInstanceId())
     expect(cssTextSetter).not.toHaveBeenCalled()
     cssTextSetter.mockRestore()
+  })
+
+  describe('backplate opaco (panel móvil) — el teclado translúcido de iOS 26 nunca deja ver la página anfitriona', () => {
+    // matchMedia por QUERY: el loader consulta tanto el breakpoint móvil como
+    // '(prefers-color-scheme: dark)' (fallback del color del backplate) — un
+    // mockReturnValue único contaminaría una consulta con la otra.
+    function mockMatchMediaByQuery(opts: { mobile: boolean; dark: boolean }) {
+      return vi.spyOn(window, 'matchMedia').mockImplementation((query: string) => ({
+        matches: query.includes('max-width') ? opts.mobile : opts.dark,
+        media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(),
+        addListener: vi.fn(), removeListener: vi.fn(), onchange: null, dispatchEvent: vi.fn(),
+      } as unknown as MediaQueryList))
+    }
+
+    function bootMobilePanel(): { iframe: HTMLIFrameElement; container: HTMLElement } {
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const container = iframe.parentElement as HTMLElement
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      fakeShellMessage('opened', null, bootedInstanceId())
+      return { iframe, container }
+    }
+
+    afterEach(() => {
+      Reflect.deleteProperty(window, 'visualViewport')
+    })
+
+    it('sin surface del shell y esquema claro: el backplate cae a blanco (#ffffff, el --surface claro del token set)', () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: false })
+      const { vv } = makeFakeVisualViewport({ width: 390, height: 500 })
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true })
+      const { container } = bootMobilePanel()
+      expect(container.style.backgroundColor).toBe('rgb(255, 255, 255)')
+      matchMedia.mockRestore()
+    })
+
+    it('sin surface del shell y esquema oscuro: el backplate cae al --surface oscuro del token set (#171a21)', () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: true })
+      const { vv } = makeFakeVisualViewport({ width: 390, height: 500 })
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true })
+      const { container } = bootMobilePanel()
+      expect(container.style.backgroundColor).toBe('rgb(23, 26, 33)')
+      matchMedia.mockRestore()
+    })
+
+    it('opened{surface} válido del shell: el backplate usa EXACTAMENTE ese color, no el fallback', () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: false })
+      const { vv } = makeFakeVisualViewport({ width: 390, height: 500 })
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true })
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const container = iframe.parentElement as HTMLElement
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      fakeShellMessage('opened', { surface: '#101319' }, bootedInstanceId())
+      expect(container.style.backgroundColor).toBe('rgb(16, 19, 25)')
+      matchMedia.mockRestore()
+    })
+
+    it('opened{surface} INVÁLIDO (no hex — frontera postMessage no confiable): se ignora y se usa el fallback', () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: false })
+      const { vv } = makeFakeVisualViewport({ width: 390, height: 500 })
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true })
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const container = iframe.parentElement as HTMLElement
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      fakeShellMessage('opened', { surface: 'url(https://evil.example/x.png)' }, bootedInstanceId())
+      expect(container.style.backgroundColor).toBe('rgb(255, 255, 255)')
+      matchMedia.mockRestore()
+    })
+
+    it('closed tras una sesión móvil: el fondo del backplate se LIMPIA — el launcher nunca hereda un cuadrado opaco', () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: false })
+      const { vv } = makeFakeVisualViewport({ width: 390, height: 500 })
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true })
+      const { container } = bootMobilePanel()
+      expect(container.style.backgroundColor).not.toBe('')
+      fakeShellMessage('closed', null, bootedInstanceId())
+      expect(container.style.backgroundColor).toBe('')
+      expect(container.style.width).toBe('104px')
+      matchMedia.mockRestore()
+    })
+
+    it('panel DESKTOP: sin backplate — el contenedor conserva su caja anclada sin fondo propio', () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: false, dark: false })
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const container = iframe.parentElement as HTMLElement
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      fakeShellMessage('opened', { surface: '#101319' }, bootedInstanceId())
+      expect(container.style.backgroundColor).toBe('')
+      expect(container.style.inset).toBe('')
+      matchMedia.mockRestore()
+    })
+
+    it("un 'opened' repetido con el panel YA abierto (re-emisión de surface por cambio de esquema) actualiza el backplate pero NO se reenvía a los listeners públicos de on('opened') — el panel nunca se reabrió", () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: false })
+      const { vv } = makeFakeVisualViewport({ width: 390, height: 500 })
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true })
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const container = iframe.parentElement as HTMLElement
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      const cb = vi.fn()
+      getApi()('on', 'opened', cb)
+
+      fakeShellMessage('opened', { surface: '#ffffff' }, bootedInstanceId())
+      expect(cb).toHaveBeenCalledTimes(1) // apertura real: el host se entera
+
+      // El SO cambia a oscuro con el panel abierto: el shell re-emite opened
+      // con el surface nuevo SOLO para el backplate.
+      fakeShellMessage('opened', { surface: '#171a21' }, bootedInstanceId())
+      expect(container.style.backgroundColor).toBe('rgb(23, 26, 33)') // el backplate SÍ se repinta
+      expect(cb).toHaveBeenCalledTimes(1) // el host NO recibe un opened duplicado
+
+      // Cerrar y reabrir: eso SÍ es una apertura nueva para el host.
+      fakeShellMessage('closed', null, bootedInstanceId())
+      fakeShellMessage('opened', { surface: '#ffffff' }, bootedInstanceId())
+      expect(cb).toHaveBeenCalledTimes(2)
+      matchMedia.mockRestore()
+    })
+
+    it('sin VisualViewport (navegador sin soporte): backplate inset:0 y el iframe rellena el contenedor al 100%', () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: false })
+      const { iframe, container } = bootMobilePanel()
+      expect(container.style.inset).toBe('0px')
+      expect(container.style.backgroundColor).toBe('rgb(255, 255, 255)')
+      expect(iframe.style.width).toBe('100%')
+      expect(iframe.style.height).toBe('100%')
+      matchMedia.mockRestore()
+    })
   })
 
   describe('locale (Plan 4) — lang de la página anfitriona propagado al shell', () => {
