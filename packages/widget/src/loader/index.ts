@@ -85,6 +85,11 @@ function setBoxStyle(el: HTMLElement, style: Record<string, string>): void {
 export function bootLoader(w: Window, opts: LoaderOptions): void {
   const stub = installGlobalStub(w as Window & { NeventWidget?: ApiStub })
   let instance: Instance | null = null
+  // UNA MediaQueryList viva para todo el loader — applySizing corre en cada
+  // resize/scroll del VisualViewport durante la animación del teclado y no
+  // debe construir una MQL nueva por invocación; .matches se lee perezoso y
+  // siempre refleja el esquema actual.
+  const darkScheme = w.matchMedia(DARK_SCHEME_QUERY)
 
   const sendToShell = (type: string, payload: unknown): void => {
     if (!instance) return
@@ -122,7 +127,7 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
     if (!instance) return
     if (instance.mode === 'panel' && instance.isMobile) {
       const surface = instance.panelSurface
-        ?? (w.matchMedia(DARK_SCHEME_QUERY).matches ? SURFACE_FALLBACK.dark : SURFACE_FALLBACK.light)
+        ?? (darkScheme.matches ? SURFACE_FALLBACK.dark : SURFACE_FALLBACK.light)
       setBoxStyle(instance.container, { position: 'fixed', zIndex: '2147483647', inset: '0px', background: surface })
       const vv = w.visualViewport
       if (vv) {
@@ -239,9 +244,16 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
         // no-hex (o un shell antiguo que no lo manda) deja null → fallback.
         const payload = env.payload as { surface?: unknown } | null | undefined
         const surface = typeof payload?.surface === 'string' ? payload.surface.trim() : null
+        const wasPanel = instance.mode === 'panel'
         instance.panelSurface = surface !== null && SAFE_HEX.test(surface) ? surface : null
         instance.mode = 'panel'
         applySizing()
+        // Un `opened` con el panel YA abierto es una re-emisión de surface
+        // (cambio de esquema claro/oscuro, ver shell/app.tsx): repinta el
+        // backplate y nada más — para el host el panel nunca se reabrió, así
+        // que NO se reenvía a los listeners públicos de on('opened') (evita
+        // aperturas duplicadas en la analítica del anfitrión).
+        if (wasPanel) return
       } else if (env.type === 'closed') {
         instance.mode = 'launcher'
         applySizing()

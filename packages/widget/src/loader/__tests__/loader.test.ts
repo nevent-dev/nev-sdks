@@ -676,6 +676,34 @@ describe('loader', () => {
       matchMedia.mockRestore()
     })
 
+    it("un 'opened' repetido con el panel YA abierto (re-emisión de surface por cambio de esquema) actualiza el backplate pero NO se reenvía a los listeners públicos de on('opened') — el panel nunca se reabrió", () => {
+      const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: false })
+      const { vv } = makeFakeVisualViewport({ width: 390, height: 500 })
+      Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true })
+      bootLoader(window, { shellUrl: SHELL_URL })
+      getApi()('boot', 'inst_demo_festival_01')
+      const iframe = document.querySelector('iframe')!
+      const container = iframe.parentElement as HTMLElement
+      Object.defineProperty(iframe, 'contentWindow', { value: { postMessage: vi.fn() } })
+      const cb = vi.fn()
+      getApi()('on', 'opened', cb)
+
+      fakeShellMessage('opened', { surface: '#ffffff' }, bootedInstanceId())
+      expect(cb).toHaveBeenCalledTimes(1) // apertura real: el host se entera
+
+      // El SO cambia a oscuro con el panel abierto: el shell re-emite opened
+      // con el surface nuevo SOLO para el backplate.
+      fakeShellMessage('opened', { surface: '#171a21' }, bootedInstanceId())
+      expect(container.style.backgroundColor).toBe('rgb(23, 26, 33)') // el backplate SÍ se repinta
+      expect(cb).toHaveBeenCalledTimes(1) // el host NO recibe un opened duplicado
+
+      // Cerrar y reabrir: eso SÍ es una apertura nueva para el host.
+      fakeShellMessage('closed', null, bootedInstanceId())
+      fakeShellMessage('opened', { surface: '#ffffff' }, bootedInstanceId())
+      expect(cb).toHaveBeenCalledTimes(2)
+      matchMedia.mockRestore()
+    })
+
     it('sin VisualViewport (navegador sin soporte): backplate inset:0 y el iframe rellena el contenedor al 100%', () => {
       const matchMedia = mockMatchMediaByQuery({ mobile: true, dark: false })
       const { iframe, container } = bootMobilePanel()
