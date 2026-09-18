@@ -1982,6 +1982,24 @@ export class NewsletterWidget {
         ? `${cssFontFamilyLiteral(styles.button.fontFamily)}, ${globalFontFamily}`
         : globalFontFamily;
 
+    // A fixed button height (the admin emits 30–80px) leaves no room for the
+    // 12px vertical fallback padding plus a text line: with 32px the content
+    // box shrinks to 6px, the label overflows it downwards and renders
+    // against the bottom border. With a fixed height the flex centering of
+    // .nevent-submit-button does the vertical work, so the fallback keeps
+    // only the horizontal padding. Automatic height keeps 12px 24px so the
+    // button does not collapse, and an explicit padding always wins.
+    const configuredButtonHeight = styles?.button?.height;
+    const buttonHeight =
+      typeof configuredButtonHeight === 'string'
+        ? configuredButtonHeight.trim()
+        : undefined;
+    const hasFixedButtonHeight =
+      !!buttonHeight && buttonHeight.toLowerCase() !== 'auto';
+    const buttonPadding =
+      styles?.button?.padding ||
+      (hasFixedButtonHeight ? '0 24px' : '12px 24px');
+
     const labelFontFamily = styles?.input?.labelFont?.family
       ? `${cssFontFamilyLiteral(styles.input.labelFont.family)}, ${globalFontFamily}`
       : globalFontFamily;
@@ -2137,8 +2155,12 @@ export class NewsletterWidget {
       }
 
       .nevent-submit-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
         width: 100%;
-        padding: ${styles?.button?.padding || '12px 24px'};
+        padding: ${buttonPadding};
         background: ${styles?.button?.backgroundColor || primaryColor};
         color: ${styles?.button?.textColor || '#fff'};
         border: ${this.generateBorderCSS(styles?.button?.borderWidth, styles?.button?.borderColor, primaryColor)};
