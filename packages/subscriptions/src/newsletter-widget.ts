@@ -1989,7 +1989,11 @@ export class NewsletterWidget {
     // .nevent-submit-button does the vertical work, so the fallback keeps
     // only the horizontal padding. Automatic height keeps 12px 24px so the
     // button does not collapse, and an explicit padding always wins.
-    const buttonHeight = styles?.button?.height?.trim();
+    const configuredButtonHeight = styles?.button?.height;
+    const buttonHeight =
+      typeof configuredButtonHeight === 'string'
+        ? configuredButtonHeight.trim()
+        : undefined;
     const hasFixedButtonHeight =
       !!buttonHeight && buttonHeight.toLowerCase() !== 'auto';
     const buttonPadding =
