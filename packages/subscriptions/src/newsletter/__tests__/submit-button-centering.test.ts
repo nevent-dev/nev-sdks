@@ -146,6 +146,17 @@ describe('NewsletterWidget — submit button label centering', () => {
     expect(verticalPadding(style)).toEqual(['12px', '12px']);
   });
 
+  it('keeps rendering when an untyped embed supplies a numeric height', async () => {
+    // JavaScript embedders can bypass the public string type. Previously the
+    // browser ignored the invalid unitless height; initialization still worked.
+    stubConfig({ height: 32 as unknown as string });
+
+    const button = await renderButton();
+
+    expect(button.textContent?.trim()).toBe('Enviar');
+    expect(verticalPadding(getComputedStyle(button))).toEqual(['12px', '12px']);
+  });
+
   it('respects an explicit padding even with a fixed height', async () => {
     stubConfig({ height: '32px', padding: '4px 10px' });
 
