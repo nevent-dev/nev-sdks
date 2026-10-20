@@ -1,0 +1,75 @@
+name: Sync main into development
+
+# Trunk model (nevent-work#200): `development` is the trunk and every change enters it by pull request. The
+# production branch only moves by promotion (`nevent-promote`, a fast-forward to a tested trunk commit) or by a
+# hotfix pull request. A hotfix merged here comes back to the trunk automatically, so no port pull request exists.
+#
+# Per repository, set PROD/TRUNK (main|master, development|develop) and DEV_DEPLOY (the workflow that builds or
+# deploys the trunk; it needs a `workflow_dispatch:` trigger, because a push made with GITHUB_TOKEN does not start
+# other workflows). Leave DEV_DEPLOY empty when the trunk has no deploy workflow.
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: sync-main-to-development
+  cancel-in-progress: false
+
+env:
+  PROD: main
+  TRUNK: development
+  DEV_DEPLOY: deploy-dev.yml
+
+jobs:
+  Sync:
+    name: Merge the production branch into the trunk
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TRUNK }}
+          fetch-depth: 0
+
+      - name: Merge, or open a pull request when it conflicts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          for attempt in 1 2 3; do
+            git fetch -q origin "$PROD" "$TRUNK"
+            git checkout -q -B "$TRUNK" "origin/$TRUNK"
+            if git merge-base --is-ancestor "origin/$PROD" HEAD; then
+              echo "$TRUNK already contains $PROD $(git rev-parse --short "origin/$PROD"): nothing to merge."
+              exit 0
+            fi
+            if ! git merge --no-ff --no-edit -m "chore(sync): merge $PROD $(git rev-parse --short "origin/$PROD") into $TRUNK" "origin/$PROD"; then
+              git merge --abort
+              branch="sync/$PROD-to-$TRUNK-$(git rev-parse --short "origin/$PROD")"
+              git push -q origin "origin/$PROD:refs/heads/$branch"
+              # The organization does not let GITHUB_TOKEN open pull requests ("Allow GitHub Actions to create and
+              # approve pull requests" is off); then the run fails with the link a person opens it from.
+              if gh pr create --base "$TRUNK" --head "$branch" \
+                --title "sync: $PROD → $TRUNK ($(git rev-parse --short "origin/$PROD"), conflicts)" \
+                --body "Automatic back-merge of a hotfix merged into \`$PROD\` (nevent-work#200). It conflicts with \`$TRUNK\`: resolve on this branch and merge it with a merge commit (never squash: \`$PROD\` must stay an ancestor of \`$TRUNK\`)."; then
+                echo "::warning::Merge conflicts: opened a pull request from $branch"
+                exit 0
+              fi
+              echo "::error::Merge conflicts: open the pull request from $branch by hand: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$TRUNK...$branch?expand=1"
+              exit 1
+            fi
+            if git push -q origin "HEAD:$TRUNK"; then
+              echo "Merged $PROD into $TRUNK."
+              if [ -n "$DEV_DEPLOY" ]; then gh workflow run "$DEV_DEPLOY" --ref "$TRUNK"; fi
+              exit 0
+            fi
+            echo "The trunk moved while merging (attempt $attempt); retrying from its new tip."
+          done
+          echo "::error::Could not push the back-merge after 3 attempts."
+          exit 1
