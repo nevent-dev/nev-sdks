@@ -53,16 +53,11 @@ jobs:
               git merge --abort
               branch="sync/$PROD-to-$TRUNK-$(git rev-parse --short "origin/$PROD")"
               git push -q origin "origin/$PROD:refs/heads/$branch"
-              # The organization does not let GITHUB_TOKEN open pull requests ("Allow GitHub Actions to create and
-              # approve pull requests" is off); then the run fails with the link a person opens it from.
-              if gh pr create --base "$TRUNK" --head "$branch" \
+              gh pr create --base "$TRUNK" --head "$branch" \
                 --title "sync: $PROD → $TRUNK ($(git rev-parse --short "origin/$PROD"), conflicts)" \
-                --body "Automatic back-merge of a hotfix merged into \`$PROD\` (nevent-work#200). It conflicts with \`$TRUNK\`: resolve on this branch and merge it with a merge commit (never squash: \`$PROD\` must stay an ancestor of \`$TRUNK\`)."; then
-                echo "::warning::Merge conflicts: opened a pull request from $branch"
-                exit 0
-              fi
-              echo "::error::Merge conflicts: open the pull request from $branch by hand: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/compare/$TRUNK...$branch?expand=1"
-              exit 1
+                --body "Automatic back-merge of a hotfix merged into \`$PROD\` (nevent-work#200). It conflicts with \`$TRUNK\`: resolve on this branch and merge it with a merge commit (never squash: \`$PROD\` must stay an ancestor of \`$TRUNK\`)."
+              echo "::warning::Merge conflicts: opened a pull request from $branch"
+              exit 0
             fi
             if git push -q origin "HEAD:$TRUNK"; then
               echo "Merged $PROD into $TRUNK."
