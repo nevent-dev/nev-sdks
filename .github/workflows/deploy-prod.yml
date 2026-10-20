@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    # A push that only changes workflows (such as the trunk-model infrastructure) does not redeploy production.
+    paths-ignore:
+      - '.github/workflows/**'
 
 # A running production deploy is never cancelled; a newer push waits for it (and replaces an older
 # waiting one).
