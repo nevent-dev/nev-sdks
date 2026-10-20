@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - development
+  # The sync-main-to-development workflow starts it after a back-merge: its GITHUB_TOKEN push starts no
+  # workflow.
+  workflow_dispatch:
+
+# A newer trunk push supersedes a running development deploy.
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: true
 
 jobs:
   deploy:
