@@ -5,6 +5,12 @@ on:
     branches:
       - main
 
+# A running production deploy is never cancelled; a newer push waits for it (and replaces an older
+# waiting one).
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
