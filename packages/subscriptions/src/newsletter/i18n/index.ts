@@ -62,3 +62,17 @@ export function createNewsletterI18n(
 
   return i18n;
 }
+
+/**
+ * The language the browser reports for the visitor (BCP 47), before any fallback to the
+ * locales the widget has labels for (nevent-work#286). `undefined` when there is none:
+ * the widget never invents a preference.
+ */
+export function observedBrowserLanguage(): string | undefined {
+  if (typeof navigator === 'undefined') {
+    return undefined;
+  }
+  const candidate = navigator.languages?.[0] || navigator.language;
+  const trimmed = typeof candidate === 'string' ? candidate.trim() : '';
+  return trimmed.length > 0 ? trimmed : undefined;
+}

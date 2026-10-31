@@ -35,6 +35,7 @@ import {
 import {
   createNewsletterI18n,
   type NewsletterLabels,
+  observedBrowserLanguage,
 } from './newsletter/i18n/index';
 
 // ============================================================================
@@ -2426,6 +2427,16 @@ export class NewsletterWidget {
             },
           };
         }
+
+        // nevent-work#286: the observed language (the browser's) and the shown one, apart
+        const observedLanguage = observedBrowserLanguage();
+        subscriptionData = {
+          ...subscriptionData,
+          ...(observedLanguage
+            ? { language: observedLanguage, languageSource: 'navigator' as const }
+            : {}),
+          displayLanguage: this.i18n.getLocale(),
+        };
 
         if (this.config.onSubmit) {
           const safeOnSubmit = this.errorBoundary.wrapCallback(

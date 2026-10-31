@@ -101,6 +101,43 @@ describe('User Flows (E2E)', () => {
   });
 
   // -------------------------------------------------------------------------
+  // nevent-work#286: the subscriber's observed language and the shown one
+  // -------------------------------------------------------------------------
+
+  describe('Language: observed by the browser, shown by the widget, sent apart', () => {
+    async function submittedBody(languages: string[] | undefined, language: string | undefined, locale: string) {
+      Object.defineProperty(navigator, 'languages', { value: languages, configurable: true });
+      Object.defineProperty(navigator, 'language', { value: language, configurable: true });
+      const fetchMock = mockFetchSuccess({ success: true, message: 'ok' });
+      const { widget, container } = createWidget({ locale });
+      await widget.init();
+      const shadow = getShadowRoot(container)!;
+      fillInput(shadow, 'input[name="email"]', 'fan@example.com');
+      toggleCheckbox(shadow, '.nevent-gdpr-checkbox', true);
+      submitForm(shadow);
+      await vi.advanceTimersByTimeAsync(100);
+      await flush();
+      const call = fetchMock.mock.calls.find((c: unknown[]) => String(c[0]).includes('/subscribe'));
+      widget.destroy();
+      return JSON.parse((call![1] as RequestInit).body as string);
+    }
+
+    it('sends ar-SA as observed and es as shown when an Arabic browser sees the widget in Spanish', async () => {
+      const body = await submittedBody(['ar-SA', 'en'], 'ar-SA', 'es');
+      expect(body.language).toBe('ar-SA');
+      expect(body.languageSource).toBe('navigator');
+      expect(body.displayLanguage).toBe('es');
+    });
+
+    it('sends no observed language when the browser reports none, and never invents es', async () => {
+      const body = await submittedBody([], '', 'pt');
+      expect(body.language).toBeUndefined();
+      expect(body.languageSource).toBeUndefined();
+      expect(body.displayLanguage).toBe('pt');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Validation Flow
   // -------------------------------------------------------------------------
 
