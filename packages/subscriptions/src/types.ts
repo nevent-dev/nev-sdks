@@ -344,6 +344,15 @@ export interface SubscriptionData {
   email: string;
   properties?: Record<string, string>;
   consent: ConsentData;
+  /**
+   * The subscriber's language as the browser reports it (BCP 47), before the widget's
+   * visual fallback (nevent-work#286). Omitted when the browser reports none.
+   */
+  language?: string;
+  /** Where {@link language} was observed. */
+  languageSource?: 'navigator';
+  /** The locale the widget was shown in: its visual fallback, never the subscriber's preference. */
+  displayLanguage?: string;
 }
 
 /**
