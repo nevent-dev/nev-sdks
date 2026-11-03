@@ -1,4 +1,9 @@
-import type { ApiError, ApiResponse, RequestConfig } from './types';
+import type {
+  ApiError,
+  ApiResponse,
+  RequestConfig,
+  RequestOptions,
+} from './types';
 
 // ============================================================================
 // Types
@@ -239,10 +244,14 @@ export class HttpClient {
 
     const url = `${this.baseUrl}${endpoint}`;
     const timeout = config.timeout ?? this.config.timeout;
+    const maxRetries = config.retry?.maxRetries ?? this.config.maxRetries;
+    const retryableStatuses = config.retry?.retryableStatuses
+      ? new Set(config.retry.retryableStatuses)
+      : RETRYABLE_STATUS_CODES;
     let lastError: ApiError | undefined;
 
     // Attempt request with retries
-    for (let attempt = 0; attempt <= this.config.maxRetries; attempt++) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
       // Wait before retry (skip delay on first attempt)
       if (attempt > 0) {
         await this.backoff(attempt);
@@ -255,8 +264,8 @@ export class HttpClient {
 
         // Only retry on retryable errors
         if (
-          !this.isRetryable(lastError) ||
-          attempt === this.config.maxRetries
+          !this.isRetryable(lastError, retryableStatuses) ||
+          attempt === maxRetries
         ) {
           throw lastError;
         }
@@ -289,10 +298,15 @@ export class HttpClient {
    * @typeParam T - Expected response data type
    * @param endpoint - API endpoint path
    * @param body - Request body (will be JSON stringified)
+   * @param options - Per-request headers, timeout or retry policy
    * @returns Promise resolving to the API response
    */
-  async post<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
-    return this.request<T>(endpoint, { method: 'POST', body });
+  async post<T>(
+    endpoint: string,
+    body: unknown,
+    options?: RequestOptions
+  ): Promise<ApiResponse<T>> {
+    return this.request<T>(endpoint, { ...options, method: 'POST', body });
   }
 
   /**
@@ -362,11 +376,19 @@ export class HttpClient {
         response = await interceptor(response);
       }
 
-      const data = (await response.json()) as ApiResponse<T>;
-
       if (!response.ok) {
-        throw this.createError(response.status, data);
+        // A gateway in front of the API answers 502/503/504 with HTML: the
+        // error keeps its HTTP status even when the body is not JSON.
+        let errorBody: unknown;
+        try {
+          errorBody = await response.json();
+        } catch {
+          errorBody = { message: response.statusText || 'Request failed' };
+        }
+        throw this.createError(response.status, errorBody);
       }
+
+      const data = (await response.json()) as ApiResponse<T>;
 
       return data;
     } catch (error) {
@@ -410,13 +432,17 @@ export class HttpClient {
    * - Client errors: 400, 401, 403, 404, 409, 422, etc.
    *
    * @param error - The API error to evaluate
+   * @param retryableStatuses - Statuses retried by this request
    * @returns `true` if the request should be retried
    */
-  private isRetryable(error: ApiError): boolean {
+  private isRetryable(
+    error: ApiError,
+    retryableStatuses: ReadonlySet<number>
+  ): boolean {
     // Network errors (no status) are retryable
     if (!error.status || error.status === 0) return true;
 
-    return RETRYABLE_STATUS_CODES.has(error.status);
+    return retryableStatuses.has(error.status);
   }
 
   /**

@@ -41,6 +41,7 @@
  */
 
 export { NewsletterWidget } from './newsletter-widget';
+export { SubscriptionError } from './newsletter/subscription-error';
 export type {
   NewsletterConfig,
   FieldConfig,

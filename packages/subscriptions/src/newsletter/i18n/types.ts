@@ -38,6 +38,8 @@ export interface NewsletterLabels extends Record<string, string> {
 
   // Validation
   fieldRequired: string;
+  /** A value the API rejected for a field (HTTP 400 with `field`). */
+  fieldInvalid: string;
   invalidEmailFormat: string;
   invalidPhoneFormat: string;
   invalidNumberFormat: string;

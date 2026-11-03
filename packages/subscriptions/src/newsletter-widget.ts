@@ -24,6 +24,7 @@ import type {
 } from './types';
 import { WidgetTracker } from './newsletter/analytics/widget-tracker';
 import { FormRenderer } from './newsletter/form-renderer';
+import { SubscriptionError } from './newsletter/subscription-error';
 import { adaptFieldConfigurations } from './newsletter/field-adapter';
 import { injectSchemaOrg } from './newsletter/schema-injector';
 import { injectSeoTags } from './newsletter/seo-injector';
@@ -41,6 +42,15 @@ import {
 // ============================================================================
 // Constants
 // ============================================================================
+
+/**
+ * Retry policy of the subscription POST (nevent-work#315): only a gateway
+ * error (502, 503, 504) or a network failure, where the API most likely did
+ * not get to process it, is sent again. A 500 or a 4xx is sent once: the API
+ * answered, and repeating it does not change the answer. Narrowed for this
+ * request only; HttpClient's defaults stay.
+ */
+const SUBSCRIBE_RETRY_POLICY = { retryableStatuses: [502, 503, 504] };
 
 /** Maximum number of retry attempts for API calls */
 const MAX_RETRIES = 3;
@@ -1440,7 +1450,8 @@ export class NewsletterWidget {
     // Initialize FormRenderer for field rendering
     this.formRenderer = new FormRenderer(
       this.fieldConfigurations,
-      this.config.styles
+      this.config.styles,
+      (key, params) => this.i18n.t(key, params)
     );
 
     // Check if layoutElements exist
@@ -1947,6 +1958,8 @@ export class NewsletterWidget {
       global.backgroundColor || this.config.backgroundColor;
     const primaryColor = this.config.primaryColor;
     const borderRadius = this.extractNumericValue(this.config.borderRadius);
+    // A checked or focused option takes the tenant's focus colour (nevent-work#315)
+    const checkedBorderColor = styles?.input?.focusBorderColor || primaryColor;
 
     // Build font-family cascades with fallbacks. Both GOOGLE_FONT and
     // CUSTOM_FONT collapse into the same shape: the configured family wins,
@@ -2131,6 +2144,89 @@ export class NewsletterWidget {
         outline-color: #dc3545;
       }
 
+      /* Multiple choice (a LIST with options): checkboxes with the input styles */
+      .nevent-checkbox-group {
+        border: 0;
+        margin: 0;
+        padding: 0;
+        min-width: 0;
+      }
+
+      .nevent-checkbox-legend {
+        display: block;
+        padding: 0;
+        margin-bottom: 8px;
+      }
+
+      /* Two columns from ~340px of field width, one below it */
+      .nevent-checkbox-options {
+        display: grid;
+        grid-template-columns: repeat(
+          auto-fill,
+          minmax(min(100%, max(166px, calc((100% - 8px) / 2))), 1fr)
+        );
+        gap: 8px;
+      }
+
+      .nevent-checkbox-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-sizing: border-box;
+        min-height: 40px;
+        padding: 8px 10px;
+        border: ${this.generateBorderCSS(styles?.input?.borderWidth, styles?.input?.borderColor, primaryColor)};
+        border-radius: ${styles?.input?.borderRadius || '4px'};
+        background: ${styles?.input?.backgroundColor || '#fff'};
+        color: ${styles?.input?.textColor || 'inherit'};
+        font-family: ${inputFontFamily};
+        font-size: 14px;
+        line-height: 1.3;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+      }
+
+      .nevent-checkbox-option--checked {
+        border-color: ${checkedBorderColor};
+        box-shadow: inset 0 0 0 1px ${checkedBorderColor};
+      }
+
+      .nevent-checkbox-input {
+        flex: none;
+        width: 16px;
+        height: 16px;
+        margin: 0;
+        accent-color: ${styles?.input?.textColor || primaryColor};
+        cursor: pointer;
+      }
+
+      /* WCAG: Visible focus indicator for each option */
+      .nevent-checkbox-input:focus-visible {
+        outline: 2px solid ${checkedBorderColor};
+        outline-offset: 2px;
+      }
+
+      .nevent-checkbox-label {
+        min-width: 0;
+        overflow-wrap: anywhere;
+      }
+
+      .nevent-field--error .nevent-checkbox-option {
+        border-color: #dc3545;
+      }
+
+      .nevent-visually-hidden {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border: 0;
+      }
+
       .nevent-gdpr {
         margin: 8px 0;
       }
@@ -2264,6 +2360,7 @@ export class NewsletterWidget {
       @media (prefers-reduced-motion: reduce) {
         .nevent-widget-form,
         .nevent-input,
+        .nevent-checkbox-option,
         .nevent-submit-button,
         .nevent-newsletter-spinner,
         .nevent-newsletter-success-message {
@@ -2392,10 +2489,15 @@ export class NewsletterWidget {
         if (this.formRenderer) {
           // Get data from dynamic form
           const dynamicFormData = this.formRenderer.getFormData();
-          const emailValue = dynamicFormData.email?.trim() || email.trim();
+          const dynamicEmail = dynamicFormData.email;
+          const emailValue =
+            (typeof dynamicEmail === 'string' ? dynamicEmail.trim() : '') ||
+            email.trim();
 
-          // Build properties: { propertyDefinitionId: value } (exclude email)
-          const properties: Record<string, string> = {};
+          // Build properties: { propertyDefinitionId: value } (exclude email).
+          // A LIST with options sends the checked options as string[]; with
+          // none checked it is not sent.
+          const properties: Record<string, string | string[]> = {};
           this.fieldConfigurations.forEach((config) => {
             if (
               config.propertyDefinitionId &&
@@ -2403,7 +2505,7 @@ export class NewsletterWidget {
               config.fieldName !== 'email'
             ) {
               const value = dynamicFormData[config.fieldName];
-              if (value) {
+              if (value && (!Array.isArray(value) || value.length > 0)) {
                 properties[config.propertyDefinitionId] = value;
               }
             }
@@ -2450,7 +2552,8 @@ export class NewsletterWidget {
 
         const response = await this.httpClient.post<SubscriptionResponse>(
           `/public/newsletter/${this.config.newsletterId}/subscribe?tenantId=${this.config.tenantId}`,
-          subscriptionData
+          subscriptionData,
+          { retry: SUBSCRIBE_RETRY_POLICY }
         );
 
         const successMsg =
@@ -2481,19 +2584,17 @@ export class NewsletterWidget {
       } catch (error) {
         this.logger.error('Submission error:', error);
 
-        const errorMessage =
-          error instanceof Error
-            ? error.message
-            : this.config.messages.error || this.i18n.t('errorMessage');
+        // HttpClient rejects with a plain ApiError object: onError always
+        // receives an Error, with the status, code and field of the answer.
+        const failure = SubscriptionError.from(error);
+        const errorMessage = this.showSubscriptionFailure(failure);
 
-        this.showError(errorMessage);
-
-        if (this.config.onError && error instanceof Error) {
+        if (this.config.onError) {
           const safeOnError = this.errorBoundary.wrapCallback(
             this.config.onError as (...args: unknown[]) => unknown,
             'onError'
           );
-          safeOnError(error);
+          safeOnError(failure);
         }
 
         this.trackEvent('subscription_error', {
@@ -2508,6 +2609,43 @@ export class NewsletterWidget {
   // --------------------------------------------------------------------------
   // Status messages
   // --------------------------------------------------------------------------
+
+  /**
+   * Tells the subscriber why the subscription failed, always with the
+   * widget's own texts (the server's message is for developers, in onError):
+   * - a 400 on a rendered field: `fieldInvalid` next to that field;
+   * - a 409: `alreadySubscribed`;
+   * - anything else: the generic error message.
+   *
+   * @param failure - The failed subscription
+   * @returns The message shown
+   */
+  private showSubscriptionFailure(failure: SubscriptionError): string {
+    if (failure.status === 400 && failure.field && this.formRenderer) {
+      const field = this.fieldConfigurations.find(
+        (f) =>
+          f.fieldName === failure.field ||
+          f.propertyDefinitionId === failure.field
+      );
+      if (field) {
+        const message = this.i18n.t('fieldInvalid', {
+          fieldName: field.displayName,
+        });
+        if (this.formRenderer.showFieldError(field.fieldName, message)) {
+          this.restoreSubmitButton();
+          return message;
+        }
+      }
+    }
+
+    const message =
+      failure.status === 409
+        ? this.config.messages.alreadySubscribed ||
+          this.i18n.t('alreadySubscribed')
+        : this.config.messages.error || this.i18n.t('errorMessage');
+    this.showError(message);
+    return message;
+  }
 
   /**
    * Shows loading state on the form.

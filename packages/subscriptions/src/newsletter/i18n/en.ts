@@ -29,6 +29,7 @@ export const en: NewsletterLabels = {
 
   // Validation
   fieldRequired: '{{fieldName}} is required',
+  fieldInvalid: '{{fieldName}} is not valid',
   invalidEmailFormat: 'Please enter a valid email address',
   invalidPhoneFormat: 'Please enter a valid phone number',
   invalidNumberFormat: 'Please enter a valid number',

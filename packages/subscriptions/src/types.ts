@@ -176,6 +176,8 @@ export interface WidgetStyles {
     padding?: string;
     height?: string;
     textColor?: string;
+    /** Border colour of a focused or checked control (checkbox options). */
+    focusBorderColor?: string;
     hintHidden?: boolean;
   };
   button?: {
@@ -342,7 +344,11 @@ export interface FontsResponse {
  */
 export interface SubscriptionData {
   email: string;
-  properties?: Record<string, string>;
+  /**
+   * Custom field values by propertyDefinitionId: a string, or the checked
+   * options of a LIST with options (multiple choice).
+   */
+  properties?: Record<string, string | string[]>;
   consent: ConsentData;
   /**
    * The subscriber's language as the browser reports it (BCP 47), before the widget's
