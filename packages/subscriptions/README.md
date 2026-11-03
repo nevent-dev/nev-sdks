@@ -155,7 +155,24 @@ await widget.init();
 - `onLoad(widget)`: Called when widget is initialized
 - `onSubmit(data)`: Called before form submission
 - `onSuccess(response)`: Called after successful subscription
-- `onError(error)`: Called on submission error
+- `onError(error)`: Called on every submission error with a `SubscriptionError`
+  (an `Error` with `status`, `code` and, for a 400 on a custom field, `field`;
+  `status` is 0 for a network failure)
+
+### Custom fields from the API
+
+- A `LIST` field with options is answered with checkboxes (multiple choice) and
+  sent as `properties[propertyDefinitionId] = string[]`; with none checked it is
+  not sent, and a required one needs at least one box checked.
+- A `SELECT` field keeps its drop-down and is sent as a string.
+
+### Errors and retries
+
+- A 400 on a field shows the `fieldInvalid` text next to it; a 409 shows
+  `alreadySubscribed`; anything else, the generic error text. The server's
+  message only reaches `onError`.
+- The subscription request is retried only after a 502, 503, 504 or a network
+  failure; a 500 or a 4xx is sent once.
 
 ## Migration from v1.3.6
 

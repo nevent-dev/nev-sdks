@@ -29,7 +29,25 @@ export interface RequestConfig {
   headers?: Record<string, string>;
   body?: unknown;
   timeout?: number;
+  /** Retry policy for this request only; the client's defaults apply to the rest. */
+  retry?: RequestRetryPolicy;
 }
+
+/**
+ * Narrows how one request is retried without touching the client's defaults.
+ */
+export interface RequestRetryPolicy {
+  /** Maximum retry attempts for this request (defaults to the client's). */
+  maxRetries?: number;
+  /**
+   * HTTP statuses this request retries. A network failure (no status) is
+   * always retried. Defaults to the client's set (500, 502, 503, 504, 408, 429).
+   */
+  retryableStatuses?: number[];
+}
+
+/** Per-request options of the HttpClient convenience methods. */
+export type RequestOptions = Pick<RequestConfig, 'headers' | 'timeout' | 'retry'>;
 
 /**
  * Widget base configuration

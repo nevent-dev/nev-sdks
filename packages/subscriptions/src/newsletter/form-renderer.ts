@@ -1,10 +1,23 @@
 import type { FieldConfiguration, FieldType, WidgetStyles } from '../types';
 
 /**
+ * Translates an i18n key of the widget (e.g. `fieldRequired`) with its
+ * `{{param}}` values. Without one, the renderer keeps its English texts.
+ */
+export type FieldTranslator = (
+  key: string,
+  params?: Record<string, string>
+) => string;
+
+/** Value of a field in {@link FormRenderer.getFormData}: a LIST with options gives the checked options. */
+export type FormFieldValue = string | string[];
+
+/**
  * FormRenderer: Dynamic form rendering engine
  *
  * Renders form fields dynamically based on FieldConfiguration array from API.
- * Supports multiple field types: text, email, tel, number, url, password, textarea, date.
+ * Supports multiple field types: text, email, tel, number, url, password, textarea, date,
+ * select (a `<select>`) and list with options (checkboxes, multiple choice).
  *
  * Features:
  * - Dynamic field rendering from API config
@@ -31,20 +44,26 @@ export class FormRenderer {
     string,
     HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
   > = new Map();
+  /** Checkboxes of each multiple choice field (a LIST with options), by fieldName. */
+  private checkboxGroups: Map<string, HTMLInputElement[]> = new Map();
   private widgetStyles: WidgetStyles | null = null;
+  private translate: FieldTranslator | null;
 
   /**
    * Creates a new FormRenderer instance
    *
    * @param fieldConfigurations - Array of field configurations from API
    * @param widgetStyles - Optional widget styles configuration for labelHidden/hintHidden
+   * @param translate - Optional i18n lookup for the validation messages
    */
   constructor(
     fieldConfigurations: FieldConfiguration[] = [],
-    widgetStyles: WidgetStyles | null = null
+    widgetStyles: WidgetStyles | null = null,
+    translate: FieldTranslator | null = null
   ) {
     this.fieldConfigurations = fieldConfigurations;
     this.widgetStyles = widgetStyles;
+    this.translate = translate;
   }
 
   /**
@@ -74,6 +93,7 @@ export class FormRenderer {
    */
   public render(container: HTMLElement): void {
     this.fieldElements.clear();
+    this.checkboxGroups.clear();
 
     // Apply flex-wrap layout styles to container
     container.style.display = 'flex';
@@ -121,18 +141,23 @@ export class FormRenderer {
     }
     fieldContainer.style.boxSizing = 'border-box';
 
-    // Create label (only if not hidden)
-    const label = this.createLabel(config);
-    if (label) {
-      fieldContainer.appendChild(label);
+    if (this.isMultipleChoice(config)) {
+      // A LIST with options: one checkbox per option inside a fieldset
+      fieldContainer.appendChild(this.createCheckboxGroup(config));
+    } else {
+      // Create label (only if not hidden)
+      const label = this.createLabel(config);
+      if (label) {
+        fieldContainer.appendChild(label);
+      }
+
+      // Create input based on type
+      const input = this.createInput(config);
+      fieldContainer.appendChild(input);
+
+      // Store reference to input element
+      this.fieldElements.set(config.fieldName, input);
     }
-
-    // Create input based on type
-    const input = this.createInput(config);
-    fieldContainer.appendChild(input);
-
-    // Store reference to input element
-    this.fieldElements.set(config.fieldName, input);
 
     // Create hint text if provided and not hidden
     const hintHidden = this.widgetStyles?.input?.hintHidden ?? false;
@@ -144,9 +169,125 @@ export class FormRenderer {
     // Create error container (hidden by default)
     const errorContainer = document.createElement('span');
     errorContainer.className = 'nevent-field-error nevent-field-error--hidden';
+    if (this.checkboxGroups.has(config.fieldName)) {
+      // The checkboxes point at it with aria-describedby
+      errorContainer.id = this.errorId(config.fieldName);
+      errorContainer.setAttribute('role', 'alert');
+    }
     fieldContainer.appendChild(errorContainer);
 
     return fieldContainer;
+  }
+
+  /**
+   * Whether a field is answered with checkboxes: a LIST with options.
+   * A SELECT keeps its `<select>`, and a LIST without options too.
+   *
+   * @param config - Field configuration
+   */
+  private isMultipleChoice(config: FieldConfiguration): boolean {
+    return (
+      config.type === 'list' && this.extractAllowedValues(config).length > 0
+    );
+  }
+
+  /** Id of the error message of a field. */
+  private errorId(fieldName: string): string {
+    return `nevent-field-${fieldName}-error`;
+  }
+
+  /**
+   * Creates the checkbox group of a multiple choice field: a `<fieldset>`
+   * named by its `<legend>` (label and required asterisk), with a native
+   * checkbox and its own `<label>` per option, so it works with the keyboard
+   * (Tab and Space) and is announced as a group by screen readers.
+   *
+   * @param config - Field configuration (a LIST with options)
+   * @returns HTMLFieldSetElement
+   */
+  private createCheckboxGroup(config: FieldConfiguration): HTMLFieldSetElement {
+    const fieldset = document.createElement('fieldset');
+    fieldset.className = 'nevent-checkbox-group';
+
+    const legend = document.createElement('legend');
+    legend.className = 'nevent-field-label nevent-checkbox-legend';
+    legend.textContent = config.displayName;
+    if (config.required) {
+      const requiredSpan = document.createElement('span');
+      requiredSpan.className = 'nevent-required';
+      requiredSpan.textContent = ' *';
+      legend.appendChild(requiredSpan);
+    }
+    // Hidden labels stay readable for screen readers: the group needs its name
+    if (this.widgetStyles?.input?.labelHidden ?? false) {
+      legend.classList.add('nevent-visually-hidden');
+    }
+    fieldset.appendChild(legend);
+
+    const optionsContainer = document.createElement('div');
+    optionsContainer.className = 'nevent-checkbox-options';
+
+    const boxes: HTMLInputElement[] = [];
+    this.extractAllowedValues(config).forEach((raw, index) => {
+      const { value, label } = this.optionValueAndLabel(raw);
+
+      const optionLabel = document.createElement('label');
+      optionLabel.className = 'nevent-checkbox-option';
+
+      const box = document.createElement('input');
+      box.type = 'checkbox';
+      box.className = 'nevent-checkbox-input';
+      box.id = `nevent-field-${config.fieldName}-${index}`;
+      box.name = config.fieldName;
+      box.value = value;
+      box.setAttribute('aria-describedby', this.errorId(config.fieldName));
+      box.addEventListener('change', () => {
+        optionLabel.classList.toggle(
+          'nevent-checkbox-option--checked',
+          box.checked
+        );
+        // The error (required or rejected by the API) was about the previous
+        // selection: a new one clears it until the next submit validates it.
+        const fieldContainer = box.closest('.nevent-field') as HTMLElement | null;
+        if (fieldContainer) {
+          this.clearError(fieldContainer);
+        }
+      });
+      optionLabel.htmlFor = box.id;
+
+      const text = document.createElement('span');
+      text.className = 'nevent-checkbox-label';
+      text.textContent = label;
+
+      optionLabel.appendChild(box);
+      optionLabel.appendChild(text);
+      optionsContainer.appendChild(optionLabel);
+      boxes.push(box);
+    });
+
+    fieldset.appendChild(optionsContainer);
+    this.checkboxGroups.set(config.fieldName, boxes);
+    return fieldset;
+  }
+
+  /**
+   * Value and visible text of an option, from either an allowed value
+   * (`'Techno'`) or a FieldOption (`{ value, label }`).
+   */
+  private optionValueAndLabel(raw: unknown): { value: string; label: string } {
+    if (typeof raw === 'object' && raw !== null) {
+      const option = raw as { value?: unknown; label?: unknown };
+      const value = String(option.value ?? '');
+      return { value, label: String(option.label ?? value) };
+    }
+    return { value: String(raw), label: String(raw) };
+  }
+
+  /** The `fieldRequired` message of a field, in the widget's language when there is a translator. */
+  private requiredMessage(config: FieldConfiguration): string {
+    return this.translate
+      ? this.translate('fieldRequired', { fieldName: config.displayName })
+      : `${config.displayName} is required`;
   }
 
   /**
@@ -442,6 +583,23 @@ export class FormRenderer {
     let isValid = true;
 
     this.fieldConfigurations.forEach((config) => {
+      const boxes = this.checkboxGroups.get(config.fieldName);
+      if (boxes) {
+        const groupContainer = this.fieldContainerOf(config.fieldName);
+        if (!groupContainer) return;
+        this.clearError(groupContainer);
+        // Required = at least one option checked
+        if (config.required && !boxes.some((box) => box.checked)) {
+          this.showError(
+            groupContainer,
+            this.requiredMessage(config),
+            groupContainer.querySelector('.nevent-field-error') as HTMLSpanElement
+          );
+          isValid = false;
+        }
+        return;
+      }
+
       const input = this.fieldElements.get(config.fieldName);
       if (!input) {
         return;
@@ -459,7 +617,7 @@ export class FormRenderer {
       if (config.required && !input.value.trim()) {
         this.showError(
           fieldContainer,
-          `${config.displayName} is required`,
+          this.requiredMessage(config),
           errorContainer
         );
         isValid = false;
@@ -594,6 +752,9 @@ export class FormRenderer {
     if (input) {
       input.classList.add('nevent-input--invalid');
     }
+    fieldContainer
+      .querySelectorAll('.nevent-checkbox-input')
+      .forEach((box) => box.setAttribute('aria-invalid', 'true'));
 
     // Add error state to field container
     fieldContainer.classList.add('nevent-field--error');
@@ -616,6 +777,9 @@ export class FormRenderer {
     if (input) {
       input.classList.remove('nevent-input--invalid');
     }
+    fieldContainer
+      .querySelectorAll('.nevent-checkbox-input')
+      .forEach((box) => box.removeAttribute('aria-invalid'));
 
     // Remove error state from field container
     fieldContainer.classList.remove('nevent-field--error');
@@ -630,12 +794,38 @@ export class FormRenderer {
   }
 
   /**
+   * Shows a message next to a rendered field, e.g. a value the API rejected.
+   *
+   * @param fieldName - The field's fieldName
+   * @param message - Text to show (already translated)
+   * @returns `true` when the field is rendered and the message is shown
+   */
+  public showFieldError(fieldName: string, message: string): boolean {
+    const fieldContainer = this.fieldContainerOf(fieldName);
+    if (!fieldContainer) return false;
+    this.showError(
+      fieldContainer,
+      message,
+      fieldContainer.querySelector('.nevent-field-error') as HTMLSpanElement
+    );
+    return true;
+  }
+
+  /** The `.nevent-field` container of a rendered field. */
+  private fieldContainerOf(fieldName: string): HTMLElement | null {
+    const element =
+      this.fieldElements.get(fieldName) ?? this.checkboxGroups.get(fieldName)?.[0];
+    return (element?.closest('.nevent-field') as HTMLElement | null) ?? null;
+  }
+
+  /**
    * Gets form data from all fields
    *
-   * @returns Record of field names to values
+   * @returns Record of field names to values: a string, or the checked
+   *   options (in option order) of a LIST with options
    */
-  public getFormData(): Record<string, string> {
-    const formData: Record<string, string> = {};
+  public getFormData(): Record<string, FormFieldValue> {
+    const formData: Record<string, FormFieldValue> = {};
 
     this.fieldElements.forEach((input, fieldName) => {
       if (input instanceof HTMLInputElement && input.type === 'checkbox') {
@@ -643,6 +833,12 @@ export class FormRenderer {
       } else {
         formData[fieldName] = input.value;
       }
+    });
+
+    this.checkboxGroups.forEach((boxes, fieldName) => {
+      formData[fieldName] = boxes
+        .filter((box) => box.checked)
+        .map((box) => box.value);
     });
 
     return formData;
@@ -661,6 +857,19 @@ export class FormRenderer {
 
       // Clear errors
       const fieldContainer = input.closest('.nevent-field') as HTMLElement;
+      if (fieldContainer) {
+        this.clearError(fieldContainer);
+      }
+    });
+
+    this.checkboxGroups.forEach((boxes, fieldName) => {
+      boxes.forEach((box) => {
+        box.checked = false;
+        box
+          .closest('.nevent-checkbox-option')
+          ?.classList.remove('nevent-checkbox-option--checked');
+      });
+      const fieldContainer = this.fieldContainerOf(fieldName);
       if (fieldContainer) {
         this.clearError(fieldContainer);
       }

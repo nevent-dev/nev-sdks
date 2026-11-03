@@ -29,6 +29,7 @@ export const es: NewsletterLabels = {
 
   // Validation
   fieldRequired: '{{fieldName}} es obligatorio',
+  fieldInvalid: '{{fieldName}} no es valido',
   invalidEmailFormat: 'Por favor, introduce un email valido',
   invalidPhoneFormat: 'Por favor, introduce un telefono valido',
   invalidNumberFormat: 'Por favor, introduce un numero valido',

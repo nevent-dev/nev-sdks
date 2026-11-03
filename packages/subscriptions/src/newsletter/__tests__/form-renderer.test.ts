@@ -1268,14 +1268,14 @@ describe('FormRenderer', () => {
       expect(hint).toBeFalsy();
     });
 
-    it('should apply custom placeholder to select/list fields', () => {
+    it('should apply custom placeholder to select fields', () => {
       const fieldConfigurations: FieldConfiguration[] = [
         {
           fieldName: 'category',
           displayName: 'Select Category',
           hint: null,
           required: true,
-          type: 'list',
+          type: 'select',
           placeholder: 'Choose an option',
           validatorConfiguration: {
             type: 'ENUM',
@@ -1493,14 +1493,14 @@ describe('FormRenderer', () => {
   });
 
   describe('LIST/select field rendering', () => {
-    it('should render a select element for list type fields', () => {
+    it('should render a select element for select type fields with allowedValues', () => {
       const configs: FieldConfiguration[] = [
         {
           fieldName: 'category',
           displayName: 'Category',
           hint: null,
           required: true,
-          type: 'list',
+          type: 'select',
           validatorConfiguration: {
             type: 'ENUM',
             config: { allowedValues: ['Sports', 'Music', 'Tech'] },
@@ -1557,7 +1557,7 @@ describe('FormRenderer', () => {
           displayName: 'Category',
           hint: null,
           required: true,
-          type: 'list',
+          type: 'select',
           validatorConfiguration: {
             type: 'ENUM',
             config: { allowedValues: ['A', 'B'] },
@@ -1583,7 +1583,7 @@ describe('FormRenderer', () => {
           displayName: 'Interest',
           hint: null,
           required: false,
-          type: 'list',
+          type: 'select',
           validatorConfiguration: {
             type: 'ENUM',
             config: { allowedValues: ['Tech', 'Sports'] },
