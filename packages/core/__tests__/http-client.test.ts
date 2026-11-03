@@ -367,6 +367,96 @@ describe('HttpClient', () => {
   });
 
   // --------------------------------------------------------------------------
+  // Per-request retry policy (nevent-work#315): one request narrows which
+  // statuses it retries, the client defaults stay as they are.
+  // --------------------------------------------------------------------------
+
+  describe('per-request retry policy', () => {
+    const gatewayOnly = { retryableStatuses: [502, 503, 504] };
+
+    it('does not retry a 500 when the request retries only gateway errors', async () => {
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 3,
+        retryDelay: 10,
+      });
+      fetchSpy.mockResolvedValue(mockResponse({ message: 'boom' }, 500));
+
+      await expect(
+        retryClient.post('/subscribe', { a: 1 }, { retry: gatewayOnly })
+      ).rejects.toMatchObject({ status: 500 });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([502, 503, 504])('retries a %i when the request lists it', async (status) => {
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 3,
+        retryDelay: 10,
+      });
+      fetchSpy
+        .mockResolvedValueOnce(mockResponse({ message: 'gw' }, status))
+        .mockResolvedValueOnce(mockResponse({ data: 'ok', success: true }, 200));
+
+      const result = await retryClient.post<string>('/subscribe', {}, { retry: gatewayOnly });
+      expect(result.data).toBe('ok');
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('still retries a network failure under a narrowed policy', async () => {
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 3,
+        retryDelay: 10,
+      });
+      fetchSpy
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+        .mockResolvedValueOnce(mockResponse({ data: 'ok', success: true }, 200));
+
+      const result = await retryClient.post<string>('/subscribe', {}, { retry: gatewayOnly });
+      expect(result.data).toBe('ok');
+      expect(fetchSpy).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry a timeout under a narrowed policy', async () => {
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        maxRetries: 3,
+        retryDelay: 10,
+      });
+      const abort = new Error('aborted');
+      abort.name = 'AbortError';
+      fetchSpy.mockRejectedValue(abort);
+
+      await expect(
+        retryClient.post('/subscribe', {}, { retry: gatewayOnly })
+      ).rejects.toMatchObject({ status: 408 });
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('leaves the client defaults untouched for other requests', async () => {
+      const retryClient = new HttpClient('https://api.example.com', 'key', {
+        retryDelay: 10,
+      });
+      fetchSpy.mockResolvedValue(mockResponse({ message: 'boom' }, 500));
+
+      await expect(
+        retryClient.post('/subscribe', {}, { retry: gatewayOnly })
+      ).rejects.toBeDefined();
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+
+      await expect(retryClient.get('/other')).rejects.toBeDefined();
+      // default: 1 initial + 3 retries, 500 included
+      expect(fetchSpy).toHaveBeenCalledTimes(5);
+    });
+
+    it('keeps the HTTP status of an error whose body is not JSON', async () => {
+      const response = mockResponse({}, 502);
+      (response as { json: () => Promise<unknown> }).json = () =>
+        Promise.reject(new SyntaxError('Unexpected token <'));
+      fetchSpy.mockResolvedValue(response);
+
+      await expect(client.get('/test')).rejects.toMatchObject({ status: 502 });
+    });
+  });
+
+  // --------------------------------------------------------------------------
   // Offline detection
   // --------------------------------------------------------------------------
 
