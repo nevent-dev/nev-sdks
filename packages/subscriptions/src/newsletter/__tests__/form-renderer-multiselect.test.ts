@@ -148,6 +148,7 @@ describe('FormRenderer · LIST with options as checkboxes', () => {
       renderer.render(container);
 
       const inputs = boxes(container);
+      expect(inputs).toHaveLength(GENRES.length);
       inputs.forEach((input) => {
         expect(input.disabled).toBe(false);
         expect(input.tabIndex).toBe(0);
