@@ -246,6 +246,12 @@ export class FormRenderer {
           'nevent-checkbox-option--checked',
           box.checked
         );
+        // The error (required or rejected by the API) was about the previous
+        // selection: a new one clears it until the next submit validates it.
+        const fieldContainer = box.closest('.nevent-field') as HTMLElement | null;
+        if (fieldContainer) {
+          this.clearError(fieldContainer);
+        }
       });
       optionLabel.htmlFor = box.id;
 

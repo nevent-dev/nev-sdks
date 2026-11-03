@@ -244,6 +244,21 @@ describe('FormRenderer · LIST with options as checkboxes', () => {
       });
     });
 
+    it('changing the selection clears the error shown on the group', () => {
+      const renderer = new FormRenderer([genreField()]);
+      renderer.render(container);
+
+      expect(renderer.validateFields()).toBe(false);
+      boxes(container)[0].click();
+
+      const error = container.querySelector('.nevent-field-error') as HTMLElement;
+      expect(error.classList.contains('nevent-field-error--hidden')).toBe(true);
+      expect(container.querySelector('.nevent-field--error')).toBeNull();
+      boxes(container).forEach((input) => {
+        expect(input.getAttribute('aria-invalid')).toBeNull();
+      });
+    });
+
     it('an optional group with nothing checked is valid', () => {
       const renderer = new FormRenderer([genreField({ required: false })]);
       renderer.render(container);
