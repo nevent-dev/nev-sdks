@@ -35,6 +35,8 @@ import {
 } from './newsletter/font-format';
 import {
   createNewsletterI18n,
+  browserLanguages,
+  negotiateWidgetLocale,
   type NewsletterLabels,
   observedBrowserLanguage,
 } from './newsletter/i18n/index';
@@ -711,6 +713,16 @@ export class NewsletterWidget {
 
       // ── happy path ──
       const serverConfig = (await response.json()) as ServerWidgetConfig;
+
+      // nevent-work#279 (decision 4, option B): the visitor's browser negotiated among the tenant's language and the
+      // widget's own, else the tenant's, never a fixed «es». An explicit locale of the embed still wins.
+      // Without tenantLanguage (an older API) the locale chosen at construction is today's and is left untouched.
+      if (serverConfig.tenantLanguage) {
+        const negotiated = negotiateWidgetLocale(browserLanguages(), serverConfig.tenantLanguage, this.config.locale);
+        if (negotiated !== this.i18n.getLocale()) {
+          this.i18n.setLocale(negotiated);
+        }
+      }
 
       // STRICT: the apiUrl, newsletterId and tenantId the caller passed at
       // construction time are the source of truth. The server's config

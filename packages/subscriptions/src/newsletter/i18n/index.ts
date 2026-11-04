@@ -63,6 +63,56 @@ export function createNewsletterI18n(
   return i18n;
 }
 
+/** The base language of a BCP 47 tag, lower case ('pt-BR' → 'pt'); undefined when there is none. */
+function baseLanguage(tag: string | null | undefined): string | undefined {
+  const base = typeof tag === 'string' ? tag.trim().split(/[-_]/)[0]?.toLowerCase() : undefined;
+  return base ? base : undefined;
+}
+
+/**
+ * The locale an anonymous visitor sees the widget in (nevent-work#279, decision 4 of #274, option B):
+ * 1. a locale the operator set in the embed, if the widget has labels for it;
+ * 2. the first browser language whose labels the widget has (it negotiates among the tenant's language and the
+ *    widget's own: es, en, ca, pt);
+ * 3. the tenant's language (`tenantLanguage` of the public config), if the widget has labels for it;
+ * 4. English — never a fixed Spanish.
+ * Without `tenantLanguage` (an API that does not send it yet) it is exactly today's choice, {@link createNewsletterI18n}:
+ * the explicit locale or the base of `navigator.language`, matched exactly, else {@link DEFAULT_LOCALE} (M1 of
+ * i18n-rev2: an old API changes nothing).
+ */
+export function negotiateWidgetLocale(
+  browserLanguages: readonly string[],
+  tenantLanguage?: string | null,
+  explicitLocale?: string | null
+): string {
+  if (tenantLanguage === undefined || tenantLanguage === null || tenantLanguage.trim() === '') {
+    const detected = explicitLocale || I18nManager.detectLocale();
+    return NEWSLETTER_LOCALES[detected] ? detected : DEFAULT_LOCALE;
+  }
+  const has = (l: string | undefined): l is string => !!l && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, l);
+  const explicit = baseLanguage(explicitLocale);
+  if (has(explicit)) {
+    return explicit;
+  }
+  for (const browser of browserLanguages) {
+    const base = baseLanguage(browser);
+    if (has(base)) {
+      return base;
+    }
+  }
+  const tenant = baseLanguage(tenantLanguage);
+  return has(tenant) ? tenant : 'en';
+}
+
+/** The browser's languages in order of preference (navigator.languages, else navigator.language). */
+export function browserLanguages(): string[] {
+  if (typeof navigator === 'undefined') {
+    return [];
+  }
+  const list = navigator.languages && navigator.languages.length > 0 ? navigator.languages : [navigator.language];
+  return list.filter((l): l is string => typeof l === 'string' && l.trim().length > 0);
+}
+
 /**
  * The language the browser reports for the visitor (BCP 47), before any fallback to the
  * locales the widget has labels for (nevent-work#286). `undefined` when there is none:

@@ -307,6 +307,11 @@ export interface NewsletterConfig {
  * Server configuration response
  */
 export interface ServerWidgetConfig {
+  /**
+   * The tenant's communication language, canonical BCP 47 (nevent-work#279, decision 4). Optional: older APIs do not
+   * send it, and then the widget keeps today's fallback.
+   */
+  tenantLanguage?: string;
   theme?: string;
   primaryColor?: string;
   backgroundColor?: string;
