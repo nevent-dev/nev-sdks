@@ -2,8 +2,8 @@
  * nevent-work#279 (decision 4 of #274, option B): the locale an anonymous visitor sees the newsletter widget in.
  * The cases of the before/after mock (evidencias/i18n-eventos/d4-3-mock-widget-idioma.html).
  */
-import { describe, expect, it } from 'vitest';
-import { negotiateWidgetLocale } from '../i18n/index';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createNewsletterI18n, negotiateWidgetLocale } from '../i18n/index';
 
 describe('negotiateWidgetLocale (decision 4, option B)', () => {
   it.each([
@@ -24,9 +24,23 @@ describe('negotiateWidgetLocale (decision 4, option B)', () => {
     expect(negotiateWidgetLocale(['en-GB'], 'es', 'fr')).toBe('en');
   });
 
-  it('an API that does not send tenantLanguage keeps today\'s fallback (es), as before', () => {
-    expect(negotiateWidgetLocale(['fr-FR'], undefined)).toBe('es');
-    expect(negotiateWidgetLocale(['en-US'], undefined)).toBe('en');
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('M1 of i18n-rev2: without tenantLanguage the choice is exactly today\'s, over a grid of explicit × browser', () => {
+    const explicits = [undefined, 'en', 'en-GB', 'EN', 'pt', 'ca', 'xx', 'es-MX'];
+    const browsers = [['en-US'], ['fr-FR', 'en-US'], ['es'], ['pt-BR'], ['ca'], ['xx'], ['EN'], []];
+    const differences: string[] = [];
+    for (const explicit of explicits) {
+      for (const browser of browsers) {
+        vi.stubGlobal('navigator', { language: browser[0] ?? '', languages: browser });
+        const today = createNewsletterI18n(explicit).getLocale();
+        for (const missing of [undefined, null, '']) {
+          const now = negotiateWidgetLocale(browser, missing, explicit);
+          if (now !== today) differences.push(`${explicit}/${browser.join(',')}/${String(missing)}: ${now} ≠ ${today}`);
+        }
+      }
+    }
+    expect(differences).toEqual([]);
   });
 
   it('counter-experiment: today\'s fixed «es» would be wrong for a non-Spanish tenant', () => {

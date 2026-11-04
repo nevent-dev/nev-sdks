@@ -76,13 +76,19 @@ function baseLanguage(tag: string | null | undefined): string | undefined {
  *    widget's own: es, en, ca, pt);
  * 3. the tenant's language (`tenantLanguage` of the public config), if the widget has labels for it;
  * 4. English — never a fixed Spanish.
- * Without `tenantLanguage` (an API that does not send it yet) step 3–4 keep today's fallback, {@link DEFAULT_LOCALE}.
+ * Without `tenantLanguage` (an API that does not send it yet) it is exactly today's choice, {@link createNewsletterI18n}:
+ * the explicit locale or the base of `navigator.language`, matched exactly, else {@link DEFAULT_LOCALE} (M1 of
+ * i18n-rev2: an old API changes nothing).
  */
 export function negotiateWidgetLocale(
   browserLanguages: readonly string[],
   tenantLanguage?: string | null,
   explicitLocale?: string | null
 ): string {
+  if (tenantLanguage === undefined || tenantLanguage === null || tenantLanguage.trim() === '') {
+    const detected = explicitLocale || I18nManager.detectLocale();
+    return NEWSLETTER_LOCALES[detected] ? detected : DEFAULT_LOCALE;
+  }
   const has = (l: string | undefined): l is string => !!l && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, l);
   const explicit = baseLanguage(explicitLocale);
   if (has(explicit)) {
@@ -93,9 +99,6 @@ export function negotiateWidgetLocale(
     if (has(base)) {
       return base;
     }
-  }
-  if (tenantLanguage === undefined || tenantLanguage === null) {
-    return DEFAULT_LOCALE;
   }
   const tenant = baseLanguage(tenantLanguage);
   return has(tenant) ? tenant : 'en';
