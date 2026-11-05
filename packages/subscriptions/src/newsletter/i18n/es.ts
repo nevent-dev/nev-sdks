@@ -5,8 +5,8 @@ import type { NewsletterLabels } from './types';
  */
 export const es: NewsletterLabels = {
   // Form chrome
-  formTitle: 'Suscribete a nuestro newsletter',
-  formAriaLabel: 'Formulario de suscripcion al newsletter',
+  formTitle: 'Suscríbete a nuestro newsletter',
+  formAriaLabel: 'Formulario de suscripción al newsletter',
 
   // Buttons
   submitButton: 'Suscribirse',
@@ -14,31 +14,31 @@ export const es: NewsletterLabels = {
 
   // Status messages
   successMessage:
-    'Suscripcion exitosa. Ya estas recibiendo nuestras comunicaciones.',
-  errorMessage: 'Ha ocurrido un error. Intentalo de nuevo.',
-  alreadySubscribed: 'Este email ya esta suscrito.',
-  invalidEmail: 'Por favor, introduce un email valido.',
-  offlineMessage: 'Sin conexion a internet. Comprueba tu conexion.',
-  retryMessage: 'Reintentando conexion...',
+    'Suscripción exitosa. Ya estás recibiendo nuestras comunicaciones.',
+  errorMessage: 'Ha ocurrido un error. Inténtalo de nuevo.',
+  alreadySubscribed: 'Este email ya está suscrito.',
+  invalidEmail: 'Por favor, introduce un email válido.',
+  offlineMessage: 'Sin conexión a internet. Comprueba tu conexión.',
+  retryMessage: 'Reintentando conexión...',
 
   // GDPR
   gdprText:
-    'Acepto el tratamiento de mis datos personales para recibir comunicaciones comerciales y promociones relacionadas con {{companyName}}, segun la {{privacyPolicyLink}}.',
-  gdprRequired: 'Debes aceptar la politica de privacidad para continuar.',
-  privacyPolicyLabel: 'Politica de Privacidad',
+    'Acepto el tratamiento de mis datos personales para recibir comunicaciones comerciales y promociones relacionadas con {{companyName}}, según la {{privacyPolicyLink}}.',
+  gdprRequired: 'Debes aceptar la política de privacidad para continuar.',
+  privacyPolicyLabel: 'Política de Privacidad',
 
   // Validation
   fieldRequired: '{{fieldName}} es obligatorio',
-  fieldInvalid: '{{fieldName}} no es valido',
-  invalidEmailFormat: 'Por favor, introduce un email valido',
-  invalidPhoneFormat: 'Por favor, introduce un telefono valido',
-  invalidNumberFormat: 'Por favor, introduce un numero valido',
-  invalidUrlFormat: 'Por favor, introduce una URL valida',
+  fieldInvalid: '{{fieldName}} no es válido',
+  invalidEmailFormat: 'Por favor, introduce un email válido',
+  invalidPhoneFormat: 'Por favor, introduce un teléfono válido',
+  invalidNumberFormat: 'Por favor, introduce un número válido',
+  invalidUrlFormat: 'Por favor, introduce una URL válida',
 
   // Accessibility
   statusRegionLabel: 'Estado del formulario',
   errorPrefix: 'Error:',
-  successPrefix: 'Exito:',
+  successPrefix: 'Éxito:',
 
   // Widget unavailable (HTTP 422 from /config — tenant legal incomplete)
   widgetUnavailable:
