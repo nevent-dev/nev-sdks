@@ -137,7 +137,7 @@ const demoCards: CardItem[] = [
 function idleMsg(overrides: Partial<StoredMessage>): StoredMessage {
   return {
     id: 'm1', role: 'bot', text: '', status: 'sent', seq: 1, streaming: false,
-    createdAt: '2026-07-18T14:00:00.000Z', clientId: null, turnId: null, ...overrides,
+    createdAt: '2026-07-18T14:00:00.000Z', clientId: null, turnId: null, authorName: null, authorAvatarUrl: null, contactBlocks: [], ...overrides,
   }
 }
 

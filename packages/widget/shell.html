@@ -22,6 +22,10 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https://res.nevent.es https://res.dev.nevent.es; font-src 'self'; connect-src 'self' https://api.nevent.es; base-uri 'none'; object-src 'none';">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="nevw-api" content="https://api.nevent.es">
+  <!-- Safari de iOS convierte en enlaces tel: los números del texto; dentro de
+       este iframe esos enlaces no abren la app Teléfono y duplican el botón
+       del bloque de contacto (nevent-work#15). -->
+  <meta name="format-detection" content="telephone=no">
   <title>Chat de ayuda</title>
 </head>
 <body><div id="root"></div><script type="module" src="/src/shell/main.tsx"></script></body>

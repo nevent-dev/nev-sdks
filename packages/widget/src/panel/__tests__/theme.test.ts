@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { isSafeColor, isSafeHttpsUrl, deriveInkColor, applyTheme, resolveSurfaceColor } from '../theme'
+import { isSafeColor, isSafeHttpsUrl, deriveInkColor, deriveBrandTextOnDark, applyTheme, resolveSurfaceColor } from '../theme'
 import type { WidgetConfig } from '../../contract/types'
 
 describe('isSafeColor — v1 SOLO hex opaco de 3/6 dígitos (Important #6, ronda 2)', () => {
@@ -174,5 +174,57 @@ describe('resolveSurfaceColor — el --surface computado que viaja al backplate 
     expect(resolveSurfaceColor(fakeWindow('linear-gradient(red, blue)'), document.documentElement)).toBeNull()
     expect(resolveSurfaceColor(fakeWindow('rgb(255, 255, 255)'), document.documentElement)).toBeNull()
     expect(resolveSurfaceColor(fakeWindow(''), document.documentElement)).toBeNull()
+  })
+})
+
+// Ratio WCAG 2.x entre dos hex, calculado aparte del código bajo prueba.
+function ratioOf(a: string, b: string): number {
+  const lum = (hex: string): number => {
+    const n = parseInt(hex.slice(1), 16)
+    const ch = [(n >> 16) & 255, (n >> 8) & 255, n & 255].map((c) => {
+      const s = c / 255
+      return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4)
+    })
+    return 0.2126 * ch[0]! + 0.7152 * ch[1]! + 0.0722 * ch[2]!
+  }
+  const [hi, lo] = [lum(a), lum(b)].sort((x, y) => y - x)
+  return (hi! + 0.05) / (lo! + 0.05)
+}
+
+describe('deriveBrandTextOnDark — marca como texto en oscuro (nevent-work#15)', () => {
+  const SURFACE = '#171a21'
+  const SOFT = '#28224a'
+
+  for (const brand of ['#6d4aff', '#1a1a6e', '#b00020', '#00a86b', '#ffe600', '#000000']) {
+    it(`${brand}: llega a 4,5:1 sobre --surface y --brand-soft oscuros`, () => {
+      const text = deriveBrandTextOnDark(brand)!
+      expect(text).toMatch(/^#[0-9a-f]{6}$/)
+      expect(ratioOf(text, SURFACE)).toBeGreaterThanOrEqual(4.5)
+      expect(ratioOf(text, SOFT)).toBeGreaterThanOrEqual(4.5)
+    })
+  }
+
+  it('una marca que ya cumple no se aclara', () => {
+    expect(deriveBrandTextOnDark('#ffe600')).toBe('#ffe600')
+  })
+
+  it('la marca por defecto se aclara: sola da 2,87:1 sobre --brand-soft oscuro', () => {
+    const text = deriveBrandTextOnDark('#6d4aff')!
+    expect(text).not.toBe('#6d4aff')
+    expect(ratioOf('#6d4aff', SOFT)).toBeLessThan(4.5) // el fallo que motivó el cambio: 2,87:1
+  })
+
+  it('color no seguro: null', () => {
+    expect(deriveBrandTextOnDark('javascript:alert(1)')).toBeNull()
+  })
+
+  it('applyTheme fija --brand-text-dark junto a --brand-a; con un color ignorado no lo fija', () => {
+    const root = document.createElement('div')
+    applyTheme(root, { primaryColor: '#1a1a6e', position: 'right', mode: 'dark' })
+    expect(root.style.getPropertyValue('--brand-text-dark')).toBe(deriveBrandTextOnDark('#1a1a6e'))
+    const other = document.createElement('div')
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    applyTheme(other, { primaryColor: '#006eff', position: 'right', mode: 'dark' })
+    expect(other.style.getPropertyValue('--brand-text-dark')).toBe('')
   })
 })

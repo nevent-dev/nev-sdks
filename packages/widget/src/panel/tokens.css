@@ -5,6 +5,10 @@
   --brand-a: #6d4aff; --brand-b: #975cf8; --brand-ink: #ffffff;
   --brand-grad: linear-gradient(135deg, var(--brand-a), var(--brand-b));
   --brand-soft: #f2eeff;
+  /* Marca usada como TEXTO o icono sobre --surface/--brand-soft (botones .act,
+     iconos del bloque de contacto). En claro es la marca; en oscuro, un tono
+     más claro que llega a 4,5:1 (nevent-work#15). */
+  --brand-text: var(--brand-a);
   --wait: #d97706; --wait-soft: #fdf2e3;
   --live: #0e9384; --live-soft: #e6f4f2;
   --wa: #128c4a; --wa-soft: #e7f8ee;
@@ -29,6 +33,10 @@
   --brand-soft: #28224a;
   --wait-soft: #332512; --live-soft: #12312d; --danger-soft: #361b19;
   --wa: #4cc488; --wa-soft: #12301f;
+  /* --brand-text-dark lo fija applyTheme (theme.ts) con un primaryColor propio;
+     sin él, la marca por defecto aclarada: #9980ff, 5,71:1 sobre --surface y
+     4,86:1 sobre --brand-soft. */
+  --brand-text: var(--brand-text-dark, color-mix(in srgb, var(--brand-a) 70%, #fff));
   --bubble-bot: var(--surface-2); --bubble-bot-ink: var(--ink);
   --shadow-panel: 0 24px 64px rgba(0, 0, 0, .5), 0 4px 16px rgba(0, 0, 0, .4);
 }
@@ -43,6 +51,7 @@
     --brand-soft: #28224a;
     --wait-soft: #332512; --live-soft: #12312d; --danger-soft: #361b19;
     --wa: #4cc488; --wa-soft: #12301f;
+    --brand-text: var(--brand-text-dark, color-mix(in srgb, var(--brand-a) 70%, #fff));
     --bubble-bot: var(--surface-2); --bubble-bot-ink: var(--ink);
     --shadow-panel: 0 24px 64px rgba(0, 0, 0, .5), 0 4px 16px rgba(0, 0, 0, .4);
   }
