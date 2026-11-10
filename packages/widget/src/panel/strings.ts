@@ -1,6 +1,7 @@
 import { createContext } from 'preact'
 import { useContext } from 'preact/hooks'
 import type { WidgetLocale } from '../contract/locale'
+import type { ContactChannel } from '../contract/types'
 
 // Todo el copy localizable de la shell (Plan 4) — un único punto de verdad,
 // consumido vía useStrings() por cada componente Y por computeViewState
@@ -49,6 +50,11 @@ export interface WidgetStrings {
   rateDown: string
   newConvTitle: string
   newConvDesc: string
+  // Bloque de contacto (nevent-work#15): botón por canal y nombre del canal
+  // para el aria del bloque («WhatsApp: +34 612 34 56 78»). A la vista solo
+  // van el icono, el valor y el botón: el nombre del canal no se pinta.
+  contactAction: Record<ContactChannel, string>
+  contactChannel: Record<ContactChannel, string>
   timeLocale: string
 }
 
@@ -93,6 +99,8 @@ const es: WidgetStrings = {
   rateDown: 'Valorar negativamente',
   newConvTitle: 'Conversación nueva',
   newConvDesc: 'La conversación anterior expiró. Cuéntanos en qué te ayudamos.',
+  contactAction: { WHATSAPP: 'Abrir WhatsApp', PHONE: 'Llamar', EMAIL: 'Escribir un email' },
+  contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Teléfono', EMAIL: 'Email' },
   timeLocale: 'es-ES',
 }
 
@@ -137,6 +145,8 @@ const en: WidgetStrings = {
   rateDown: 'Rate negatively',
   newConvTitle: 'New conversation',
   newConvDesc: 'The previous conversation expired. Tell us how we can help.',
+  contactAction: { WHATSAPP: 'Open WhatsApp', PHONE: 'Call', EMAIL: 'Send an email' },
+  contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Phone', EMAIL: 'Email' },
   timeLocale: 'en-GB',
 }
 
@@ -181,6 +191,8 @@ const ca: WidgetStrings = {
   rateDown: 'Valora negativament',
   newConvTitle: 'Conversa nova',
   newConvDesc: "La conversa anterior va caducar. Explica'ns en què et podem ajudar.",
+  contactAction: { WHATSAPP: 'Obre WhatsApp', PHONE: 'Truca', EMAIL: 'Envia un correu' },
+  contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Telèfon', EMAIL: 'Correu electrònic' },
   timeLocale: 'ca-ES',
 }
 
@@ -225,6 +237,8 @@ const pt: WidgetStrings = {
   rateDown: 'Avaliar negativamente',
   newConvTitle: 'Conversa nova',
   newConvDesc: 'A conversa anterior expirou. Diz-nos como podemos ajudar.',
+  contactAction: { WHATSAPP: 'Abrir o WhatsApp', PHONE: 'Ligar', EMAIL: 'Enviar email' },
+  contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Telefone', EMAIL: 'Email' },
   timeLocale: 'pt-PT',
 }
 

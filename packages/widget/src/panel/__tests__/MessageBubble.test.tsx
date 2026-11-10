@@ -6,7 +6,7 @@ import { mount, cleanupMounted } from './test-utils'
 function msg(overrides: Partial<StoredMessage> = {}): StoredMessage {
   return {
     id: 'm1', role: 'bot', text: 'Hola', status: 'sent', seq: 1, streaming: false,
-    createdAt: '2026-07-18T14:02:00.000Z', clientId: null, turnId: null, authorName: null, authorAvatarUrl: null, ...overrides,
+    createdAt: '2026-07-18T14:02:00.000Z', clientId: null, turnId: null, authorName: null, authorAvatarUrl: null, contactBlocks: [], ...overrides,
   }
 }
 

@@ -1,5 +1,6 @@
-import type { WidgetEvent, ConversationState, MessagesSnapshot } from '../contract/types'
+import type { WidgetEvent, ConversationState, MessagesSnapshot, WidgetContactBlock } from '../contract/types'
 import { cursorSeq } from '../transport/cursor'
+import { resolveContactContent } from '../contract/contact-block'
 
 export type MessageStatus = 'pending' | 'sent' | 'failed'
 export type ConnectionStatus = 'idle' | 'live' | 'reconnecting' | 'polling' | 'offline'
@@ -26,6 +27,12 @@ export interface StoredMessage {
   // (durable message.created, optimistic, streaming) llevan null. MANDA
   // sobre agentAvatarUrl en MessageBubble cuando está presente.
   readonly authorAvatarUrl: string | null
+  // Bloque de contacto (nevent-work#15), ya validado en la frontera
+  // (resolveContactContent). Con bloques, `text` es el `bodyText` del wire (sin
+  // los valores); sin ellos, el `text` completo. Vacío salvo en mensajes del
+  // bot con derivación; los placeholders de streaming lo llevan vacío hasta
+  // que el durable message.created los reconcilia.
+  readonly contactBlocks: readonly WidgetContactBlock[]
 }
 
 export interface StoreState {
@@ -135,12 +142,26 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   const mergeSnapshotMessages = (base: StoredMessage[], snap: MessagesSnapshot): StoredMessage[] => {
     const next = base.slice()
     for (const m of snap.messages) {
-      if (next.some((x) => x.id === m.messageId)) continue
+      const existing = next.findIndex((x) => x.id === m.messageId)
+      if (existing !== -1) {
+        // Un turno cerrado por streaming (finishBotTurn) aún no trae el bloque
+        // de contacto: si el durable se perdió y solo llega la snapshot, el
+        // bloque (y su bodyText) viene de aquí. Nada más se toca de un
+        // mensaje ya conocido.
+        const known = next[existing]!
+        if (known.contactBlocks.length === 0 && !known.streaming) {
+          const content = resolveContactContent(m)
+          if (content.contactBlocks.length > 0) next[existing] = { ...known, ...content }
+        }
+        continue
+      }
+      const content = resolveContactContent(m)
       next.push({
-        id: m.messageId, role: m.role, text: m.text, status: 'sent',
+        id: m.messageId, role: m.role, text: content.text, status: 'sent',
         seq: null, streaming: false, createdAt: m.createdAt, clientId: null, turnId: null,
         authorName: m.authorName ?? null,
         authorAvatarUrl: m.authorAvatarUrl ?? null,
+        contactBlocks: content.contactBlocks,
       })
     }
     return next
@@ -152,10 +173,11 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     const seq = cursorSeq(event.eventId)
     advanceCursor(event.eventId)
     if (event.type === 'message.created') {
+      const { text, contactBlocks } = resolveContactContent(event.payload)
       const i = indexOf((m) => m.id === event.payload.messageId)
       if (i !== -1) {
         const next = messages.slice()
-        next[i] = { ...next[i]!, text: event.payload.text, seq, status: 'sent', streaming: false, turnId: null }
+        next[i] = { ...next[i]!, text, contactBlocks, seq, status: 'sent', streaming: false, turnId: null }
         setMessages(next)
       } else {
         // No exact id match. A degraded non-streaming ack (server response had no
@@ -169,10 +191,10 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
           m.role === event.payload.role && Date.parse(event.occurredAt) >= Date.parse(m.createdAt))
         const next = messages.slice()
         if (pi !== -1) {
-          next[pi] = { ...next[pi]!, id: event.payload.messageId, text: event.payload.text, seq, status: 'sent', streaming: false, turnId: null }
+          next[pi] = { ...next[pi]!, id: event.payload.messageId, text, contactBlocks, seq, status: 'sent', streaming: false, turnId: null }
         } else {
           next.push({
-            id: event.payload.messageId, role: event.payload.role, text: event.payload.text,
+            id: event.payload.messageId, role: event.payload.role, text,
             status: 'sent', seq, streaming: false, createdAt: event.occurredAt, clientId: null, turnId: null,
             // The live message.created contract carries no authorName (that
             // field is snapshot-only, backend W5a) — an agent-role message
@@ -181,6 +203,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
             authorName: null,
             // Same reasoning: authorAvatarUrl is snapshot-only too.
             authorAvatarUrl: null,
+            contactBlocks,
           })
         }
         setMessages(next)
@@ -278,7 +301,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   const addOptimistic = (clientId: string, text: string): void => {
     setMessages([...messages, {
       id: clientId, role: 'user', text, status: 'pending', seq: null,
-      streaming: false, createdAt: now(), clientId, turnId: null, authorName: null, authorAvatarUrl: null,
+      streaming: false, createdAt: now(), clientId, turnId: null, authorName: null, authorAvatarUrl: null, contactBlocks: [],
     }])
   }
   const ackOptimistic = (clientId: string, messageId: string): void => {
@@ -332,7 +355,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
   const beginBotTurn = (turnId: string): void => {
     setMessages([...messages, {
       id: `turn:${turnId}`, role: 'bot', text: '', status: 'sent', seq: null,
-      streaming: true, createdAt: now(), clientId: null, turnId, authorName: null, authorAvatarUrl: null,
+      streaming: true, createdAt: now(), clientId: null, turnId, authorName: null, authorAvatarUrl: null, contactBlocks: [],
     }])
   }
   const appendBotDelta = (turnId: string, delta: string): void => {

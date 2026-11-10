@@ -53,9 +53,32 @@ interface EventBase {
 }
 
 export type WidgetEvent =
-  | (EventBase & { type: 'message.created'; payload: { messageId: string; role: 'bot' | 'agent' | 'user'; text: string } })
+  | (EventBase & { type: 'message.created'; payload: MessageCreatedPayload })
   | (EventBase & { type: 'conversation.state_changed'; payload: { state: ConversationState } })
   | (EventBase & { type: 'agent.joined'; payload: { agentName: string; agentAvatarUrl: string | null } })
+
+// Bloque de contacto (nevent-work#15). Copiado del contrato
+// (_rescate/t15-mock/contrato.md §2 = nev-api WidgetContactBlockDto).
+export interface WidgetContactBlock {
+  channel: 'WHATSAPP' | 'PHONE' | 'EMAIL'
+  value: string     // E.164 ("+34612345678") o email en minúsculas
+  display: string   // lo que se ve: "+34 612 34 56 78" o el email
+  url: string       // botón: "https://wa.me/34612345678" | "tel:+34612345678" | "mailto:atencion@club.com"
+}
+
+export type ContactChannel = WidgetContactBlock['channel']
+
+// `bodyText` y `contacts` son opcionales y van juntos, solo en mensajes del
+// bot del canal widget. `text` siempre lleva los contactos escritos (lo que
+// pinta un widget anterior). Regla del cliente y validación en la frontera:
+// contract/contact-block.ts resolveContactContent.
+export interface MessageCreatedPayload {
+  messageId: string
+  role: 'bot' | 'agent' | 'user'
+  text: string
+  bodyText?: string
+  contacts?: WidgetContactBlock[]
+}
 
 export type ConversationState = 'BOT_ACTIVE' | 'ESCALATED_WAITING' | 'AGENT_ACTIVE' | 'RESOLVED'
 
@@ -94,6 +117,10 @@ export interface WidgetMessage {
   // (backend aún no desplegado) o mandarlo null (agente sin foto); nunca se
   // confía en el shape tal cual llega de red.
   authorAvatarUrl?: string | null
+  // Bloque de contacto (nevent-work#15): mismos dos campos opcionales que
+  // message.created, para que el bloque sobreviva a recargar el panel.
+  bodyText?: string
+  contacts?: WidgetContactBlock[]
 }
 
 // GET /widget/v1/conversations/current/messages?limit=N

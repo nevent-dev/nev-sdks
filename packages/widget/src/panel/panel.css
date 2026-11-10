@@ -256,13 +256,24 @@ button, input, textarea, select { font-family: inherit; }
 .card .bd { padding: 10px 12px 12px; }
 .card .bd .t { font: 600 13px var(--font-display); color: var(--ink); }
 .card .bd .d { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
-.card .bd .act {
+.card .bd .act, .cblock .act {
   margin-top: 9px; display: block; width: 100%; text-align: center; font: 600 12px var(--font-body);
   color: var(--brand-a); background: transparent; border: 1px solid color-mix(in srgb, var(--brand-a) 35%, transparent);
   border-radius: 8px; padding: 6px 0; cursor: pointer;
 }
-.card .bd .act:hover { background: var(--brand-soft); }
-.card .bd .act:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+.card .bd .act:hover, .cblock .act:hover { background: var(--brand-soft); }
+.card .bd .act:focus-visible, .cblock .act:focus-visible { outline: 2px solid var(--brand-a); outline-offset: 2px; }
+
+/* ===== Bloque de contacto (nevent-work#15) =====
+   Mismo marco que .card y mismo botón .act; el valor lo pone el sistema. */
+.cblocks { display: grid; gap: 6px; margin-top: 6px; min-width: 210px; }
+.cblock { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 10px 12px; }
+.cblock .v { display: flex; align-items: center; gap: 9px; font: 600 13.5px var(--font-body); color: var(--ink); font-variant-numeric: tabular-nums; }
+.cblock .val { min-width: 0; overflow-wrap: anywhere; }
+.cblock .ic { width: 30px; height: 30px; border-radius: 8px; display: grid; place-items: center; flex-shrink: 0; background: var(--brand-soft); color: var(--brand-a); }
+.cblock .ic svg { width: 16px; height: 16px; }
+.cblock .ic-whatsapp { background: var(--wa-soft); color: var(--wa); }
+.cblock .act { box-sizing: border-box; text-decoration: none; }
 
 /* ===== Adjuntos / upload =====
    Variante por CLASE PROPIA (`.file-user`, fijada por el componente vía la
