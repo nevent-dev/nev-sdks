@@ -48,3 +48,17 @@ describe('tokens.css', () => {
     expect(declaredValue(':root', '--accent-sun-b')).toBe('#ef4444')
   })
 })
+
+describe('tokens.css — marca como texto (nevent-work#15)', () => {
+  it('en claro, --brand-text es la marca', () => {
+    expect(declaredValue(':root', '--brand-text')).toBe('var(--brand-a)')
+  })
+  it('en oscuro (data-theme y prefers-color-scheme), la marca aclarada o el tono que calcula applyTheme', () => {
+    const dark = 'var(--brand-text-dark, color-mix(in srgb, var(--brand-a) 70%, #fff))'
+    expect(declaredValue('[data-theme="dark"]', '--brand-text')).toBe(dark)
+    const media = Array.from(document.styleSheets).flatMap((s) => Array.from(s.cssRules))
+      .find((r) => r instanceof CSSMediaRule && r.conditionText.includes('prefers-color-scheme: dark')) as CSSMediaRule
+    const rule = Array.from(media.cssRules).find((r) => r instanceof CSSStyleRule) as CSSStyleRule
+    expect(rule.style.getPropertyValue('--brand-text').trim()).toBe(dark)
+  })
+})

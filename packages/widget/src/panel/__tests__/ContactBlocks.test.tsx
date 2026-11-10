@@ -74,6 +74,33 @@ describe('ContactBlocks — lo que se ve', () => {
     expect(links[2]!.hasAttribute('target')).toBe(false)
   })
 
+  it('en táctil (pointer: coarse), tel: y mailto: también abren en ventana nueva: Safari de iOS no los entrega desde el iframe', async () => {
+    const matchMedia = vi.fn((q: string) => ({ matches: q === '(pointer: coarse)' }))
+    vi.stubGlobal('matchMedia', matchMedia)
+    try {
+      const root = await mount(<ContactBlocks blocks={[wa, tel, mail]} />)
+      for (const a of Array.from(root.querySelectorAll<HTMLAnchorElement>('a.act'))) {
+        expect(a.getAttribute('target')).toBe('_blank')
+        expect(a.getAttribute('rel')).toBe('noopener noreferrer')
+      }
+      expect(matchMedia).toHaveBeenCalledWith('(pointer: coarse)')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('en escritorio (pointer: fine), tel: y mailto: sin target; wa.me sigue en pestaña nueva', async () => {
+    vi.stubGlobal('matchMedia', vi.fn(() => ({ matches: false })))
+    try {
+      const root = await mount(<ContactBlocks blocks={[wa, tel, mail]} />)
+      const links = Array.from(root.querySelectorAll<HTMLAnchorElement>('a.act'))
+      expect(links.map((a) => a.getAttribute('target'))).toEqual(['_blank', null, null])
+      expect(links[1]!.hasAttribute('rel')).toBe(false)
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
   it('un solo bloque: el botón se nombra por su texto, sin aria-label', async () => {
     const root = await mount(<ContactBlocks blocks={[wa]} />)
     expect(root.querySelector('a.act')!.hasAttribute('aria-label')).toBe(false)

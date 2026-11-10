@@ -11,17 +11,29 @@ export interface ContactBlocksProps {
 // (lo escribe el club en su idioma). El canal va en el aria del grupo.
 // Con dos o más bloques, el aria del botón lleva también el valor, para que
 // un lector de pantalla distinga dos «Llamar» seguidos.
+// Cómo se abre cada botón:
+// - wa.me es https: pestaña nueva, como el resto de enlaces del panel.
+// - tel: y mailto: los abre el sistema. En Safari de iOS, un esquema externo
+//   navegado desde el iframe de origen cruzado no llega a la app del sistema;
+//   como ventana nueva (target=_blank, que el sandbox permite con allow-popups)
+//   sí llega (aceptación de nevent-work#15 en el simulador, 10-11-2026). En
+//   escritorio una ventana nueva para tel:/mailto: puede dejar una pestaña
+//   vacía, así que ahí se quedan sin target.
+function isTouchDevice(): boolean {
+  return typeof window !== 'undefined' && typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+}
+
 export function ContactBlocks({ blocks }: ContactBlocksProps) {
   const strings = useStrings()
   if (blocks.length === 0) return null
   const several = blocks.length > 1
+  const touch = isTouchDevice()
   return (
     <div class="cblocks">
       {blocks.map((b, i) => {
         const action = strings.contactAction[b.channel]
-        // wa.me es https: pestaña nueva, como el resto de enlaces del panel.
-        // tel: y mailto: los abre el sistema; el iframe no navega.
-        const external = b.channel === 'WHATSAPP'
+        const external = b.channel === 'WHATSAPP' || touch
         return (
           <div class="cblock" role="group" aria-label={`${strings.contactChannel[b.channel]}: ${b.display}`} key={`${b.channel}:${b.value}:${i}`}>
             <div class="v">

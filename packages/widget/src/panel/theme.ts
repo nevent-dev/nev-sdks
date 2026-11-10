@@ -90,6 +90,29 @@ export function deriveInkColor(primaryColorHex: string): string | null {
 // debajo del visual viewport). Devuelve null si el valor computado no es un
 // hex validable (isSafeColor) — la frontera shell→loader es postMessage y el
 // loader aplica entonces su propio fallback, nunca un valor arbitrario.
+// Superficies del modo oscuro (tokens.css, [data-theme="dark"]): --surface y
+// --brand-soft, el fondo del hover de .act y de los iconos del bloque.
+const DARK_BACKGROUNDS = ['#171a21', '#28224a']
+
+// nevent-work#15: en oscuro, la marca usada como texto (--brand-text) es la
+// marca aclarada con blanco lo justo para llegar a 4,5:1 (texto, 1.4.3) sobre
+// las dos superficies oscuras; eso cubre también los iconos (3:1, 1.4.11).
+// Mezcla en sRGB, como color-mix(in srgb, …) de tokens.css. Devuelve null si
+// el color no es seguro.
+export function deriveBrandTextOnDark(primaryColorHex: string): string | null {
+  if (!isSafeColor(primaryColorHex)) return null
+  const [r, g, b] = hexToRgb(normalizeHex(primaryColorHex.trim()))
+  const backgrounds = DARK_BACKGROUNDS.map((hex) => relativeLuminance(...hexToRgb(hex)))
+  for (let white = 0; white <= 100; white += 5) {
+    const mix = [r, g, b].map((c) => Math.round(c + (255 - c) * (white / 100))) as [number, number, number]
+    const lum = relativeLuminance(...mix)
+    if (backgrounds.every((bg) => contrastRatio(lum, bg) >= AA_NORMAL_TEXT)) {
+      return '#' + mix.map((c) => c.toString(16).padStart(2, '0')).join('')
+    }
+  }
+  return '#ffffff'
+}
+
 export function resolveSurfaceColor(w: Window, root: HTMLElement): string | null {
   const value = w.getComputedStyle(root).getPropertyValue('--surface').trim()
   return isSafeColor(value) ? value : null
@@ -115,6 +138,8 @@ export function applyTheme(root: HTMLElement, theme: WidgetConfig['theme'] | und
       if (ink) {
         root.style.setProperty('--brand-a', normalized)
         root.style.setProperty('--brand-ink', ink)
+        // Solo se usa en oscuro (tokens.css): en claro --brand-text es la marca.
+        root.style.setProperty('--brand-text-dark', deriveBrandTextOnDark(normalized) as string)
       } else {
         // Ni blanco ni la tinta oscura alcanzan 4.5:1 real contra este color:
         // en vez de aceptar un texto que no cumple AA, se ignora el override
