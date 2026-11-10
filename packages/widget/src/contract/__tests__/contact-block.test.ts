@@ -8,7 +8,7 @@ const mail = { channel: 'EMAIL', value: 'atencion@club.com', display: 'atencion@
 const text = 'Sorry to hear about your phone. MYA handles lost property on WhatsApp: +34 612 34 56 78'
 const bodyText = 'Sorry to hear about your phone. MYA handles lost property on WhatsApp:'
 
-const withBlocks = (contacts: unknown, extra: Record<string, unknown> = {}) => resolveContactContent({ text, bodyText, contacts, ...extra })
+const withBlocks = (contacts: unknown, extra: Record<string, unknown> = {}) => resolveContactContent({ role: 'bot', text, bodyText, contacts, ...extra })
 const fallback = { text, contactBlocks: [] }
 
 describe('resolveContactContent — regla del cliente del contrato', () => {
@@ -17,14 +17,14 @@ describe('resolveContactContent — regla del cliente del contrato', () => {
   })
 
   it('mensaje sin los campos nuevos: text tal cual, sin bloques', () => {
-    expect(resolveContactContent({ text })).toEqual(fallback)
+    expect(resolveContactContent({ role: 'bot', text })).toEqual(fallback)
   })
 
   it('cualquier otro caso → text, sin bloques', () => {
     expect(withBlocks([])).toEqual(fallback)
     expect(withBlocks(null)).toEqual(fallback)
     expect(withBlocks({ ...wa })).toEqual(fallback)
-    expect(resolveContactContent({ text, contacts: [wa] })).toEqual(fallback) // sin bodyText
+    expect(resolveContactContent({ role: 'bot', text, contacts: [wa] })).toEqual(fallback) // sin bodyText
     expect(withBlocks([wa], { bodyText: 42 })).toEqual(fallback)
   })
 
@@ -86,5 +86,21 @@ describe('resolveContactContent — regla del cliente del contrato', () => {
 
   it('campos de más en el bloque no llegan al store', () => {
     expect(withBlocks([{ ...wa, routeName: 'Objetos perdidos' }])).toEqual({ text: bodyText, contactBlocks: [wa] })
+  })
+
+  it('solo en mensajes del bot: con role agent o user, text sin bloques', () => {
+    expect(withBlocks([wa], { role: 'agent' })).toEqual(fallback)
+    expect(withBlocks([wa], { role: 'user' })).toEqual(fallback)
+  })
+
+  it('display con caracteres de formato (U+202E, U+2066, U+200B) → text', () => {
+    for (const mark of ['\u202e', '\u2066', '\u200b']) {
+      expect(withBlocks([{ ...wa, display: `${mark}+34 612 34 56 78` }])).toEqual(fallback)
+    }
+  })
+
+  it('value repetido es un dato roto: cae a text', () => {
+    expect(withBlocks([wa, wa])).toEqual(fallback)
+    expect(withBlocks([wa, tel, { ...wa, channel: 'PHONE', url: 'tel:+34612345678' }])).toEqual(fallback)
   })
 })

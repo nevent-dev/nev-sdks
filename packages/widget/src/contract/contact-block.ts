@@ -16,8 +16,10 @@ import type { WidgetContactBlock } from './types'
 
 const MAX_BLOCKS = 10
 const MAX_LENGTH = 254
-// Sin controles ni saltos de línea en lo que se pinta.
-const CONTROL_CHARS = /[\u0000-\u001f\u007f]/
+// Sin controles, saltos de línea ni caracteres de formato (\p{Cf}: marcas de
+// dirección como U+202E, que harían leer las cifras en otro orden que el
+// botón, y espacios de ancho cero) en lo que se pinta.
+const CONTROL_CHARS = /[\u0000-\u001f\u007f\p{Cf}]/u
 const E164 = /^\+(\d{6,15})$/
 // Un único buzón: sin consulta (?subject=), fragmento, separadores ni escapes.
 const EMAIL = /^[^\s@?#&/\\,;:%<>"]+@[^\s@?#&/\\,;:%<>"]+\.[^\s@?#&/\\,;:%<>"]+$/
@@ -58,12 +60,16 @@ export interface MessageContent {
 }
 
 // Aplica la regla del cliente a un message.created o a un mensaje del snapshot.
-export function resolveContactContent(message: { text: string; bodyText?: unknown; contacts?: unknown }): MessageContent {
-  const { text, bodyText, contacts } = message
-  if (!Array.isArray(contacts) || contacts.length === 0 || contacts.length > MAX_BLOCKS || typeof bodyText !== 'string') {
+// Bloques solo en mensajes del bot, y sin duplicados por `value` (contrato): un
+// `value` repetido es un dato roto más y el mensaje cae a `text`.
+export function resolveContactContent(message: { role: string; text: string; bodyText?: unknown; contacts?: unknown }): MessageContent {
+  const { role, text, bodyText, contacts } = message
+  if (role !== 'bot' || !Array.isArray(contacts) || contacts.length === 0 || contacts.length > MAX_BLOCKS || typeof bodyText !== 'string') {
     return { text, contactBlocks: [] }
   }
   const blocks = contacts.map(normalizeOne)
   if (blocks.some((b) => b === null)) return { text, contactBlocks: [] }
-  return { text: bodyText, contactBlocks: blocks as WidgetContactBlock[] }
+  const valid = blocks as WidgetContactBlock[]
+  if (new Set(valid.map((b) => b.value)).size !== valid.length) return { text, contactBlocks: [] }
+  return { text: bodyText, contactBlocks: valid }
 }
