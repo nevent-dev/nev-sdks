@@ -1,6 +1,7 @@
 import type { StoredMessage } from '../store/message-store'
 import { AgentAvatar, BotLogo } from './icons'
 import { renderMarkdown } from './markdown'
+import { ContactBlocks } from './ContactBlocks'
 import { useStrings } from './strings'
 
 export interface MessageBubbleProps {
@@ -62,11 +63,14 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
             {strings.thinking}
           </div>
         ) : (
-          <div class="bubble">
-            {isUser ? message.text : renderMarkdown(message.text)}
-            {message.streaming && <span class="stream-caret" aria-hidden="true" />}
-          </div>
+          (message.text !== '' || message.streaming || message.contactBlocks.length === 0) && (
+            <div class="bubble">
+              {isUser ? message.text : renderMarkdown(message.text)}
+              {message.streaming && <span class="stream-caret" aria-hidden="true" />}
+            </div>
+          )
         )}
+        {!isUser && !message.streaming && <ContactBlocks blocks={message.contactBlocks} />}
         {isUser && (
           <div class="meta">
             {formatTime(message.createdAt, strings.timeLocale)}

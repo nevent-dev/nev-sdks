@@ -6,7 +6,7 @@ import { mount, rerender, cleanupMounted } from './test-utils'
 function msg(overrides: Partial<StoredMessage>): StoredMessage {
   return {
     id: 'm1', role: 'bot', text: '', status: 'sent', seq: null, streaming: false,
-    createdAt: '2026-07-18T10:00:00.000Z', clientId: null, turnId: null, authorName: null, authorAvatarUrl: null, ...overrides,
+    createdAt: '2026-07-18T10:00:00.000Z', clientId: null, turnId: null, authorName: null, authorAvatarUrl: null, contactBlocks: [], ...overrides,
   }
 }
 
@@ -75,5 +75,31 @@ describe('useAnnouncement', () => {
     const second = read(root)
     expect(stripZeroWidth(second)).toBe('Un momento') // el texto "hablado" es el mismo...
     expect(second).not.toBe(first) // ...pero el string completo mutó de verdad (el DOM cambió)
+  })
+})
+
+describe('useAnnouncement — bloque de contacto (nevent-work#15)', () => {
+  const block = { channel: 'WHATSAPP' as const, value: '+34612345678', display: '+34 612 34 56 78', url: 'https://wa.me/34612345678' }
+
+  it('el bloque que llega con el durable, tras anunciar el texto del turno, se anuncia aparte y una sola vez', async () => {
+    const root = await mount(<Probe messages={[]} />)
+    await rerender(<Probe messages={[msg({ id: 'm1', text: 'En MYA, los objetos perdidos se gestionan por WhatsApp:' })]} />, root)
+    expect(stripZeroWidth(read(root))).toBe('En MYA, los objetos perdidos se gestionan por WhatsApp:')
+    await rerender(<Probe messages={[msg({ id: 'm1', text: 'En MYA, los objetos perdidos se gestionan por WhatsApp:', contactBlocks: [block] })]} />, root)
+    expect(stripZeroWidth(read(root))).toBe('WhatsApp: +34 612 34 56 78')
+    const before = read(root)
+    await rerender(<Probe messages={[msg({ id: 'm1', text: 'En MYA, los objetos perdidos se gestionan por WhatsApp:', contactBlocks: [block] })]} />, root)
+    expect(read(root)).toBe(before)
+  })
+
+  it('texto y bloque en el mismo mensaje nuevo: se anuncian juntos sin «:.»', async () => {
+    const root = await mount(<Probe messages={[]} />)
+    await rerender(<Probe messages={[msg({ id: 'm1', text: 'Por WhatsApp:', contactBlocks: [block] })]} />, root)
+    expect(stripZeroWidth(read(root))).toBe('Por WhatsApp: WhatsApp: +34 612 34 56 78')
+  })
+
+  it('el bloque de un mensaje ya presente al montar no se anuncia', async () => {
+    const root = await mount(<Probe messages={[msg({ id: 'h1', text: 'Por WhatsApp:', contactBlocks: [block] })]} />)
+    expect(read(root)).toBe('')
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import type { StoredMessage } from '../store/message-store'
+import { useStrings } from './strings'
 
 // Región aria-live separada de la lista visible (Task 8, MessageList): un
 // delta de streaming por token saturaría al lector de pantalla. Resuelve tres
@@ -20,29 +21,43 @@ import type { StoredMessage } from '../store/message-store'
 // note (exactamente el tipo de fragilidad a evitar en un paso ejecutable).
 const ZERO_WIDTH_SPACE = String.fromCharCode(0x200b)
 
+// «…por WhatsApp:» + «WhatsApp: +34…» no debe leerse «WhatsApp:. WhatsApp…».
+function joinSentences(parts: readonly string[]): string {
+  return parts.reduce((acc, part) => (acc === '' ? part : /[.:!?…]\s*$/.test(acc) ? `${acc} ${part}` : `${acc}. ${part}`), '')
+}
+
+// Bloque de contacto (nevent-work#15): con bloques, la burbuja muestra
+// `bodyText`, sin los valores, y los bloques suelen llegar DESPUÉS de que el
+// turno en streaming ya se anunció (los trae el durable message.created). Se
+// anuncian con el mismo texto que el aria del bloque («WhatsApp: +34 612 34
+// 56 78»), solo los que aún no se habían anunciado para ese mensaje.
 export function useAnnouncement(messages: readonly StoredMessage[]): string {
+  const strings = useStrings()
   const [announcement, setAnnouncement] = useState('')
-  const announcedIds = useRef<Set<string> | null>(null)
+  // id → bloques de contacto ya anunciados de ese mensaje.
+  const announced = useRef<Map<string, number> | null>(null)
   const toggleRef = useRef(false)
 
   useEffect(() => {
     const isCompleteReply = (m: StoredMessage): boolean =>
-      (m.role === 'bot' || m.role === 'agent') && !m.streaming && m.text !== ''
+      (m.role === 'bot' || m.role === 'agent') && !m.streaming && (m.text !== '' || m.contactBlocks.length > 0)
 
-    if (announcedIds.current === null) {
-      announcedIds.current = new Set(messages.filter(isCompleteReply).map((m) => m.id))
+    if (announced.current === null) {
+      announced.current = new Map(messages.filter(isCompleteReply).map((m) => [m.id, m.contactBlocks.length]))
       return
     }
     const fresh: string[] = []
     for (const m of messages) {
-      if (isCompleteReply(m) && !announcedIds.current.has(m.id)) {
-        announcedIds.current.add(m.id)
-        fresh.push(m.text)
-      }
+      if (!isCompleteReply(m)) continue
+      const done = announced.current.get(m.id)
+      const blocks = m.contactBlocks.slice(done ?? 0).map((b) => `${strings.contactChannel[b.channel]}: ${b.display}`)
+      if (done === undefined && m.text !== '') fresh.push(m.text)
+      fresh.push(...blocks)
+      announced.current.set(m.id, m.contactBlocks.length)
     }
     if (fresh.length > 0) {
       toggleRef.current = !toggleRef.current
-      setAnnouncement(fresh.join('. ') + (toggleRef.current ? ZERO_WIDTH_SPACE : ''))
+      setAnnouncement(joinSentences(fresh) + (toggleRef.current ? ZERO_WIDTH_SPACE : ''))
     }
   }, [messages])
 

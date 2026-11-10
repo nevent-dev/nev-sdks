@@ -12,6 +12,8 @@ import { computeViewState } from '../src/panel/view-state'
 import { createMessageStore, type MessageStore, type StoredMessage } from '../src/store/message-store'
 import { fixtureConfig } from '../src/contract/fixtures'
 import type { Transport } from '../src/transport'
+import { STRINGS, StringsContext } from '../src/panel/strings'
+import type { WidgetLocale } from '../src/contract/locale'
 
 const STATES = [
   ['launcher', 'Burbuja (cerrado)'],
@@ -25,7 +27,39 @@ const STATES = [
   ['offline', 'Sin conexión'],
   ['resolved', 'Resuelto'],
   ['waiting-offline', 'Escalado + sin conexión (combo)'],
+  ['contact-es', 'Bloque de contacto · es'],
+  ['contact-en', 'Bloque de contacto · en'],
+  ['contact-ca', 'Bloque de contacto · ca'],
+  ['contact-pt', 'Bloque de contacto · pt'],
+  ['contact-several', 'Varios bloques seguidos · es'],
+  ['contact-dark', 'Bloque de contacto · oscuro'],
+  ['contact-none', 'Sin derivación (sin bloque)'],
 ] as const
+
+// nevent-work#15: textos del modelo de los ejemplos del catálogo; el bloque lo
+// pone el sistema. Llegan por el wire como cualquier message.created.
+const CONTACT_TEXT: Record<WidgetLocale, [string, string]> = {
+  es: ['Ayer perdí el móvil, ¿cómo contacto con objetos perdidos?', 'Siento lo del móvil. En MYA, los objetos perdidos se gestionan por WhatsApp:'],
+  en: ['I lost my phone yesterday, how can I go to the lost and found?', 'Sorry to hear about your phone. MYA handles lost property on WhatsApp:'],
+  ca: ['Ahir vaig perdre el mòbil, com contacto amb objectes perduts?', 'Sento el del mòbil. A MYA, els objectes perduts es gestionen per WhatsApp:'],
+  pt: ['Perdi o telemóvel ontem, como contacto os perdidos e achados?', 'Lamento o do telemóvel. Na MYA, os perdidos e achados tratam-se por WhatsApp:'],
+}
+const WA_BLOCK = { channel: 'WHATSAPP', value: '+34612345678', display: '+34 612 34 56 78', url: 'https://wa.me/34612345678' }
+
+// Forma del contrato (_rescate/t15-mock/contrato.md §2): text con los valores
+// escritos, bodyText sin ellos y contacts.
+function contactTransport(locale: WidgetLocale, blocks: Array<{ display: string }>, botText?: string): Transport {
+  const [ask, answer] = CONTACT_TEXT[locale]
+  return fakeTransport((store) => {
+    store.applySnapshot({ messages: [{ messageId: 'u1', role: 'user', text: ask, createdAt: '2026-11-10T12:00:00.000Z' }], state: 'BOT_ACTIVE', snapshotCursor: 'evt_v1_demo_1' })
+    store.applyDurableEvent(JSON.parse(JSON.stringify({
+      eventId: 'evt_v1_demo_2', schemaVersion: 1, conversationId: 'demo', occurredAt: '2026-11-10T12:00:05.000Z',
+      type: 'message.created', payload: blocks.length > 0
+        ? { messageId: 'b1', role: 'bot', text: `${botText ?? answer} ${blocks.map((b) => b.display).join(', ')}`, bodyText: botText ?? answer, contacts: blocks }
+        : { messageId: 'b1', role: 'bot', text: botText ?? answer },
+    })))
+  })
+}
 
 function fakeTransport(configure: (store: MessageStore) => void): Transport {
   const store = createMessageStore(() => '2026-07-18T14:00:00.000Z')
@@ -69,6 +103,16 @@ function buildTransport(state: string): Transport {
       store.setConnection('reconnecting')
     })
   }
+  if (state === 'contact-es' || state === 'contact-dark') return contactTransport('es', [WA_BLOCK])
+  if (state === 'contact-en' || state === 'contact-ca' || state === 'contact-pt') return contactTransport(state.slice(8) as WidgetLocale, [WA_BLOCK])
+  if (state === 'contact-several') {
+    return contactTransport('es', [
+      { channel: 'PHONE', value: '+34963123456', display: '+34 963 12 34 56', url: 'tel:+34963123456' },
+      { channel: 'EMAIL', value: 'atencion@tuclub.com', display: 'atencion@tuclub.com', url: 'mailto:atencion@tuclub.com' },
+      WA_BLOCK,
+    ], 'Puedes escribir o llamar a la oficina del club:')
+  }
+  if (state === 'contact-none') return contactTransport('es', [], 'No tengo un contacto de MYA para objetos perdidos.')
   if (state === 'offline') return fakeTransport((store) => { store.setConnection('offline') })
   if (state === 'resolved') return fakeTransport((store) => { store.applySnapshot({ messages: [], state: 'RESOLVED', snapshotCursor: 'evt_v1_demo_1' }) })
   // Combo waiting+offline (gap de Task 13): la conexión nunca sustituye la
@@ -131,8 +175,16 @@ function UploadPreview() {
   )
 }
 
+function localeOf(state: string): WidgetLocale {
+  const tail = state.slice(8)
+  return state.startsWith('contact-') && (tail === 'en' || tail === 'ca' || tail === 'pt') ? tail : 'es'
+}
+
 export function FixturesApp() {
-  const [state, setState] = useState<string>('welcome')
+  const [state, setState] = useState<string>(new URLSearchParams(location.search).get('state') ?? 'welcome')
+  // Tema oscuro solo para el estado que lo pide (mismo atributo que theme.ts).
+  if (state === 'contact-dark') document.documentElement.setAttribute('data-theme', 'dark')
+  else document.documentElement.removeAttribute('data-theme')
   return (
     <div style={{ display: 'flex', gap: '32px', padding: '24px', fontFamily: 'sans-serif', alignItems: 'flex-start' }}>
       <aside>
@@ -153,8 +205,11 @@ export function FixturesApp() {
         {state === 'rich' && <RichPreview />}
         {state === 'upload' && <UploadPreview />}
         {state !== 'launcher' && state !== 'rich' && state !== 'upload' && (
-          <Panel config={fixtureConfig()} transport={buildTransport(state)} onMinimize={() => {}} onClose={() => {}} onResize={() => {}}
-            viewportKind="desktop" viewportHeight={900} />
+          <StringsContext.Provider value={STRINGS[localeOf(state)]}>
+            <Panel key={state} config={{ ...fixtureConfig(), assistantName: state.startsWith('contact') ? 'MYA Valencia' : fixtureConfig().assistantName }}
+              transport={buildTransport(state)} onMinimize={() => {}} onClose={() => {}} onResize={() => {}}
+              viewportKind="desktop" viewportHeight={900} />
+          </StringsContext.Provider>
         )}
       </main>
       <section style={{ maxWidth: '320px' }}>
