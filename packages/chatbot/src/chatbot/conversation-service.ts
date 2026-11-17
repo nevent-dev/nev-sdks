@@ -391,7 +391,9 @@ export class ConversationService {
    * @throws {ChatbotError} with code `CONFIG_LOAD_FAILED` on any failure
    */
   async fetchConfig(tenantId: string): Promise<ServerChatbotConfig> {
-    const endpoint = `/public/chatbot/${this.chatbotId}/config?tenantId=${encodeURIComponent(tenantId)}`;
+    // ownTexts=true (nevent-work#40, COMMS-012): this SDK greets and prompts in the visitor's language with its own
+    // catalog, so the API leaves out its fixed defaults; SDK versions without it keep receiving them.
+    const endpoint = `/public/chatbot/${this.chatbotId}/config?tenantId=${encodeURIComponent(tenantId)}&ownTexts=true`;
     this.logger.debug('Fetching chatbot config', {
       chatbotId: this.chatbotId,
       tenantId,
