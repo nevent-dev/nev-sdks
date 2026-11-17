@@ -1342,6 +1342,8 @@ export interface ChatbotTranslations extends Record<string, string> {
   rateLimitError: string;
   /** Rate limit error with countdown (uses {seconds} placeholder) */
   rateLimitCountdown: string;
+  /** The countdown when exactly one second is left (nevent-work#40: «1 segundo», never «1 segundos»). */
+  rateLimitCountdownOne: string;
   /** "Powered by Nevent" branding text */
   poweredBy: string;
   /** New conversation button text */

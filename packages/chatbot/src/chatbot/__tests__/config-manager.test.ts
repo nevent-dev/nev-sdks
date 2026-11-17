@@ -76,7 +76,8 @@ describe('ConfigManager', () => {
       expect(config.containerId).toBeNull();
       expect(config.position).toBe('bottom-right');
       expect(config.theme).toBe('light');
-      expect(config.locale).toBe('es');
+      // nevent-work#40 (FAN-049): no default locale, the visitor's is detected
+      expect(config.locale).toBeUndefined();
       expect(config.analytics).toBe(true);
       expect(config.analyticsUrl).toBe('https://events.neventapis.com');
       expect(config.debug).toBe(false);
@@ -358,9 +359,9 @@ describe('ConfigManager', () => {
       expect(manager.getLocale()).toBe('en');
     });
 
-    it('getLocale() returns default locale (es)', () => {
+    it('getLocale() is undefined without a locale: the widget detects the visitor\'s (nevent-work#40)', () => {
       const manager = new ConfigManager(createMinimalConfig());
-      expect(manager.getLocale()).toBe('es');
+      expect(manager.getLocale()).toBeUndefined();
     });
 
     it('getTheme() returns correct theme', () => {
