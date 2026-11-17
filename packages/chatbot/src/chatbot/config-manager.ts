@@ -42,7 +42,8 @@ const DEFAULTS: Omit<Required<ChatbotConfig>, 'chatbotId' | 'tenantId'> = {
   containerId: null,
   position: 'bottom-right' as BubblePosition,
   theme: 'light' as ThemeMode,
-  locale: 'es' as SupportedLocale,
+  // nevent-work#40 (FAN-049): no locale set by the embed means «detect the visitor's» (I18nManager), never a fixed es
+  locale: undefined as unknown as SupportedLocale,
   avatar: '',
   styles: {} as ChatbotStyles,
   analytics: true,
