@@ -31,6 +31,11 @@ export const pt: NewsletterLabels = {
   emailLabel: 'Email',
   emailPlaceholder: 'O seu email',
 
+  firstNamePlaceholder: 'O seu nome',
+  lastNamePlaceholder: 'Apelidos',
+  postalCodePlaceholder: 'Código postal',
+  birthDatePlaceholder: 'Data de nascimento',
+
   // Validation
   fieldRequired: '{{fieldName}} e obrigatorio',
   fieldInvalid: '{{fieldName}} nao e valido',

@@ -105,23 +105,28 @@ export function negotiateWidgetLocale(
 }
 
 /**
- * The locale the widget can already tell before it reads the config (nevent-work#40): the embed's explicit locale or
- * the first browser language it has labels for, as steps 1 and 2 of {@link negotiateWidgetLocale}. It travels to the
- * API as `?language=` so that the default texts, consent included, come in the same language as the rest of the form.
- * `undefined` when neither matches: then the API's texts decide (see {@link visitLocale}).
+ * The languages the API has default texts for (title, button, messages, consent): the widget can only show a visit in
+ * one language if the API serves its texts in it (nevent-work#40).
+ */
+export const API_TEXT_LANGUAGES: readonly string[] = ['es', 'en'];
+
+/**
+ * The language the widget asks the API for, before it reads the config (nevent-work#40), as `?language=`: the embed's
+ * explicit locale if the widget has labels for it, else the first browser language the API has texts for (es or en),
+ * so a Catalan browser that also reads English gets English, not Catalan around Spanish texts. `undefined` when
+ * neither matches: then the API answers in the organisation's language and the widget follows it.
  */
 export function preferredWidgetLocale(
   browserLanguages: readonly string[],
   explicitLocale?: string | null
 ): string | undefined {
-  const has = (l: string | undefined): l is string => !!l && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, l);
   const explicit = baseLanguage(explicitLocale);
-  if (has(explicit)) {
+  if (explicit && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, explicit)) {
     return explicit;
   }
   for (const browser of browserLanguages) {
     const base = baseLanguage(browser);
-    if (has(base)) {
+    if (base && API_TEXT_LANGUAGES.includes(base)) {
       return base;
     }
   }
@@ -130,9 +135,9 @@ export function preferredWidgetLocale(
 
 /**
  * The one locale of a visit (nevent-work#40). With an API that says the language of its default texts
- * (`textsLanguage`), the widget shows its own texts in the locale it asked for and, if it asked for none, in the
- * language of those texts, so that title, fields, consent, errors and messages never mix two languages. Without it
- * (an older API), {@link negotiateWidgetLocale} as before.
+ * (`textsLanguage`), the visit is in that language, so title, fields, consent, errors and messages never mix two; only
+ * an explicit locale of the embed overrides it (the operator chose it, and usually wrote the newsletter's own texts in
+ * it). Without `textsLanguage` (an older API), {@link negotiateWidgetLocale} as before.
  */
 export function visitLocale(
   browserLanguages: readonly string[],
@@ -142,7 +147,8 @@ export function visitLocale(
 ): string | undefined {
   const texts = baseLanguage(textsLanguage);
   if (texts && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, texts)) {
-    return preferredWidgetLocale(browserLanguages, explicitLocale) ?? texts;
+    const explicit = baseLanguage(explicitLocale);
+    return explicit && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, explicit) ? explicit : texts;
   }
   if (tenantLanguage === undefined || tenantLanguage === null || tenantLanguage.trim() === '') {
     return undefined;

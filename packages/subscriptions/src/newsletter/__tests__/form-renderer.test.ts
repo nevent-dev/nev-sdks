@@ -515,7 +515,7 @@ describe('FormRenderer', () => {
       const renderer = new FormRenderer([], null, translate);
       renderer.render(container);
 
-      expect(container.textContent).toContain('Correo electrónico');
+      expect(container.textContent).toContain('Email');
       expect((container.querySelector('input[type="email"]') as HTMLInputElement).placeholder).toBe('Tu email');
     });
   });

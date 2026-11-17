@@ -567,27 +567,13 @@ export class NewsletterWidget {
       backgroundColor: '#ffffff',
       borderRadius: 8,
       fields: {
-        email: { enabled: true, required: true, placeholder: 'Tu email' },
-        firstName: {
-          enabled: true,
-          required: false,
-          placeholder: 'Tu nombre',
-        },
-        lastName: {
-          enabled: false,
-          required: false,
-          placeholder: 'Apellidos',
-        },
-        postalCode: {
-          enabled: false,
-          required: false,
-          placeholder: 'Codigo postal',
-        },
-        birthDate: {
-          enabled: false,
-          required: false,
-          placeholder: 'Fecha de nacimiento',
-        },
+        // nevent-work#40: no fixed placeholders here (they were Spanish for every visitor); empty means «the
+        // widget's catalog in the visitor's language» where the field is drawn
+        email: { enabled: true, required: true, placeholder: '' },
+        firstName: { enabled: true, required: false, placeholder: '' },
+        lastName: { enabled: false, required: false, placeholder: '' },
+        postalCode: { enabled: false, required: false, placeholder: '' },
+        birthDate: { enabled: false, required: false, placeholder: '' },
       },
       messages: {
         submit: '',
@@ -1666,13 +1652,13 @@ export class NewsletterWidget {
 
     return `
       <div class="nevent-field">
-        <label for="${fieldId}" class="nevent-field-label nevent-sr-only">Email</label>
+        <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(this.i18n.t('emailLabel'))}</label>
         <input
           type="email"
           id="${fieldId}"
           name="email"
           class="nevent-input"
-          placeholder="${Sanitizer.escapeHtml(field.placeholder || '')}"
+          placeholder="${Sanitizer.escapeHtml(field.placeholder || this.i18n.t('emailPlaceholder'))}"
           aria-describedby="${errorId}"
           autocomplete="email"
           ${field.required ? 'required aria-required="true"' : ''}
@@ -1696,13 +1682,13 @@ export class NewsletterWidget {
       const errorId = 'nevent-firstname-error';
       html += `
         <div class="nevent-field">
-          <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(fields.firstName.placeholder || 'First name')}</label>
+          <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(fields.firstName.placeholder || this.i18n.t('firstNamePlaceholder'))}</label>
           <input
             type="text"
             id="${fieldId}"
             name="firstName"
             class="nevent-input"
-            placeholder="${Sanitizer.escapeHtml(fields.firstName.placeholder || '')}"
+            placeholder="${Sanitizer.escapeHtml(fields.firstName.placeholder || this.i18n.t('firstNamePlaceholder'))}"
             aria-describedby="${errorId}"
             autocomplete="given-name"
             ${fields.firstName.required ? 'required aria-required="true"' : ''}
@@ -1717,13 +1703,13 @@ export class NewsletterWidget {
       const errorId = 'nevent-lastname-error';
       html += `
         <div class="nevent-field">
-          <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(fields.lastName.placeholder || 'Last name')}</label>
+          <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(fields.lastName.placeholder || this.i18n.t('lastNamePlaceholder'))}</label>
           <input
             type="text"
             id="${fieldId}"
             name="lastName"
             class="nevent-input"
-            placeholder="${Sanitizer.escapeHtml(fields.lastName.placeholder || '')}"
+            placeholder="${Sanitizer.escapeHtml(fields.lastName.placeholder || this.i18n.t('lastNamePlaceholder'))}"
             aria-describedby="${errorId}"
             autocomplete="family-name"
             ${fields.lastName.required ? 'required aria-required="true"' : ''}
@@ -1738,13 +1724,13 @@ export class NewsletterWidget {
       const errorId = 'nevent-postalcode-error';
       html += `
         <div class="nevent-field">
-          <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(fields.postalCode.placeholder || 'Postal code')}</label>
+          <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(fields.postalCode.placeholder || this.i18n.t('postalCodePlaceholder'))}</label>
           <input
             type="text"
             id="${fieldId}"
             name="postalCode"
             class="nevent-input"
-            placeholder="${Sanitizer.escapeHtml(fields.postalCode.placeholder || '')}"
+            placeholder="${Sanitizer.escapeHtml(fields.postalCode.placeholder || this.i18n.t('postalCodePlaceholder'))}"
             aria-describedby="${errorId}"
             autocomplete="postal-code"
             ${fields.postalCode.required ? 'required aria-required="true"' : ''}
@@ -1759,13 +1745,13 @@ export class NewsletterWidget {
       const errorId = 'nevent-birthdate-error';
       html += `
         <div class="nevent-field">
-          <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(fields.birthDate.placeholder || 'Birth date')}</label>
+          <label for="${fieldId}" class="nevent-field-label nevent-sr-only">${Sanitizer.escapeHtml(fields.birthDate.placeholder || this.i18n.t('birthDatePlaceholder'))}</label>
           <input
             type="date"
             id="${fieldId}"
             name="birthDate"
             class="nevent-input"
-            placeholder="${Sanitizer.escapeHtml(fields.birthDate.placeholder || '')}"
+            placeholder="${Sanitizer.escapeHtml(fields.birthDate.placeholder || this.i18n.t('birthDatePlaceholder'))}"
             aria-describedby="${errorId}"
             autocomplete="bday"
             ${fields.birthDate.required ? 'required aria-required="true"' : ''}

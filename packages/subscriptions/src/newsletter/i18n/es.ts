@@ -28,8 +28,13 @@ export const es: NewsletterLabels = {
   privacyPolicyLabel: 'Política de privacidad',
 
   // Default email field (when the API configuration brings none)
-  emailLabel: 'Correo electrónico',
+  emailLabel: 'Email',
   emailPlaceholder: 'Tu email',
+
+  firstNamePlaceholder: 'Tu nombre',
+  lastNamePlaceholder: 'Apellidos',
+  postalCodePlaceholder: 'Código postal',
+  birthDatePlaceholder: 'Fecha de nacimiento',
 
   // Validation
   fieldRequired: '{{fieldName}} es obligatorio',
