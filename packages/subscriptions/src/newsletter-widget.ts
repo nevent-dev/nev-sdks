@@ -36,7 +36,8 @@ import {
 import {
   createNewsletterI18n,
   browserLanguages,
-  negotiateWidgetLocale,
+  preferredWidgetLocale,
+  visitLocale,
   type NewsletterLabels,
   observedBrowserLanguage,
 } from './newsletter/i18n/index';
@@ -197,6 +198,8 @@ export class NewsletterWidget {
    * friendly fallback panel is shown instead of the form.
    */
   private widgetUnavailable = false;
+  /** The language of the API's default texts in the loaded config (nevent-work#40); sent back on subscribe. */
+  private textsLanguage: string | undefined;
 
   // --------------------------------------------------------------------------
   // Event listener references (for cleanup in destroy)
@@ -673,7 +676,10 @@ export class NewsletterWidget {
    */
   private async loadWidgetConfig(): Promise<void> {
     try {
-      const url = `${this.config.apiUrl}/public/widget/${this.config.newsletterId}/config?tenantId=${this.config.tenantId}`;
+      // nevent-work#40: ask for the default texts in the visitor's locale, so the whole form is in one language
+      const preferred = preferredWidgetLocale(browserLanguages(), this.config.locale);
+      const language = preferred ? `&language=${encodeURIComponent(preferred)}` : '';
+      const url = `${this.config.apiUrl}/public/widget/${this.config.newsletterId}/config?tenantId=${this.config.tenantId}${language}`;
 
       // Use a single retry for config loading (non-critical, falls back to defaults)
       const response = await this.fetchWithRetry(
@@ -716,12 +722,17 @@ export class NewsletterWidget {
 
       // nevent-work#279 (decision 4, option B): the visitor's browser negotiated among the tenant's language and the
       // widget's own, else the tenant's, never a fixed «es». An explicit locale of the embed still wins.
-      // Without tenantLanguage (an older API) the locale chosen at construction is today's and is left untouched.
-      if (serverConfig.tenantLanguage) {
-        const negotiated = negotiateWidgetLocale(browserLanguages(), serverConfig.tenantLanguage, this.config.locale);
-        if (negotiated !== this.i18n.getLocale()) {
-          this.i18n.setLocale(negotiated);
-        }
+      // nevent-work#40: with textsLanguage, a visitor matched by neither gets the language of the API's texts, so the
+      // form never mixes two. Without tenantLanguage (an older API) the locale chosen at construction is left untouched.
+      this.textsLanguage = serverConfig.textsLanguage || undefined;
+      const negotiated = visitLocale(
+        browserLanguages(),
+        serverConfig.tenantLanguage,
+        this.config.locale,
+        serverConfig.textsLanguage
+      );
+      if (negotiated && negotiated !== this.i18n.getLocale()) {
+        this.i18n.setLocale(negotiated);
       }
 
       // STRICT: the apiUrl, newsletterId and tenantId the caller passed at
@@ -1316,12 +1327,12 @@ export class NewsletterWidget {
     return [
       {
         fieldName: 'email',
-        displayName: 'Email Address',
+        displayName: this.i18n.t('emailLabel'),
         hint: null,
         required: true,
         type: 'email',
         placeholder:
-          this.config.fields.email?.placeholder || 'Enter your email',
+          this.config.fields.email?.placeholder || this.i18n.t('emailPlaceholder'),
       },
     ];
   }
@@ -1445,12 +1456,12 @@ export class NewsletterWidget {
     if (!hasEmailField) {
       this.fieldConfigurations.unshift({
         fieldName: 'email',
-        displayName: 'Email Address',
+        displayName: this.i18n.t('emailLabel'),
         hint: null,
         required: true,
         type: 'email',
         placeholder:
-          this.config.fields.email?.placeholder || 'Enter your email',
+          this.config.fields.email?.placeholder || this.i18n.t('emailPlaceholder'),
       });
     }
 
@@ -2550,6 +2561,7 @@ export class NewsletterWidget {
             ? { language: observedLanguage, languageSource: 'navigator' as const }
             : {}),
           displayLanguage: this.i18n.getLocale(),
+          ...(this.textsLanguage ? { textsLanguage: this.textsLanguage } : {}),
         };
 
         if (this.config.onSubmit) {

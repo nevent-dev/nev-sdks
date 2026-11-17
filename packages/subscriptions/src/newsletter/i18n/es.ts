@@ -25,7 +25,11 @@ export const es: NewsletterLabels = {
   gdprText:
     'Acepto el tratamiento de mis datos personales para recibir comunicaciones comerciales y promociones relacionadas con {{companyName}}, según la {{privacyPolicyLink}}.',
   gdprRequired: 'Debes aceptar la política de privacidad para continuar.',
-  privacyPolicyLabel: 'Política de Privacidad',
+  privacyPolicyLabel: 'Política de privacidad',
+
+  // Default email field (when the API configuration brings none)
+  emailLabel: 'Correo electrónico',
+  emailPlaceholder: 'Tu email',
 
   // Validation
   fieldRequired: '{{fieldName}} es obligatorio',

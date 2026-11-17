@@ -27,6 +27,10 @@ export const pt: NewsletterLabels = {
   gdprRequired: 'Deve aceitar a politica de privacidade para continuar.',
   privacyPolicyLabel: 'Politica de Privacidade',
 
+  // Default email field (when the API configuration brings none)
+  emailLabel: 'Email',
+  emailPlaceholder: 'O seu email',
+
   // Validation
   fieldRequired: '{{fieldName}} e obrigatorio',
   fieldInvalid: '{{fieldName}} nao e valido',

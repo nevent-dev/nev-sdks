@@ -104,6 +104,52 @@ export function negotiateWidgetLocale(
   return has(tenant) ? tenant : 'en';
 }
 
+/**
+ * The locale the widget can already tell before it reads the config (nevent-work#40): the embed's explicit locale or
+ * the first browser language it has labels for, as steps 1 and 2 of {@link negotiateWidgetLocale}. It travels to the
+ * API as `?language=` so that the default texts, consent included, come in the same language as the rest of the form.
+ * `undefined` when neither matches: then the API's texts decide (see {@link visitLocale}).
+ */
+export function preferredWidgetLocale(
+  browserLanguages: readonly string[],
+  explicitLocale?: string | null
+): string | undefined {
+  const has = (l: string | undefined): l is string => !!l && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, l);
+  const explicit = baseLanguage(explicitLocale);
+  if (has(explicit)) {
+    return explicit;
+  }
+  for (const browser of browserLanguages) {
+    const base = baseLanguage(browser);
+    if (has(base)) {
+      return base;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * The one locale of a visit (nevent-work#40). With an API that says the language of its default texts
+ * (`textsLanguage`), the widget shows its own texts in the locale it asked for and, if it asked for none, in the
+ * language of those texts, so that title, fields, consent, errors and messages never mix two languages. Without it
+ * (an older API), {@link negotiateWidgetLocale} as before.
+ */
+export function visitLocale(
+  browserLanguages: readonly string[],
+  tenantLanguage?: string | null,
+  explicitLocale?: string | null,
+  textsLanguage?: string | null
+): string | undefined {
+  const texts = baseLanguage(textsLanguage);
+  if (texts && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, texts)) {
+    return preferredWidgetLocale(browserLanguages, explicitLocale) ?? texts;
+  }
+  if (tenantLanguage === undefined || tenantLanguage === null || tenantLanguage.trim() === '') {
+    return undefined;
+  }
+  return negotiateWidgetLocale(browserLanguages, tenantLanguage, explicitLocale);
+}
+
 /** The browser's languages in order of preference (navigator.languages, else navigator.language). */
 export function browserLanguages(): string[] {
   if (typeof navigator === 'undefined') {
