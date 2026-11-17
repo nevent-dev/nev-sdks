@@ -39,6 +39,10 @@ export interface NewsletterLabels extends Record<string, string> {
   // Default email field (when the API configuration brings none)
   emailLabel: string;
   emailPlaceholder: string;
+  firstNamePlaceholder: string;
+  lastNamePlaceholder: string;
+  postalCodePlaceholder: string;
+  birthDatePlaceholder: string;
 
   // Validation
   fieldRequired: string;

@@ -31,6 +31,11 @@ export const ca: NewsletterLabels = {
   emailLabel: 'Correu electrònic',
   emailPlaceholder: 'El teu correu electrònic',
 
+  firstNamePlaceholder: 'El teu nom',
+  lastNamePlaceholder: 'Cognoms',
+  postalCodePlaceholder: 'Codi postal',
+  birthDatePlaceholder: 'Data de naixement',
+
   // Validation
   fieldRequired: '{{fieldName}} es obligatori',
   fieldInvalid: '{{fieldName}} no es valid',

@@ -160,7 +160,7 @@ describe('ConversationService', () => {
       const calledUrl = fetchMock.mock.calls[0]![0] as string;
 
       expect(calledUrl).toBe(
-        `${API_URL}/public/chatbot/${CHATBOT_ID}/config?tenantId=${TENANT_ID}`
+        `${API_URL}/public/chatbot/${CHATBOT_ID}/config?tenantId=${TENANT_ID}&ownTexts=true`
       );
       expect(fetchMock.mock.calls[0]![1]).toMatchObject({ method: 'GET' });
     });

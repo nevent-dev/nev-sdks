@@ -84,6 +84,28 @@ describe('One language per visit (nevent-work#40)', () => {
     widget.destroy();
   });
 
+  it('without fields from the API, the default email field is in the visitor\'s language (FAN-048)', async () => {
+    browser(['en-GB']);
+    mockFetch({ configResponse: { ...ENGLISH_TEXTS, fieldConfigurations: [] } });
+    const { widget, container } = createWidget({ locale: undefined });
+    await widget.init();
+
+    const email = getShadowRoot(container)!.querySelector('input[type="email"]') as HTMLInputElement;
+    expect(email.placeholder).toBe('Your email');
+    widget.destroy();
+  });
+
+  it('a Catalan browser does not ask for Catalan and gets the one language of the texts', async () => {
+    browser(['ca-ES', 'ca']);
+    const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'es', textsLanguage: 'es' } });
+    const { widget } = createWidget({ locale: undefined });
+    await widget.init();
+
+    expect(configUrl(fetchMock)).not.toContain('language=');
+    expect(widget.getLocale()).toBe('es');
+    widget.destroy();
+  });
+
   it('a browser the widget has no labels for gets the language of the texts, not a second one', async () => {
     browser(['fr-FR']);
     const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'fr', textsLanguage: 'es' } });
@@ -116,9 +138,12 @@ describe('One language per visit (nevent-work#40)', () => {
 });
 
 describe('preferredWidgetLocale and visitLocale', () => {
-  it('the embed locale, else the first browser language with labels, else none', () => {
+  it('the embed locale, else the first browser language the API has texts for, else none', () => {
     expect(preferredWidgetLocale(['en-GB'], undefined)).toBe('en');
-    expect(preferredWidgetLocale(['fr-FR', 'ca-ES', 'en'], undefined)).toBe('ca');
+    expect(preferredWidgetLocale(['fr-FR', 'ca-ES', 'en'], undefined)).toBe('en');
+    expect(preferredWidgetLocale(['ca-ES'], undefined)).toBeUndefined();
+    expect(preferredWidgetLocale(['pt-BR', 'es'], undefined)).toBe('es');
+    expect(preferredWidgetLocale(['en-GB'], 'ca')).toBe('ca');
     expect(preferredWidgetLocale(['en-GB'], 'es')).toBe('es');
     expect(preferredWidgetLocale(['fr-FR'], 'xx')).toBeUndefined();
     expect(preferredWidgetLocale([], undefined)).toBeUndefined();
@@ -128,6 +153,11 @@ describe('preferredWidgetLocale and visitLocale', () => {
     expect(visitLocale(['en-GB'], 'es', undefined, 'en')).toBe('en');
     expect(visitLocale(['fr-FR'], 'en-GB', undefined, 'en')).toBe('en');
     expect(visitLocale(['de-DE'], 'pt-PT', undefined, 'es')).toBe('es');
+    // a Catalan or Portuguese browser follows the language of the texts, never Catalan around Spanish
+    expect(visitLocale(['ca-ES'], 'es', undefined, 'es')).toBe('es');
+    expect(visitLocale(['pt-BR'], 'en', undefined, 'en')).toBe('en');
+    // an explicit locale of the embed is the operator's choice and still wins
+    expect(visitLocale(['en-GB'], 'es', 'ca', 'es')).toBe('ca');
     expect(visitLocale(['de-DE'], 'pt-PT', undefined, undefined)).toBe('pt');
     expect(visitLocale(['en-GB'], undefined, undefined, undefined)).toBeUndefined();
   });
