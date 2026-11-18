@@ -50,7 +50,7 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     }
   }
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!config?.resolutionSurvey && !config?.teamSurvey && !config?.answerFeedback) return
     setFeedback(null)
     setResolutionPrompt(null)
