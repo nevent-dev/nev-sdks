@@ -5,13 +5,14 @@ import type { Transport } from '../transport'
 import { FeedbackUnavailable } from '../transport/feedback'
 
 const SURVEY_DELAY_MS = 120_000
+const INITIAL_READ_TIMEOUT_MS = 2_000
 
 export function useFeedback(config: WidgetFeedbackConfig | undefined, transport: Transport, state: StoreState, handoffAvailable: boolean) {
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
   const [resolutionPrompt, setResolutionPrompt] = useState<FeedbackSurvey | null>(null)
   const [nextAction, setNextAction] = useState<FeedbackAction>('NONE')
   const [actionLocale, setActionLocale] = useState<string | null>(null)
-  const lastResolution = useRef<FeedbackSurvey | null>(null)
+  const lastResolution = useRef<FeedbackSurvey | null | undefined>(undefined)
   const initialRead = useRef<Promise<void> | null>(null)
   const candidate = useRef<{ lastMessageId: string | undefined } | null>(null)
   const cancelPrompt = useRef<(() => void) | null>(null)
@@ -32,14 +33,21 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     cancelPrompt.current?.()
   }
 
-  async function syncFeedback(afterSend = false, hadPrompt = false): Promise<void> {
+  async function syncFeedback({ afterSend = false, hadPrompt = false, initial = false } = {}): Promise<void> {
     syncRequest.current?.abort()
     const request = new AbortController()
     const startedAt = answerRevision.current
     syncRequest.current = request
+    let timeout: ReturnType<typeof setTimeout> | undefined
     try {
-      const result = await transport.feedbackState(request.signal)
-      if (request.signal.aborted) return
+      const pending = transport.feedbackState(request.signal)
+      const result = initial ? await Promise.race([
+        pending,
+        new Promise<null>(resolve => {
+          timeout = setTimeout(() => { resolve(null); request.abort() }, INITIAL_READ_TIMEOUT_MS)
+        }),
+      ]) : await pending
+      if (!result || request.signal.aborted) return
       const answers = new Map(result.answers.map(record => [record.messageId, record]))
       for (const [messageId, saved] of savedAnswers.current) {
         if (saved.revision > startedAt) answers.set(messageId, saved.record)
@@ -50,7 +58,8 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
       lastResolution.current = survey
       if (survey?.status === 'ANSWERED') {
         setResolutionPrompt(previous => previous ? survey : previous)
-        const newVote = previousSurvey?.status !== 'ANSWERED' || previousSurvey.expiresAt !== survey.expiresAt
+        const newVote = previousSurvey !== undefined
+          && (previousSurvey?.status !== 'ANSWERED' || previousSurvey.expiresAt !== survey.expiresAt)
         if (afterSend && newVote && survey.value === 0) {
           const legacyAction = hadPrompt ? (handoffAvailable ? 'OFFER_HANDOFF' : 'REFORMULATE') : 'NONE'
           const action = result.nextAction ?? legacyAction
@@ -65,6 +74,8 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
         setFeedback(null)
         setResolutionPrompt(null)
       }
+    } finally {
+      clearTimeout(timeout)
     }
   }
 
@@ -75,9 +86,9 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     setResolutionPrompt(null)
     setNextAction('NONE')
     setActionLocale(null)
-    lastResolution.current = null
+    lastResolution.current = undefined
     if (!config?.resolutionSurvey && !config?.teamSurvey && !config?.answerFeedback) return
-    initialRead.current = !teamResolved || !config.teamSurvey ? syncFeedback() : Promise.resolve()
+    initialRead.current = !teamResolved || !config.teamSurvey ? syncFeedback({ initial: true }) : Promise.resolve()
     return () => {
       initialRead.current = null
       syncRequest.current?.abort()
@@ -166,7 +177,7 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     const delivery = config?.resolutionSurvey && baseline ? baseline.then(send) : send()
     void delivery.finally(() => {
       if (baseline === initialRead.current && (config?.resolutionSurvey || (teamResolved && config?.teamSurvey))) {
-        void syncFeedback(true, hadPrompt)
+        void syncFeedback({ afterSend: true, hadPrompt })
       }
     })
   }
