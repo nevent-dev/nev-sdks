@@ -24,6 +24,8 @@ const ROOTS = ['packages/subscriptions/src', 'packages/chatbot/src', 'packages/w
 const CATALOGS = [
   /^packages\/subscriptions\/src\/newsletter\/i18n\//,
   /^packages\/chatbot\/src\/chatbot\/i18n-manager\.ts$/,
+  /^packages\/chatbot\/src\/chatbot\/ui\/renderer-labels\.ts$/,
+  /^packages\/widget\/src\/contract\/locale\.ts$/,
   /^packages\/widget\/src\/panel\/strings\.ts$/,
 ];
 
@@ -126,4 +128,65 @@ export function compare(found, baseline) {
   const added = found.filter(f => !baseline.includes(`${f.file}\t${f.literal}`));
   const fixed = baseline.filter(line => !keys.includes(line));
   return { added, fixed };
+}
+
+const PORTUGUESE_COPY = /(?<![\p{L}\p{M}])(?:você|vocês|conosco|arquivo|celular|conectando|reconectando|contato|senha|nova aba|subscripci[oó]n|subscricao|politica de privacidade|e-mail|tu|teu|tua)(?![\p{L}\p{M}])/iu;
+
+function objectBody(code, name) {
+  return new RegExp(`^\\w*\\s*const ${name}(?::[^\\n]+)? = \\{\\n([\\s\\S]*?)^\\}`, 'm').exec(code)?.[1] ?? '';
+}
+
+function keysAt(body, indent) {
+  return [...body.matchAll(new RegExp(`^${' '.repeat(indent)}([A-Za-z][\\w]*):`, 'gm'))].map(match => match[1]).sort();
+}
+
+export function localeMapProblems(name, entries, languages, keys, indent = 4) {
+  const problems = [];
+  const actual = Object.keys(entries).sort();
+  if (actual.join(',') !== [...languages].sort().join(',')) problems.push(`${name}: locales ${actual.join(', ')}`);
+  for (const [locale, body] of Object.entries(entries)) {
+    if (keys && keysAt(body, indent).join(',') !== keys.join(',')) {
+      problems.push(`${name}.${locale}: translation keys differ`);
+    }
+    if (locale === 'pt') {
+      const expression = body.match(PORTUGUESE_COPY)?.[0];
+      if (expression) problems.push(`${name}.pt: ${expression}`);
+    }
+  }
+  return problems;
+}
+
+export function scanLocaleMaps(repo = REPO) {
+  const read = file => stripComments(readFileSync(path.join(repo, file), 'utf8'));
+  const collect = (body, regexp) => Object.fromEntries([...body.matchAll(regexp)].map(([, key, value]) => [key, value]));
+  const newsletterRoot = 'packages/subscriptions/src/newsletter/i18n';
+  const registry = objectBody(read(`${newsletterRoot}/index.ts`), 'NEWSLETTER_LOCALES');
+  const newsletterLocales = [...registry.matchAll(/^  ([a-z]{2}),/gm)].map(([, locale]) => locale);
+  const newsletter = Object.fromEntries(newsletterLocales.map(locale => [locale, objectBody(read(`${newsletterRoot}/${locale}.ts`), locale)]));
+
+  const chatbot = 'packages/chatbot/src';
+  const supported = /\btype SupportedLocale = ([^;\n]+)/.exec(read(`${chatbot}/types.ts`))?.[1] ?? '';
+  const chatbotLocales = [...supported.matchAll(/'([a-z]{2})'/g)].map(([, locale]) => locale);
+  const catalog = collect(objectBody(read(`${chatbot}/chatbot/i18n-manager.ts`), 'TRANSLATIONS'), /^  ([a-z]{2}): \{\n([\s\S]*?)^  \},/gm);
+  const renderer = collect(objectBody(read(`${chatbot}/chatbot/ui/renderer-labels.ts`), 'LABELS'), /^  ([a-z]{2}): \{\n([\s\S]*?)^  \},/gm);
+
+  const widget = 'packages/widget/src';
+  const contract = read(`${widget}/contract/locale.ts`);
+  const widgetUnion = /\btype WidgetLocale = ([^;\n]+)/.exec(contract)?.[1] ?? '';
+  const widgetLocales = [...widgetUnion.matchAll(/'([a-z]{2})'/g)].map(([, locale]) => locale);
+  const titles = collect(objectBody(contract, 'WIDGET_TITLES'), /^  ([a-z]{2}): (.+),?$/gm);
+  const panel = read(`${widget}/panel/strings.ts`);
+  const panelLocales = /\bconst STRINGS: [^=]+ = \{ ([^}]+) \}/.exec(panel)?.[1].split(/,\s*/) ?? [];
+  const panelCatalogs = Object.fromEntries(panelLocales.map(locale => [locale, objectBody(panel, locale)]));
+  const maps = [
+    ['newsletter', newsletter, [...new Set([...newsletterLocales, 'pt'])], 2],
+    ['chatbot', catalog, chatbotLocales, 4],
+    ['chatbot-renderers', renderer, chatbotLocales, 4],
+    ['support-panel', panelCatalogs, widgetLocales, 2],
+    ['support-title', titles, widgetLocales, 0],
+  ];
+  return maps.flatMap(([name, entries, locales, indent]) => [
+    ...(!entries.es?.trim() ? [`${name}: Spanish reference catalogue missing`] : []),
+    ...localeMapProblems(name, entries, locales, indent ? keysAt(entries.es ?? '', indent) : undefined, indent),
+  ]);
 }

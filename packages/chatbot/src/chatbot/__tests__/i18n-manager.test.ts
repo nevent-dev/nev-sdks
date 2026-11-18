@@ -61,7 +61,7 @@ describe('I18nManager', () => {
       const i18n = new I18nManager('pt');
       expect(i18n.t('sendButton')).toBe('Enviar');
       expect(i18n.t('inputPlaceholder')).toBe('Escreva uma mensagem...');
-      expect(i18n.t('defaultTitle')).toBe('Converse conosco');
+      expect(i18n.t('defaultTitle')).toBe('Fale connosco');
     });
 
     it('should return multiple translations correctly per locale', () => {
@@ -95,7 +95,7 @@ describe('I18nManager', () => {
       expect(i18n.t('defaultTitle')).toBe('Xateja amb nosaltres');
 
       i18n.setLocale('pt');
-      expect(i18n.t('defaultTitle')).toBe('Converse conosco');
+      expect(i18n.t('defaultTitle')).toBe('Fale connosco');
 
       i18n.setLocale('en');
       expect(i18n.t('defaultTitle')).toBe('Chat with us');

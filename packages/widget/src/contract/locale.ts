@@ -4,7 +4,13 @@
 // las traducciones completas solo para detectar el idioma del host.
 export type WidgetLocale = 'es' | 'en' | 'ca' | 'pt'
 
-const SUPPORTED_LOCALES: readonly WidgetLocale[] = ['es', 'en', 'ca', 'pt']
+// Shared by the frame and its loader without bundling the panel strings.
+export const WIDGET_TITLES: Record<WidgetLocale, string> = {
+  es: 'Chat de ayuda',
+  en: 'Help chat',
+  ca: "Xat d'ajuda",
+  pt: 'Chat de apoio',
+}
 
 // Normaliza un candidato crudo (document.documentElement.lang del host,
 // config.locale del backend, cualquier subetiqueta BCP-47 con o sin región)
@@ -16,5 +22,5 @@ export function resolveLocale(candidate: string | null | undefined): WidgetLocal
   if (typeof candidate !== 'string') return null
   const base = candidate.trim().toLowerCase().split('-')[0]
   if (!base) return null
-  return (SUPPORTED_LOCALES as readonly string[]).includes(base) ? (base as WidgetLocale) : null
+  return Object.prototype.hasOwnProperty.call(WIDGET_TITLES, base) ? (base as WidgetLocale) : null
 }

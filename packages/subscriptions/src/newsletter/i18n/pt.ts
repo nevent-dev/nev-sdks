@@ -6,50 +6,50 @@ import type { NewsletterLabels } from './types';
 export const pt: NewsletterLabels = {
   // Form chrome
   formTitle: 'Subscreva a nossa newsletter',
-  formAriaLabel: 'Formulario de subscricao da newsletter',
+  formAriaLabel: 'Formulário de subscrição da newsletter',
 
   // Buttons
   submitButton: 'Subscrever',
-  loadingButton: 'A enviar...',
+  loadingButton: 'A enviar…',
 
   // Status messages
   successMessage:
-    'Subscricao realizada com sucesso! Ja esta a receber as nossas comunicacoes.',
-  errorMessage: 'Ocorreu um erro. Por favor, tente novamente.',
-  alreadySubscribed: 'Este email ja esta subscrito.',
-  invalidEmail: 'Por favor, introduza um email valido.',
-  offlineMessage: 'Sem ligacao a internet. Verifique a sua ligacao.',
-  retryMessage: 'A tentar ligar novamente...',
+    'Subscrição concluída. Já pode receber as nossas comunicações.',
+  errorMessage: 'Ocorreu um erro. Tente novamente.',
+  alreadySubscribed: 'Este endereço de email já está subscrito.',
+  invalidEmail: 'Introduza um endereço de email válido.',
+  offlineMessage: 'Sem ligação à Internet. Verifique a ligação.',
+  retryMessage: 'A tentar voltar a ligar…',
 
   // GDPR
   gdprText:
-    'Aceito o tratamento dos meus dados pessoais para receber comunicacoes comerciais e promocoes relacionadas com {{companyName}}, de acordo com a {{privacyPolicyLink}}.',
-  gdprRequired: 'Deve aceitar a politica de privacidade para continuar.',
-  privacyPolicyLabel: 'Politica de Privacidade',
+    'Aceito o tratamento dos meus dados pessoais para receber comunicações comerciais e promoções relacionadas com {{companyName}}, de acordo com a {{privacyPolicyLink}}.',
+  gdprRequired: 'Deve aceitar a política de privacidade para continuar.',
+  privacyPolicyLabel: 'Política de privacidade',
 
   // Default email field (when the API configuration brings none)
   emailLabel: 'Email',
-  emailPlaceholder: 'O seu email',
+  emailPlaceholder: 'Endereço de email',
 
-  firstNamePlaceholder: 'O seu nome',
+  firstNamePlaceholder: 'Nome próprio',
   lastNamePlaceholder: 'Apelidos',
   postalCodePlaceholder: 'Código postal',
   birthDatePlaceholder: 'Data de nascimento',
 
   // Validation
-  fieldRequired: '{{fieldName}} e obrigatorio',
-  fieldInvalid: '{{fieldName}} nao e valido',
-  invalidEmailFormat: 'Por favor, introduza um email valido',
-  invalidPhoneFormat: 'Por favor, introduza um telefone valido',
-  invalidNumberFormat: 'Por favor, introduza um numero valido',
-  invalidUrlFormat: 'Por favor, introduza um URL valido',
+  fieldRequired: 'Campo obrigatório: {{fieldName}}',
+  fieldInvalid: 'Valor inválido: {{fieldName}}',
+  invalidEmailFormat: 'Introduza um endereço de email válido',
+  invalidPhoneFormat: 'Introduza um número de telefone válido',
+  invalidNumberFormat: 'Introduza um número válido',
+  invalidUrlFormat: 'Introduza um URL válido',
 
   // Accessibility
-  statusRegionLabel: 'Estado do formulario',
+  statusRegionLabel: 'Estado do formulário',
   errorPrefix: 'Erro:',
   successPrefix: 'Sucesso:',
 
   // Widget unavailable (HTTP 422 from /config — tenant legal incomplete)
   widgetUnavailable:
-    'Formulario indisponivel. Entre em contato com o organizador do evento.',
+    'Formulário indisponível. Contacte a organização do evento.',
 };

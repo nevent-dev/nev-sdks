@@ -454,6 +454,7 @@ export class ChatbotWidget {
 
         // Create root element inside the shadow boundary
         this.rootElement = document.createElement('div');
+        this.hostElement.lang = this.i18n.getLocale();
         this.rootElement.className = 'nevent-chatbot-root';
         this.rootElement.setAttribute('data-theme', config.theme);
         renderTarget.appendChild(this.rootElement);

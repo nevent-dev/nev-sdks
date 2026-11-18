@@ -1,7 +1,7 @@
 // Guarda de texto fijo de los widgets (nevent-work#40, FAN-052). Uso: node --test scripts/widget-visible-text.test.mjs
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { compare, EXCEPTIONS, findInSource, readBaseline, scan } from './widget-visible-text.mjs';
+import { compare, EXCEPTIONS, findInSource, localeMapProblems, readBaseline, scan, scanLocaleMaps } from './widget-visible-text.mjs';
 
 test('ningún texto visible fuera de los catálogos, salvo la línea base (trinquete estricto)', () => {
   const { added, fixed } = compare(scan(), readBaseline());
@@ -53,4 +53,20 @@ test('cada excepción lleva su motivo', () => {
     assert.match(key, /\t/);
     assert.ok(reason && reason.length > 20, key);
   }
+});
+
+test('los mapas y catálogos tienen todas las claves para cada idioma ofrecido', () => {
+  assert.deepEqual(scanLocaleMaps(), []);
+});
+
+test('contraexperimento: un idioma, una clave o una traducción pt-PT que falta hacen fallar la guarda', () => {
+  const entries = {
+    es: "    title: 'Bienvenida',",
+    pt: "    other: 'Converse conosco',",
+  };
+  assert.deepEqual(localeMapProblems('chatbot', entries, ['es', 'en', 'pt'], ['title']), [
+    'chatbot: locales es, pt',
+    'chatbot.pt: translation keys differ',
+    'chatbot.pt: conosco',
+  ]);
 });
