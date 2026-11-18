@@ -173,6 +173,10 @@ describe('Encuestas de valoración', () => {
     })
   }
 
+  async function flushDelivery(): Promise<void> {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
+  }
+
   it('reserves the question after two minutes and sends No and handoff outside the model', async () => {
     vi.useFakeTimers()
     const transport = fakeTransport()
@@ -227,6 +231,7 @@ describe('Encuestas de valoración', () => {
       })
     const { root } = await mountPanel({ config, transport })
     await ask(root, 'No era eso')
+    await flushDelivery()
     expect(transport.send).toHaveBeenCalledWith('No era eso')
     expect(transport.feedbackState).toHaveBeenCalledTimes(2)
     expect(root.textContent).toContain('¿Te pasamos con una persona del equipo?')
@@ -235,10 +240,12 @@ describe('Encuestas de valoración', () => {
     const decline = [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'No, gracias')!
     await act(() => decline.click())
     await ask(root)
+    await flushDelivery()
     expect(root.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
     await cleanupMounted()
     const { root: reopened } = await mountPanel({ config, transport })
     await ask(reopened)
+    await flushDelivery()
     expect(reopened.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
   })
 
@@ -258,10 +265,31 @@ describe('Encuestas de valoración', () => {
     const { root } = await mountPanel({ config, transport })
     await ask(root, alreadyAnswered ? 'Otra pregunta' : 'No era eso')
     expect(transport.send).not.toHaveBeenCalled()
-    await act(async () => { finishInitialRead(); await Promise.resolve() })
+    finishInitialRead()
+    await flushDelivery()
     expect(transport.send).toHaveBeenCalledOnce()
     expect(transport.feedbackState).toHaveBeenCalledTimes(2)
     expect(root.textContent?.includes('¿Te pasamos con una persona del equipo?')).toBe(!alreadyAnswered)
+  })
+
+  it('delivers the first message if the initial feedback endpoint stalls', async () => {
+    vi.useFakeTimers()
+    const transport = fakeTransport()
+    vi.mocked(transport.feedbackState)
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValue({
+        ...noFeedback,
+        resolutionSurvey: { ...pending, status: 'ANSWERED', value: 0 },
+        nextAction: 'OFFER_HANDOFF',
+      })
+    const { root } = await mountPanel({ config, transport })
+    await ask(root)
+    expect(transport.send).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+    const request = vi.mocked(transport.feedbackState).mock.calls[0]?.[0]
+    expect(request?.aborted).toBe(true)
+    expect(transport.send).toHaveBeenCalledWith('¿A qué hora abren?')
+    expect(root.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
   })
 
   it('offers the new action after a subsequent episode is rated in the same session', async () => {
@@ -281,10 +309,12 @@ describe('Encuestas de valoración', () => {
       })
     const { root } = await mountPanel({ config, transport })
     await ask(root, 'No era eso')
+    await flushDelivery()
     expect(root.textContent).toContain('¿Te pasamos con una persona del equipo?')
     const decline = [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'No, gracias')!
     await act(() => decline.click())
     await ask(root, 'No era eso')
+    await flushDelivery()
     expect(root.querySelector('.sr-only[role=status]')?.textContent).toBe(STRINGS.es.reformulate)
   })
 
