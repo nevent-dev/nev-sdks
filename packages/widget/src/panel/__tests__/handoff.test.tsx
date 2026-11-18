@@ -48,12 +48,13 @@ describe('ResolvedCard', () => {
     const root: HTMLElement = await mount(<ResolvedCard agentName="Laura" /> as VNode)
     expect(root.querySelector('.feedback')).toBeNull()
     expect(root.querySelector('.ttl')?.textContent).toBe('Conversación resuelta')
+    expect(root.textContent).toContain('Laura resolvió tu consulta.')
   })
   it('renders the team rating when the survey is pending and records a rating immediately', async () => {
     const onRate = vi.fn(async () => {})
     const root = await mount(
-      <ResolvedCard agentName="Laura">
-        <TeamSurvey survey={{ status: 'PENDING', value: null, expiresAt: null }} onRate={onRate} onUnavailable={vi.fn()} />
+      <ResolvedCard agentName="Laura" feedbackEnabled>
+        <TeamSurvey survey={{ status: 'PENDING', value: null, locale: 'es', expiresAt: null }} onRate={onRate} onUnavailable={vi.fn()} />
       </ResolvedCard>
     )
     const choices = [...root.querySelectorAll<HTMLButtonElement>('.feedback button')]

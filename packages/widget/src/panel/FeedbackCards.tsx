@@ -1,4 +1,4 @@
-import { useRef, useState } from 'preact/hooks'
+import { useId, useRef, useState } from 'preact/hooks'
 import type { FeedbackAction, FeedbackSurvey } from '../contract/feedback'
 import { FeedbackUnavailable } from '../transport/feedback'
 import { useStrings } from './strings'
@@ -49,12 +49,14 @@ export function ResolutionCard({ survey, nextAction, onAnswer, onHandoff, onDism
   const strings = useStrings()
   const { busy, retry, submit } = useSubmission(onUnavailable)
   const answered = survey.status === 'ANSWERED'
+  const questionId = useId()
+  const handoffId = useId()
 
   return (
     <>
-      <div class="syscard survey" aria-label={strings.resolutionQuestion}>
-        <div class="ttl">{strings.resolutionQuestion}</div>
-        <div class="feedback">
+      <div class="syscard survey">
+        <div class="ttl" id={questionId}>{strings.resolutionQuestion}</div>
+        <div class="feedback" role="group" aria-labelledby={questionId}>
           <button type="button" disabled={busy || answered} aria-pressed={survey.value === 1}
             onClick={() => void submit(() => onAnswer(1))}>{strings.yes}</button>
           <button type="button" disabled={busy || answered} aria-pressed={survey.value === 0}
@@ -70,8 +72,8 @@ export function ResolutionCard({ survey, nextAction, onAnswer, onHandoff, onDism
       )}
       {nextAction === 'OFFER_HANDOFF' && (
         <div class="syscard survey">
-          <div class="ttl">{strings.offerHandoff}</div>
-          <div class="feedback">
+          <div class="ttl" id={handoffId}>{strings.offerHandoff}</div>
+          <div class="feedback" role="group" aria-labelledby={handoffId}>
             <button type="button" disabled={busy} onClick={() => void submit(onHandoff)}>{strings.acceptHandoff}</button>
             <button type="button" disabled={busy} onClick={onDismissHandoff}>{strings.declineHandoff}</button>
           </div>
@@ -96,6 +98,7 @@ export function TeamSurvey({ survey, onRate, onUnavailable }: TeamSurveyProps) {
   const [comment, setComment] = useState('')
   const [thanked, setThanked] = useState(false)
   const answered = survey.status === 'ANSWERED'
+  const questionId = useId()
   const choices = [
     { value: 3, face: '😊', label: strings.teamGood },
     { value: 2, face: '😐', label: strings.teamFair },
@@ -122,8 +125,8 @@ export function TeamSurvey({ survey, onRate, onUnavailable }: TeamSurveyProps) {
 
   return (
     <div class="team-survey">
-      <div class="ttl">{strings.teamQuestion}</div>
-      <div class="feedback">
+      <div class="ttl" id={questionId}>{strings.teamQuestion}</div>
+      <div class="feedback" role="group" aria-labelledby={questionId}>
         {choices.map(({ value, face, label }) => (
           <button key={value} type="button" disabled={busy || answered} aria-pressed={survey.value === value}
             onClick={() => rate(value)}><span aria-hidden="true">{face}</span> {label}</button>

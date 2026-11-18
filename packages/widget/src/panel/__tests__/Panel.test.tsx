@@ -147,7 +147,7 @@ describe('Encuestas de valoración', () => {
     ...fixtureConfig(),
     feedback: { resolutionSurvey: true, teamSurvey: true, answerFeedback: false },
   }
-  const pending = { status: 'PENDING', value: null, expiresAt: null } as const
+  const pending = { status: 'PENDING', value: null, locale: 'es', expiresAt: null } as const
   const noFeedback = { resolutionSurvey: null, teamSurvey: null, answers: [] }
 
   afterEach(() => vi.useRealTimers())
@@ -221,7 +221,7 @@ describe('Encuestas de valoración', () => {
     vi.mocked(transport.feedbackState)
       .mockResolvedValueOnce({
         ...noFeedback,
-        teamSurvey: { status: 'ELIGIBLE', value: null, expiresAt: null, availableAt: new Date(Date.now() + 38_000).toISOString() },
+        teamSurvey: { status: 'ELIGIBLE', value: null, locale: 'es', expiresAt: null, availableAt: new Date(Date.now() + 38_000).toISOString() },
       })
       .mockResolvedValue({ ...noFeedback, teamSurvey: pending })
     vi.mocked(transport.feedback).mockResolvedValue({
@@ -246,6 +246,46 @@ describe('Encuestas de valoración', () => {
     expect(transport.feedback).toHaveBeenLastCalledWith({
       kind: 'AGENT', value: 2, comment: 'Me habría ayudado una respuesta más rápida.',
     })
+  })
+
+  it.each([
+    ['en-GB', 'Did we resolve your question?'],
+    ['ar', null],
+    [null, null],
+  ] as const)('uses the conversation locale %s and announces the new question without moving focus', async (locale, question) => {
+    vi.useFakeTimers()
+    const transport = fakeTransport()
+    vi.mocked(transport.promptResolution).mockResolvedValue({ ...noFeedback, resolutionSurvey: { ...pending, locale } })
+    const { root } = await mountPanel({ config, transport })
+    const composer = await ask(root)
+    composer.focus()
+    await botReply(transport.store)
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000) })
+    expect(root.querySelector('.survey .ttl')?.textContent ?? null).toBe(question)
+    expect(root.querySelector('.sr-only[role=status]')?.textContent).toBe(question ?? '')
+    expect(document.activeElement).toBe(composer)
+  })
+
+  it('keeps the previous team question hidden during a delayed read after a second resolution', async () => {
+    const transport = fakeTransport()
+    transport.store.applySnapshot({ messages: [], state: 'RESOLVED', snapshotCursor: 'evt_v1_demo_1' })
+    vi.mocked(transport.feedbackState)
+      .mockResolvedValueOnce({ ...noFeedback, teamSurvey: pending })
+      .mockImplementationOnce(() => new Promise(resolve => {
+        completeSecondRead = () => resolve(noFeedback)
+      }))
+    let completeSecondRead: () => void = () => {}
+    const { root } = await mountPanel({ config, transport })
+    expect(root.querySelector('.team-survey')).not.toBeNull()
+    await act(() => {
+      transport.store.applySnapshot({ messages: [], state: 'AGENT_ACTIVE', snapshotCursor: 'evt_v1_demo_2' })
+    })
+    await act(() => {
+      transport.store.applySnapshot({ messages: [], state: 'RESOLVED', snapshotCursor: 'evt_v1_demo_3' })
+    })
+    expect(root.querySelector('.team-survey')).toBeNull()
+    await act(async () => { completeSecondRead(); await Promise.resolve() })
+    expect(root.querySelector('.team-survey')).toBeNull()
   })
 
   it('polls the team survey when resolved and cancels the delayed check if it reopens', async () => {

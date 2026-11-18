@@ -21,6 +21,7 @@ export interface FeedbackRecord {
 export interface FeedbackSurvey {
   status: 'UNAVAILABLE' | 'ELIGIBLE' | 'PENDING' | 'ANSWERED' | 'EXPIRED'
   value: number | null
+  locale: string | null
   expiresAt: string | null
   availableAt?: string | null
 }

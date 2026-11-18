@@ -228,8 +228,8 @@ export function FixturesApp() {
       <section style={{ maxWidth: '320px' }}>
         <h2>Fuera del set de 10 estados</h2>
         <h3>Conversación resuelta con encuesta</h3>
-        <ResolvedCard agentName="Laura">
-          <TeamSurvey survey={{ status: 'PENDING', value: null, expiresAt: null }}
+        <ResolvedCard agentName="Laura" feedbackEnabled>
+          <TeamSurvey survey={{ status: 'PENDING', value: null, locale: 'es', expiresAt: null }}
             onRate={async () => {}} onUnavailable={() => {}} />
         </ResolvedCard>
         <p style={{ fontSize: '13px', color: '#555', marginTop: '16px' }}>

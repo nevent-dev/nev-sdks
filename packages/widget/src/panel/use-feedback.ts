@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
 import type { FeedbackAction, FeedbackState, FeedbackSurvey, WidgetFeedbackConfig } from '../contract/feedback'
 import type { StoreState } from '../store/message-store'
 import type { Transport } from '../transport'
@@ -58,10 +58,13 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     return () => syncRequest.current?.abort()
   }, [transport, config])
 
-  useEffect(() => {
-    if (!teamResolved || !config?.teamSurvey) return
-    void syncFeedback()
-    return () => syncRequest.current?.abort()
+  useLayoutEffect(() => {
+    if (!config?.teamSurvey) return
+    setFeedback(previous => previous && { ...previous, teamSurvey: null })
+    if (teamResolved) {
+      void syncFeedback()
+      return () => syncRequest.current?.abort()
+    }
   }, [teamResolved, config?.teamSurvey, transport])
 
   useEffect(() => {

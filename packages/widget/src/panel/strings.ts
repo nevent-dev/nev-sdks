@@ -42,7 +42,7 @@ export interface WidgetStrings {
   handoffTitle: string
   handoffDesc: string
   joinedSuffix: string
-  resolvedByAgent: (agentName: string) => string
+  resolvedByAgent: (agentName: string, feedbackEnabled?: boolean) => string
   resolvedGeneric: string
   resolvedTail: string
   agentTyping: string
@@ -105,7 +105,7 @@ const es: WidgetStrings = {
   handoffTitle: 'Te pasamos con el equipo',
   handoffDesc: 'El equipo te atenderá en breve. Puedes seguir escribiendo mientras tanto.',
   joinedSuffix: 'se ha unido',
-  resolvedByAgent: (agentName) => `${agentName} ha resuelto tu consulta.`,
+  resolvedByAgent: (agentName, feedbackEnabled) => `${agentName} ${feedbackEnabled ? 'ha resuelto' : 'resolvió'} tu consulta.`,
   resolvedGeneric: 'Tu consulta ha sido resuelta.',
   resolvedTail: 'Si necesitas algo más, escribe y volvemos al momento.',
   agentTyping: 'El agente está escribiendo',

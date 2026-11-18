@@ -44,17 +44,18 @@ export function TypingDots() {
 
 export interface ResolvedCardProps {
   agentName: string | null
+  feedbackEnabled?: boolean
   children?: ComponentChildren
 }
 
-export function ResolvedCard({ agentName, children }: ResolvedCardProps) {
+export function ResolvedCard({ agentName, feedbackEnabled, children }: ResolvedCardProps) {
   const strings = useStrings()
   return (
     <div class="syscard resolved">
       <div role="status">
         <div class="ttl">{strings.stateResolved}</div>
         <div class="dsc">
-          {agentName !== null ? strings.resolvedByAgent(agentName) : strings.resolvedGeneric} {strings.resolvedTail}
+          {agentName !== null ? strings.resolvedByAgent(agentName, feedbackEnabled) : strings.resolvedGeneric} {strings.resolvedTail}
         </div>
       </div>
       {children}
