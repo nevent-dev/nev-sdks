@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
+import { act } from 'preact/test-utils'
 import { Panel } from '../Panel'
 import { createMessageStore } from '../../store/message-store'
 import { fixtureConfig } from '../../contract/fixtures'
@@ -9,6 +10,10 @@ function fakeTransport(store = createMessageStore(() => '2026-07-18T14:00:00.000
   return {
     store,
     send: vi.fn(async () => {}),
+    feedbackState: vi.fn(async () => ({ resolutionSurvey: null, teamSurvey: null, answers: [] })),
+    promptResolution: vi.fn(async () => ({ resolutionSurvey: null, teamSurvey: null, answers: [] })),
+    feedback: vi.fn(async () => { throw new Error('No feedback response configured') }),
+    acceptFeedbackHandoff: vi.fn(async () => {}),
     retry: vi.fn(async () => {}),
     cancel: vi.fn(),
     openChannel: vi.fn(),
@@ -55,7 +60,7 @@ describe('Panel', () => {
     expect(root.querySelector('.welcome')).toBeNull() // Important #9: nunca Welcome fuera de fase idle
   })
 
-  it('gap #5 — fase RESOLVED: ResolvedCard se pinta SIN botones de feedback (Panel no pasa onFeedback)', async () => {
+  it('fase RESOLVED con valoraciones deshabilitadas conserva la tarjeta sin encuesta', async () => {
     const store = createMessageStore(() => '2026-07-18T14:00:00.000Z')
     store.applySnapshot({ messages: [], state: 'RESOLVED', snapshotCursor: 'evt_v1_c_1' })
     const { root } = await mountPanel({ transport: fakeTransport(store) })
@@ -134,5 +139,128 @@ describe('Panel', () => {
   it('Task W4 — sin newConversationNotice (caso normal), NewConversationCard no se pinta', async () => {
     const { root } = await mountPanel()
     expect(root.querySelector('.syscard.new-conversation')).toBeNull()
+  })
+})
+
+describe('Encuestas de valoración', () => {
+  const config = {
+    ...fixtureConfig(),
+    feedback: { resolutionSurvey: true, teamSurvey: true, answerFeedback: false },
+  }
+  const pending = { status: 'PENDING', value: null, expiresAt: null } as const
+  const noFeedback = { resolutionSurvey: null, teamSurvey: null, answers: [] }
+
+  afterEach(() => vi.useRealTimers())
+
+  async function ask(root: HTMLElement): Promise<HTMLTextAreaElement> {
+    const composer = root.querySelector<HTMLTextAreaElement>('.composer textarea')!
+    await act(() => {
+      composer.value = '¿A qué hora abren?'
+      composer.dispatchEvent(new Event('input', { bubbles: true }))
+      composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    })
+    return composer
+  }
+
+  async function botReply(store: Transport['store']): Promise<void> {
+    await act(() => {
+      store.applyDurableEvent({
+        eventId: 'evt_v1_demo_1', schemaVersion: 1, conversationId: 'demo', occurredAt: '2026-07-18T14:00:02.000Z',
+        type: 'message.created', payload: { messageId: 'reply', role: 'bot', text: 'A las 18:00' },
+      })
+    })
+  }
+
+  it('reserves the question after two minutes and sends No and handoff outside the model', async () => {
+    vi.useFakeTimers()
+    const transport = fakeTransport()
+    vi.mocked(transport.promptResolution).mockResolvedValue({ ...noFeedback, resolutionSurvey: pending })
+    vi.mocked(transport.feedback).mockResolvedValue({
+      feedback: { id: 'r1', kind: 'RESOLVED', value: 0, messageId: null, comment: null, createdAt: '2026-07-18T14:02:02Z', reasons: [] },
+      nextAction: 'OFFER_HANDOFF',
+    })
+    const { root } = await mountPanel({ config, transport })
+    await ask(root)
+    await botReply(transport.store)
+    await act(async () => { await vi.advanceTimersByTimeAsync(119_999) })
+    expect(transport.promptResolution).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+    expect(transport.promptResolution).toHaveBeenCalledTimes(1)
+    const no = [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'No')!
+    await act(async () => { no.click(); await Promise.resolve() })
+    expect(transport.feedback).toHaveBeenCalledWith({ kind: 'RESOLVED', value: 0 })
+    expect(no.getAttribute('aria-pressed')).toBe('true')
+    const handoff = [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'Sí, con una persona')!
+    await act(async () => { handoff.click(); await Promise.resolve() })
+    expect(transport.acceptFeedbackHandoff).toHaveBeenCalledOnce()
+    expect(transport.send).toHaveBeenCalledOnce()
+  })
+
+  it('cancels the timer on typing, and opening again does not offer a historical reply', async () => {
+    vi.useFakeTimers()
+    const transport = fakeTransport()
+    const { root } = await mountPanel({ config, transport })
+    const composer = await ask(root)
+    await botReply(transport.store)
+    await act(() => {
+      composer.value = 'Otra pregunta'
+      composer.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000) })
+    expect(transport.promptResolution).not.toHaveBeenCalled()
+    await cleanupMounted()
+    await mountPanel({ config, transport })
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000) })
+    expect(transport.promptResolution).not.toHaveBeenCalled()
+  })
+
+  it('uses the server due time and records the team rating before the optional comment', async () => {
+    vi.useFakeTimers()
+    const transport = fakeTransport()
+    transport.store.applySnapshot({ messages: [], state: 'RESOLVED', snapshotCursor: 'evt_v1_demo_1' })
+    vi.mocked(transport.feedbackState)
+      .mockResolvedValueOnce({
+        ...noFeedback,
+        teamSurvey: { status: 'ELIGIBLE', value: null, expiresAt: null, availableAt: new Date(Date.now() + 38_000).toISOString() },
+      })
+      .mockResolvedValue({ ...noFeedback, teamSurvey: pending })
+    vi.mocked(transport.feedback).mockResolvedValue({
+      feedback: { id: 'r1', kind: 'AGENT', value: 2, messageId: null, comment: null, createdAt: '2026-07-18T14:02:02Z', reasons: [] },
+      nextAction: 'NONE',
+    })
+    const { root } = await mountPanel({ config, transport })
+    await act(async () => { await vi.advanceTimersByTimeAsync(37_999) })
+    expect(root.querySelector('.team-survey')).toBeNull()
+    await act(async () => { await vi.advanceTimersByTimeAsync(1) })
+    const fair = [...root.querySelectorAll('button')].find(button => button.textContent?.includes('Regular'))!
+    await act(async () => { fair.click(); await Promise.resolve() })
+    expect(transport.feedback).toHaveBeenCalledWith({ kind: 'AGENT', value: 2 })
+    const comment = root.querySelector<HTMLTextAreaElement>('.feedback-comment textarea')!
+    expect(comment.maxLength).toBe(1000)
+    await act(() => {
+      comment.value = 'Me habría ayudado una respuesta más rápida.'
+      comment.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    const send = root.querySelector<HTMLButtonElement>('.feedback-comment button')!
+    await act(async () => { send.click(); await Promise.resolve() })
+    expect(transport.feedback).toHaveBeenLastCalledWith({
+      kind: 'AGENT', value: 2, comment: 'Me habría ayudado una respuesta más rápida.',
+    })
+  })
+
+  it('polls the team survey when resolved and cancels the delayed check if it reopens', async () => {
+    vi.useFakeTimers()
+    const transport = fakeTransport()
+    const { root } = await mountPanel({ config, transport })
+    await act(() => {
+      transport.store.applySnapshot({ messages: [], state: 'RESOLVED', snapshotCursor: 'evt_v1_demo_1' })
+    })
+    expect(root.querySelector('.team-survey')).toBeNull()
+    expect(transport.feedbackState).toHaveBeenCalledTimes(2)
+    await act(() => {
+      transport.store.applySnapshot({ messages: [], state: 'AGENT_ACTIVE', snapshotCursor: 'evt_v1_demo_2' })
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(120_000) })
+    expect(transport.feedbackState).toHaveBeenCalledTimes(2)
   })
 })

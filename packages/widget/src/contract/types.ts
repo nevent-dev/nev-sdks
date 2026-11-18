@@ -1,4 +1,5 @@
 import type { WidgetLocale } from './locale'
+import type { WidgetFeedbackConfig } from './feedback'
 
 export type { WidgetLocale } from './locale'
 
@@ -27,6 +28,7 @@ export interface WidgetConfig {
     logoUrl?: string | null
   }
   features: { upload: boolean; handoff: boolean }
+  feedback?: WidgetFeedbackConfig
   // Opcional: normalizado en runtime en shell/session.ts (Task 15) — nunca
   // se confía en el shape tal cual llega de red. Ver "Brechas de contrato" #6.
   welcome?: { title: string; subtitle: string; quickReplies: string[] }
@@ -89,7 +91,7 @@ export type ConversationState = 'BOT_ACTIVE' | 'ESCALATED_WAITING' | 'AGENT_ACTI
 export type TurnStreamFrame =
   | { type: 'accepted'; turnId: string; userMessageId: string }
   | { type: 'delta'; turnId: string; seq: number; delta: string }
-  | { type: 'done'; turnId: string; messageId: string; eventId: string }
+  | { type: 'done'; turnId: string; messageId: string | null; eventId: string | null }
   | { type: 'error'; code: string }
 
 // Ephemeral inbound events (TTL, no cursor/replay) per backend §4.3.

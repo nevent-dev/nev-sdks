@@ -40,7 +40,19 @@ declare module 'vitest' {
 expect.extend(axeMatchers)
 
 function fakeTransport(store: MessageStore): Transport {
-  return { store, send: async () => {}, retry: async () => {}, cancel: () => {}, openChannel: () => {}, closeChannel: () => {}, destroy: () => {} }
+  return {
+    store,
+    send: async () => {},
+    retry: async () => {},
+    cancel: () => {},
+    openChannel: () => {},
+    closeChannel: () => {},
+    destroy: () => {},
+    feedbackState: async () => ({ resolutionSurvey: null, teamSurvey: null, answers: [] }),
+    promptResolution: async () => ({ resolutionSurvey: null, teamSurvey: null, answers: [] }),
+    feedback: async () => { throw new Error('No feedback response configured') },
+    acceptFeedbackHandoff: async () => {},
+  }
 }
 
 async function mountPanel(configure: (store: MessageStore) => void): Promise<HTMLElement> {

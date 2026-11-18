@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks'
+import type { ComponentChildren } from 'preact'
 import { AgentAvatar } from './icons'
 import { useStrings } from './strings'
 
@@ -44,33 +44,20 @@ export function TypingDots() {
 
 export interface ResolvedCardProps {
   agentName: string | null
-  // Opcional A PROPÓSITO (gap #5): el panel INTEGRADO (Task 13) no lo pasa —
-  // sin transport.feedback() real, mostrar botones que "funcionan" sería
-  // fingir un éxito que no persiste en ningún sitio. Solo el harness de
-  // fixtures (Task 16) lo pasa, para demostrar la interacción visual.
-  onFeedback?: (value: 'up' | 'down') => void
+  children?: ComponentChildren
 }
 
-export function ResolvedCard({ agentName, onFeedback }: ResolvedCardProps) {
+export function ResolvedCard({ agentName, children }: ResolvedCardProps) {
   const strings = useStrings()
-  const [selected, setSelected] = useState<'up' | 'down' | null>(null)
-  const handle = (value: 'up' | 'down'): void => {
-    if (!onFeedback) return
-    setSelected(value)
-    onFeedback(value)
-  }
   return (
-    <div class="syscard resolved" role="status">
-      <div class="ttl">{strings.stateResolved}</div>
-      <div class="dsc">
-        {agentName !== null ? strings.resolvedByAgent(agentName) : strings.resolvedGeneric} {strings.resolvedTail}
-      </div>
-      {onFeedback && (
-        <div class="feedback">
-          <button type="button" aria-label={strings.rateUp} aria-pressed={selected === 'up'} onClick={() => handle('up')}>👍</button>
-          <button type="button" aria-label={strings.rateDown} aria-pressed={selected === 'down'} onClick={() => handle('down')}>👎</button>
+    <div class="syscard resolved">
+      <div role="status">
+        <div class="ttl">{strings.stateResolved}</div>
+        <div class="dsc">
+          {agentName !== null ? strings.resolvedByAgent(agentName) : strings.resolvedGeneric} {strings.resolvedTail}
         </div>
-      )}
+      </div>
+      {children}
     </div>
   )
 }

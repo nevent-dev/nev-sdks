@@ -8,6 +8,7 @@ import { Composer } from '../src/panel/Composer'
 import { CardCarousel, type CardItem } from '../src/panel/CardCarousel'
 import { FileBubble } from '../src/panel/FileBubble'
 import { ResolvedCard, AgentJoinedSysline } from '../src/panel/handoff'
+import { TeamSurvey } from '../src/panel/FeedbackCards'
 import { computeViewState } from '../src/panel/view-state'
 import { createMessageStore, type MessageStore, type StoredMessage } from '../src/store/message-store'
 import { fixtureConfig } from '../src/contract/fixtures'
@@ -64,7 +65,19 @@ function contactTransport(locale: WidgetLocale, blocks: Array<{ display: string 
 function fakeTransport(configure: (store: MessageStore) => void): Transport {
   const store = createMessageStore(() => '2026-07-18T14:00:00.000Z')
   configure(store)
-  return { store, send: async () => {}, retry: async () => {}, cancel: () => {}, openChannel: () => {}, closeChannel: () => {}, destroy: () => {} }
+  return {
+    store,
+    send: async () => {},
+    retry: async () => {},
+    cancel: () => {},
+    openChannel: () => {},
+    closeChannel: () => {},
+    destroy: () => {},
+    feedbackState: async () => ({ resolutionSurvey: null, teamSurvey: null, answers: [] }),
+    promptResolution: async () => ({ resolutionSurvey: null, teamSurvey: null, answers: [] }),
+    feedback: async () => { throw new Error('No feedback response configured') },
+    acceptFeedbackHandoff: async () => {},
+  }
 }
 
 function buildTransport(state: string): Transport {
@@ -207,20 +220,18 @@ export function FixturesApp() {
         {state !== 'launcher' && state !== 'rich' && state !== 'upload' && (
           <StringsContext.Provider value={STRINGS[localeOf(state)]}>
             <Panel key={state} config={{ ...fixtureConfig(), assistantName: state.startsWith('contact') ? 'MYA Valencia' : fixtureConfig().assistantName }}
-              transport={buildTransport(state)} onMinimize={() => {}} onClose={() => {}} onResize={() => {}}
+              transport={buildTransport(state)} onClose={() => {}} onResize={() => {}}
               viewportKind="desktop" viewportHeight={900} />
           </StringsContext.Provider>
         )}
       </main>
       <section style={{ maxWidth: '320px' }}>
         <h2>Fuera del set de 10 estados</h2>
-        <p style={{ fontSize: '13px', color: '#555' }}>
-          El feedback de ResolvedCard SOLO existe aquí: el panel integrado no
-          le pasa <code>onFeedback</code> (gap #5) porque no hay
-          `transport.feedback()` real que lo persista.
-        </p>
-        <h3>resolved + feedback (demo, no en producción)</h3>
-        <ResolvedCard agentName="Laura" onFeedback={(v) => console.log('feedback demo:', v)} />
+        <h3>Conversación resuelta con encuesta</h3>
+        <ResolvedCard agentName="Laura">
+          <TeamSurvey survey={{ status: 'PENDING', value: null, expiresAt: null }}
+            onRate={async () => {}} onUnavailable={() => {}} />
+        </ResolvedCard>
         <p style={{ fontSize: '13px', color: '#555', marginTop: '16px' }}>
           AgentJoinedSysline (gap #4 revertido, Important ronda 3): el
           componente sigue existiendo para paridad visual con el mock, pero

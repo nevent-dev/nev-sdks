@@ -6,12 +6,13 @@ export interface ComposerProps {
   viewState: PanelViewState
   onSend: (text: string) => void
   onStop: () => void
+  onType?: () => void
   // features.upload de la instalación: sin subida implementada/activa, el clip NI SE PINTA —
   // un control permanentemente deshabilitado es una affordance muerta (y en móvil sin tooltip).
-  uploadEnabled: boolean
+  uploadEnabled?: boolean
 }
 
-export function Composer({ viewState, onSend, onStop, uploadEnabled }: ComposerProps) {
+export function Composer({ viewState, onSend, onStop, onType, uploadEnabled = false }: ComposerProps) {
   const strings = useStrings()
   const [draft, setDraft] = useState('')
   // Se lee del DOM (no del cierre sobre `draft`) porque el `setState` del
@@ -57,7 +58,10 @@ export function Composer({ viewState, onSend, onStop, uploadEnabled }: ComposerP
           placeholder={viewState.composerPlaceholder}
           aria-label={strings.composerAria}
           disabled={viewState.composerDisabled}
-          onInput={(e) => setDraft((e.target as HTMLTextAreaElement).value)}
+          onInput={(e) => {
+            onType?.()
+            setDraft(e.currentTarget.value)
+          }}
           onKeyDown={onKeyDown}
         />
         {uploadEnabled && (
