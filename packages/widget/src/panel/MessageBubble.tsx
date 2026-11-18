@@ -98,16 +98,16 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
           </div>
         )}
         {!isUser && !message.streaming && (
-          <div class="assistant-meta">
-            <div class="meta">{formatTime(message.createdAt, strings.timeLocale)}</div>
-            {answerLocale && submitRating && (
+          answerLocale && submitRating ? (
+            <div class="assistant-meta">
+              <div class="meta">{formatTime(message.createdAt, strings.timeLocale)}</div>
               <StringsContext.Provider value={STRINGS[answerLocale]}>
                 <div class="answer-feedback-locale" lang={answerLocale}>
                   <AnswerFeedback messageId={message.id} rating={rating} submitRating={submitRating} />
                 </div>
               </StringsContext.Provider>
-            )}
-          </div>
+            </div>
+          ) : <div class="meta">{formatTime(message.createdAt, strings.timeLocale)}</div>
         )}
       </div>
     </div>
