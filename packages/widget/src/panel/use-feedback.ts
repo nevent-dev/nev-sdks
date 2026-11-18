@@ -133,8 +133,9 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
     const hadPrompt = resolutionPrompt?.status === 'PENDING'
     const baseline = initialRead.current
-    void send().finally(async () => {
-      await baseline
+    // The initial read must reach the server before the message can record a vote.
+    const delivery = config?.resolutionSurvey && baseline ? baseline.then(send) : send()
+    void delivery.finally(() => {
       if (baseline === initialRead.current && (config?.resolutionSurvey || (teamResolved && config?.teamSurvey))) {
         void syncFeedback(true, hadPrompt)
       }
