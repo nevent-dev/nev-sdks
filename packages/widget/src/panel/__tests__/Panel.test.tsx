@@ -215,6 +215,34 @@ describe('Encuestas de valoración', () => {
     expect(transport.promptResolution).not.toHaveBeenCalled()
   })
 
+  it('offers handoff after an unprompted negative reply without showing a resolution question', async () => {
+    const transport = fakeTransport()
+    vi.mocked(transport.feedbackState)
+      .mockResolvedValueOnce(noFeedback)
+      .mockResolvedValue({
+        ...noFeedback,
+        resolutionSurvey: { ...pending, status: 'ANSWERED', value: 0 },
+        nextAction: 'OFFER_HANDOFF',
+      })
+    const { root } = await mountPanel({ config, transport })
+    const composer = root.querySelector<HTMLTextAreaElement>('.composer textarea')!
+    await act(async () => {
+      composer.value = 'No era eso'
+      composer.dispatchEvent(new Event('input', { bubbles: true }))
+      composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      await Promise.resolve()
+    })
+    expect(transport.send).toHaveBeenCalledWith('No era eso')
+    expect(transport.feedbackState).toHaveBeenCalledTimes(2)
+    expect(root.textContent).toContain('¿Te pasamos con una persona del equipo?')
+    expect(root.textContent).not.toContain('¿Hemos resuelto tu consulta?')
+    expect(transport.feedback).not.toHaveBeenCalled()
+    const decline = [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'No, gracias')!
+    await act(() => decline.click())
+    await ask(root)
+    expect(root.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
+  })
+
   it('uses the server due time and records the team rating before the optional comment', async () => {
     vi.useFakeTimers()
     const transport = fakeTransport()

@@ -37,7 +37,7 @@ export function FeedbackError({ retry }: { retry: (() => void) | null }) {
 }
 
 interface ResolutionCardProps {
-  survey: FeedbackSurvey
+  survey: FeedbackSurvey | null
   nextAction: FeedbackAction
   onAnswer: (value: 0 | 1) => Promise<void>
   onHandoff: () => Promise<void>
@@ -48,23 +48,25 @@ interface ResolutionCardProps {
 export function ResolutionCard({ survey, nextAction, onAnswer, onHandoff, onDismissHandoff, onUnavailable }: ResolutionCardProps) {
   const strings = useStrings()
   const { busy, retry, submit } = useSubmission(onUnavailable)
-  const answered = survey.status === 'ANSWERED'
+  const answered = survey?.status === 'ANSWERED'
   const questionId = useId()
   const handoffId = useId()
 
   return (
     <>
-      <div class="syscard survey">
-        <div class="ttl" id={questionId}>{strings.resolutionQuestion}</div>
-        <div class="feedback" role="group" aria-labelledby={questionId}>
-          <button type="button" disabled={busy || answered} aria-pressed={survey.value === 1}
-            onClick={() => void submit(() => onAnswer(1))}>{strings.yes}</button>
-          <button type="button" disabled={busy || answered} aria-pressed={survey.value === 0}
-            onClick={() => void submit(() => onAnswer(0))}>{strings.no}</button>
+      {survey && (
+        <div class="syscard survey">
+          <div class="ttl" id={questionId}>{strings.resolutionQuestion}</div>
+          <div class="feedback" role="group" aria-labelledby={questionId}>
+            <button type="button" disabled={busy || answered} aria-pressed={survey.value === 1}
+              onClick={() => void submit(() => onAnswer(1))}>{strings.yes}</button>
+            <button type="button" disabled={busy || answered} aria-pressed={survey.value === 0}
+              onClick={() => void submit(() => onAnswer(0))}>{strings.no}</button>
+          </div>
+          <FeedbackError retry={nextAction === 'OFFER_HANDOFF' ? null : retry} />
         </div>
-        <FeedbackError retry={nextAction === 'OFFER_HANDOFF' ? null : retry} />
-      </div>
-      {answered && survey.value === 1 && (
+      )}
+      {answered && survey?.value === 1 && (
         <div class="syscard resolved" role="status">
           <div class="ttl">{strings.stateResolved}</div>
           <div class="dsc">{strings.resolvedTail}</div>
@@ -80,7 +82,7 @@ export function ResolutionCard({ survey, nextAction, onAnswer, onHandoff, onDism
           <FeedbackError retry={retry} />
         </div>
       )}
-      {nextAction === 'REFORMULATE' && <p class="syscard survey" role="status">{strings.reformulate}</p>}
+      {nextAction === 'REFORMULATE' && <p class="syscard survey">{strings.reformulate}</p>}
     </>
   )
 }
