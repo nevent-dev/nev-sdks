@@ -1,3 +1,4 @@
+import type { FeedbackRecord } from '../../contract/feedback'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act } from 'preact/test-utils'
 import { Panel } from '../Panel'
@@ -302,5 +303,76 @@ describe('Encuestas de valoración', () => {
     })
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000) })
     expect(transport.feedbackState).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('Valoración de respuestas', () => {
+  const config = {
+    ...fixtureConfig(),
+    feedback: { resolutionSurvey: false, teamSurvey: false, answerFeedback: true },
+  }
+  const empty = { resolutionSurvey: null, teamSurvey: null, answers: [] }
+  const baseRecord: FeedbackRecord = {
+    id: 'rating', messageId: 'answer', kind: 'ANSWER', value: 0, reasons: [], comment: null,
+    createdAt: '2026-07-18T14:00:02.000Z',
+  }
+
+  function conversation(): Transport {
+    const transport = fakeTransport()
+    transport.store.applySnapshot({
+      state: 'BOT_ACTIVE',
+      snapshotCursor: 'evt_v1_demo_2',
+      messages: [
+        { messageId: 'answer', role: 'bot', text: 'El festival abre a las 17:00.', createdAt: '2026-07-18T14:00:02.000Z', feedbackEligible: true, feedbackLocale: 'es' },
+        { messageId: 'notice', role: 'bot', text: 'Te pasamos con el equipo.', createdAt: '2026-07-18T14:00:03.000Z' },
+        { messageId: 'no-locale', role: 'bot', text: 'Some answer', createdAt: '2026-07-18T14:00:04.000Z', feedbackEligible: true, feedbackLocale: 'ar' },
+      ],
+    })
+    return transport
+  }
+
+  async function click(button: HTMLButtonElement): Promise<void> {
+    await act(async () => { button.click(); await Promise.resolve() })
+  }
+
+  it('shows votes only on an eligible answer, persists down and its reason immediately, then permits changing to up', async () => {
+    const transport = conversation()
+    let saved = baseRecord
+    vi.mocked(transport.feedback).mockImplementation(async request => {
+      if (request.kind !== 'ANSWER') throw new Error('Wrong feedback kind')
+      saved = { ...saved, value: request.value, reasons: request.value === 1 ? [] : request.reasons ?? saved.reasons }
+      return { feedback: saved, nextAction: 'NONE' }
+    })
+    const { root } = await mountPanel({ config, transport })
+    const votes = [...root.querySelectorAll<HTMLButtonElement>('.answer-votes button')]
+    expect(votes).toHaveLength(2)
+    const [up, down] = votes as [HTMLButtonElement, HTMLButtonElement]
+
+    await click(down)
+    expect(transport.feedback).toHaveBeenCalledWith({ kind: 'ANSWER', messageId: 'answer', value: 0 })
+    const reason = [...root.querySelectorAll<HTMLButtonElement>('.answer-reasons button')]
+      .find(button => button.textContent?.trim() === 'Está desactualizada')!
+    expect(root.querySelector('.feedback-comment textarea')).toBeNull()
+    await click(reason)
+    expect(transport.feedback).toHaveBeenCalledWith({
+      kind: 'ANSWER', messageId: 'answer', value: 0, reasons: ['OUTDATED'],
+    })
+    expect(root.querySelector('.feedback-comment textarea')).not.toBeNull()
+
+    await click(root.querySelector<HTMLButtonElement>('.answer-reasons-head button')!)
+    expect(down.getAttribute('aria-pressed')).toBe('true')
+    await click(up)
+    expect(transport.feedback).toHaveBeenLastCalledWith({ kind: 'ANSWER', messageId: 'answer', value: 1 })
+    expect(up.getAttribute('aria-pressed')).toBe('true')
+    expect(down.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('restores the vote on opening without writing it again', async () => {
+    const transport = conversation()
+    vi.mocked(transport.feedbackState).mockResolvedValue({ ...empty, answers: [baseRecord] })
+    const { root } = await mountPanel({ config, transport })
+    expect(root.querySelector('[aria-label="Valorar negativamente"]')?.getAttribute('aria-pressed')).toBe('true')
+    expect(root.querySelector('.answer-reasons')).toBeNull()
+    expect(transport.feedback).not.toHaveBeenCalled()
   })
 })

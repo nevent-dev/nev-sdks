@@ -75,6 +75,8 @@ export type ContactChannel = WidgetContactBlock['channel']
 // pinta un widget anterior). Regla del cliente y validación en la frontera:
 // contract/contact-block.ts resolveContactContent.
 export interface MessageCreatedPayload {
+  feedbackEligible?: boolean
+  feedbackLocale?: string | null
   messageId: string
   role: 'bot' | 'agent' | 'user'
   text: string
@@ -102,6 +104,8 @@ export type WidgetEphemeralEvent =
 
 // A historical message as returned by GET /messages (snapshot).
 export interface WidgetMessage {
+  feedbackEligible?: boolean
+  feedbackLocale?: string | null
   messageId: string
   role: 'bot' | 'agent' | 'user'
   text: string

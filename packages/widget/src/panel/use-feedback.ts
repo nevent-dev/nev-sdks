@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
-import type { FeedbackAction, FeedbackState, FeedbackSurvey, WidgetFeedbackConfig } from '../contract/feedback'
+import type { FeedbackAction, FeedbackRequest, FeedbackState, FeedbackSurvey, WidgetFeedbackConfig } from '../contract/feedback'
 import type { StoreState } from '../store/message-store'
 import type { Transport } from '../transport'
 import { FeedbackUnavailable } from '../transport/feedback'
@@ -15,6 +15,7 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
   const syncRequest = useRef<AbortController | null>(null)
   const lastMessage = state.messages.at(-1)
   const lastMessageId = lastMessage?.id
+  const initialLastMessageId = useRef(lastMessageId)
   const completedBotReply = lastMessage?.role === 'bot' && lastMessage.status === 'sent' && !lastMessage.streaming
   const teamResolved = state.conversationState === 'RESOLVED'
   const botActive = state.conversationState === 'BOT_ACTIVE' || state.conversationState === null
@@ -107,6 +108,23 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     return cancel
   }, [config?.resolutionSurvey, lastMessageId, completedBotReply, botActive, state.newConversationNotice, transport])
 
+  const answerRatingsEnabled = !!config?.answerFeedback && feedback !== null
+
+  useEffect(() => {
+    if (config?.answerFeedback && !answerRatingsEnabled && lastMessage?.feedbackEligible && initialLastMessageId.current !== lastMessageId) {
+      void syncFeedback()
+    }
+  }, [config?.answerFeedback, lastMessage?.feedbackEligible, lastMessageId])
+
+  async function saveAnswer(request: Extract<FeedbackRequest, { kind: 'ANSWER' }>): Promise<void> {
+    const result = await transport.feedback(request)
+    syncRequest.current?.abort()
+    setFeedback(previous => previous && {
+      ...previous,
+      answers: [...previous.answers.filter(record => record.messageId !== request.messageId), result.feedback],
+    })
+  }
+
   function onSend(send: () => Promise<void>): void {
     stopWaiting()
     if (config?.resolutionSurvey && botActive && !resolutionPrompt) {
@@ -141,6 +159,9 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
   return {
     resolutionPrompt,
+    answerRatingsEnabled,
+    answers: feedback?.answers,
+    saveAnswer,
     teamSurvey,
     nextAction,
     stopWaiting,

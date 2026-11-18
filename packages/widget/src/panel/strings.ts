@@ -60,6 +60,12 @@ export interface WidgetStrings {
   teamComment: string
   commentPrivacy: string
   feedbackThanks: string
+  answerQuestion: string
+  answerIncorrect: string
+  answerOutdated: string
+  answerIrrelevant: string
+  answerOther: string
+  answerComment: string
   rateUp: string
   rateDown: string
   newConvTitle: string
@@ -123,6 +129,12 @@ const es: WidgetStrings = {
   teamComment: '¿Qué podemos mejorar? (opcional)',
   commentPrivacy: 'No incluyas datos personales.',
   feedbackThanks: 'Gracias por tu valoración.',
+  answerQuestion: '¿Qué ha fallado?',
+  answerIncorrect: 'Es incorrecta',
+  answerOutdated: 'Está desactualizada',
+  answerIrrelevant: 'No responde a mi pregunta',
+  answerOther: 'Otro motivo',
+  answerComment: 'Cuéntanos más (opcional)',
   rateUp: 'Valorar positivamente',
   rateDown: 'Valorar negativamente',
   newConvTitle: 'Conversación nueva',
@@ -183,6 +195,12 @@ const en: WidgetStrings = {
   teamComment: 'What could we improve? (optional)',
   commentPrivacy: 'Do not include personal information.',
   feedbackThanks: 'Thank you for your feedback.',
+  answerQuestion: 'What went wrong?',
+  answerIncorrect: 'It is incorrect',
+  answerOutdated: 'It is outdated',
+  answerIrrelevant: 'It did not answer my question',
+  answerOther: 'Another reason',
+  answerComment: 'Tell us more (optional)',
   rateUp: 'Rate positively',
   rateDown: 'Rate negatively',
   newConvTitle: 'New conversation',
@@ -243,6 +261,12 @@ const ca: WidgetStrings = {
   teamComment: 'Què podem millorar? (opcional)',
   commentPrivacy: 'No hi incloguis dades personals.',
   feedbackThanks: 'Gràcies per la teva valoració.',
+  answerQuestion: 'Què ha fallat?',
+  answerIncorrect: 'És incorrecta',
+  answerOutdated: 'Està desactualitzada',
+  answerIrrelevant: 'No respon a la meva pregunta',
+  answerOther: 'Un altre motiu',
+  answerComment: 'Explica’ns-en més (opcional)',
   rateUp: 'Valora positivament',
   rateDown: 'Valora negativament',
   newConvTitle: 'Conversa nova',
@@ -303,6 +327,12 @@ const pt: WidgetStrings = {
   teamComment: 'O que podemos melhorar? (opcional)',
   commentPrivacy: 'Não inclua dados pessoais.',
   feedbackThanks: 'Agradecemos a sua avaliação.',
+  answerQuestion: 'O que correu mal?',
+  answerIncorrect: 'Está incorreta',
+  answerOutdated: 'Está desatualizada',
+  answerIrrelevant: 'Não responde à minha pergunta',
+  answerOther: 'Outro motivo',
+  answerComment: 'Conte-nos mais (opcional)',
   rateUp: 'Avaliar positivamente',
   rateDown: 'Avaliar negativamente',
   newConvTitle: 'Nova conversa',

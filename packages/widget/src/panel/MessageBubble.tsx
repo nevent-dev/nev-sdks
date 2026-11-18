@@ -1,8 +1,11 @@
+import type { FeedbackRecord } from '../contract/feedback'
+import { AnswerFeedback, type SubmitAnswerFeedback } from './AnswerFeedback'
 import type { StoredMessage } from '../store/message-store'
 import { AgentAvatar, BotLogo } from './icons'
 import { renderMarkdown } from './markdown'
 import { ContactBlocks } from './ContactBlocks'
-import { useStrings } from './strings'
+import { STRINGS, StringsContext, useStrings } from './strings'
+import { resolveLocale } from '../contract/locale'
 
 export interface MessageBubbleProps {
   message: StoredMessage
@@ -13,6 +16,8 @@ export interface MessageBubbleProps {
   // Logo del tenant (config.theme.logoUrl) — opcional: llamadores previos a
   // esta feature no lo conocen y deben seguir cayendo al BotIcon por defecto.
   logoUrl?: string | null
+  rating?: FeedbackRecord | undefined
+  submitRating?: SubmitAnswerFeedback | undefined
 }
 
 function formatTime(iso: string, timeLocale: string): string {
@@ -21,10 +26,13 @@ function formatTime(iso: string, timeLocale: string): string {
   return d.toLocaleTimeString(timeLocale, { hour: '2-digit', minute: '2-digit' })
 }
 
-export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, compact, logoUrl }: MessageBubbleProps) {
+export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, compact, logoUrl, rating, submitRating }: MessageBubbleProps) {
   const strings = useStrings()
   const isUser = message.role === 'user'
   const isAgent = message.role === 'agent'
+  const answerLocale = message.role === 'bot' && message.feedbackEligible && message.status === 'sent'
+    ? resolveLocale(message.feedbackLocale)
+    : null
   // Fix W5b: per-message authorName (snapshot-only, backend W5a) wins over
   // the conversation-level agentName (live agent.joined) — a historical
   // message authored by a PREVIOUSLY assigned agent must keep showing ITS
@@ -90,7 +98,16 @@ export function MessageBubble({ message, agentName, agentAvatarUrl, onRetry, com
           </div>
         )}
         {!isUser && !message.streaming && (
-          <div class="meta">{formatTime(message.createdAt, strings.timeLocale)}</div>
+          <div class="assistant-meta">
+            <div class="meta">{formatTime(message.createdAt, strings.timeLocale)}</div>
+            {answerLocale && submitRating && (
+              <StringsContext.Provider value={STRINGS[answerLocale]}>
+                <div class="answer-feedback-locale" lang={answerLocale}>
+                  <AnswerFeedback messageId={message.id} rating={rating} submitRating={submitRating} />
+                </div>
+              </StringsContext.Provider>
+            )}
+          </div>
         )}
       </div>
     </div>
