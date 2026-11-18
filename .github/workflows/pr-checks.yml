@@ -1,0 +1,34 @@
+# Guarda de texto fijo de los widgets (nevent-work#40, FAN-052; control 9 de la auditoría de idiomas).
+# Solo Node, sin instalar dependencias: unos segundos por PR. Los drafts se saltan (regla de CI de nevent-work#200).
+name: PR checks
+
+on:
+  pull_request:
+    # ready_for_review: un draft que pasa a ready ejecuta la guarda una vez; los drafts se saltan abajo.
+    types: [opened, synchronize, reopened, ready_for_review]
+    branches: [development]
+    paths:
+      - 'packages/*/src/**'
+      - 'scripts/widget-visible-text*'
+      - '.github/workflows/pr-checks.yml'
+
+permissions:
+  contents: read
+
+# Un push nuevo al mismo PR sustituye al que esté corriendo.
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  widget-visible-text:
+    name: Texto fijo de los widgets
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test scripts/widget-visible-text.test.mjs

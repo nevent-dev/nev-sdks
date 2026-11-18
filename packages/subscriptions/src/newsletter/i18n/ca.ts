@@ -27,6 +27,15 @@ export const ca: NewsletterLabels = {
   gdprRequired: "Has d'acceptar la politica de privacitat per continuar.",
   privacyPolicyLabel: 'Politica de Privacitat',
 
+  // Default email field (when the API configuration brings none)
+  emailLabel: 'Correu electrònic',
+  emailPlaceholder: 'El teu correu electrònic',
+
+  firstNamePlaceholder: 'El teu nom',
+  lastNamePlaceholder: 'Cognoms',
+  postalCodePlaceholder: 'Codi postal',
+  birthDatePlaceholder: 'Data de naixement',
+
   // Validation
   fieldRequired: '{{fieldName}} es obligatori',
   fieldInvalid: '{{fieldName}} no es valid',

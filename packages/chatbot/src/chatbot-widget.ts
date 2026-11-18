@@ -1153,7 +1153,9 @@ export class ChatbotWidget {
 
           // Show countdown message in the chat window
           this.showInlineError(
-            this.i18n.format('rateLimitCountdown', { seconds: retrySeconds })
+            retrySeconds === 1
+              ? this.i18n.t('rateLimitCountdownOne')
+              : this.i18n.format('rateLimitCountdown', { seconds: retrySeconds })
           );
 
           // Disable input during cooldown and re-enable when it expires
@@ -2208,8 +2210,11 @@ export class ChatbotWidget {
   private renderWelcomeMessage(): void {
     const config = this.configManager.getConfig();
     const serverConfig = this.configManager.getServerConfig();
+    // nevent-work#40 (COMMS-012): without a greeting of the web or the chatbot, the widget's own in its language
     const welcomeText =
-      config.welcomeMessage || serverConfig?.welcomeMessage || '';
+      config.welcomeMessage ||
+      serverConfig?.welcomeMessage ||
+      this.i18n.t('defaultWelcomeMessage');
 
     if (welcomeText && this.messageRenderer) {
       this.messageRenderer.renderWelcome(welcomeText);
@@ -2283,7 +2288,8 @@ export class ChatbotWidget {
 
     const response = await this.conversationService.createConversation({
       tenantId: config.tenantId,
-      locale: config.locale,
+      // The locale the visitor sees (detected when the embed sets none), not the bare config value
+      locale: this.i18n.getLocale(),
     });
 
     // Create a Conversation object and store it in state

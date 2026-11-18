@@ -1,0 +1,2 @@
+# fichero<TAB>literal; texto visible fuera de los catálogos (nevent-work#40, FAN-052). Debe quedarse vacía:
+# la guarda falla con un caso nuevo y con uno de aquí que ya no esté.

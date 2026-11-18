@@ -283,6 +283,11 @@ export class FormRenderer {
     return { value: String(raw), label: String(raw) };
   }
 
+  /** A validation message in the widget's language; without a translator, the renderer's English text. */
+  private message(key: string, fallback: string): string {
+    return this.translate ? this.translate(key) : fallback;
+  }
+
   /** The `fieldRequired` message of a field, in the widget's language when there is a translator. */
   private requiredMessage(config: FieldConfiguration): string {
     return this.translate
@@ -563,11 +568,11 @@ export class FormRenderer {
   private renderDefaultEmailField(container: HTMLElement): void {
     const defaultEmailConfig: FieldConfiguration = {
       fieldName: 'email',
-      displayName: 'Email Address',
+      displayName: this.message('emailLabel', 'Email Address'),
       hint: null,
       required: true,
       type: 'email',
-      placeholder: 'Enter your email',
+      placeholder: this.message('emailPlaceholder', 'Enter your email'),
     };
 
     const fieldElement = this.renderField(defaultEmailConfig);
@@ -676,7 +681,7 @@ export class FormRenderer {
     if (!emailRegex.test(email)) {
       return {
         valid: false,
-        error: 'Please enter a valid email address',
+        error: this.message('invalidEmailFormat', 'Please enter a valid email address'),
       };
     }
     return { valid: true };
@@ -694,7 +699,7 @@ export class FormRenderer {
     if (!phoneRegex.test(phone)) {
       return {
         valid: false,
-        error: 'Please enter a valid phone number',
+        error: this.message('invalidPhoneFormat', 'Please enter a valid phone number'),
       };
     }
     return { valid: true };
@@ -710,7 +715,7 @@ export class FormRenderer {
     if (isNaN(Number(value))) {
       return {
         valid: false,
-        error: 'Please enter a valid number',
+        error: this.message('invalidNumberFormat', 'Please enter a valid number'),
       };
     }
     return { valid: true };
@@ -729,7 +734,7 @@ export class FormRenderer {
     } catch {
       return {
         valid: false,
-        error: 'Please enter a valid URL',
+        error: this.message('invalidUrlFormat', 'Please enter a valid URL'),
       };
     }
   }

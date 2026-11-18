@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { FormRenderer } from '../form-renderer';
 import type { FieldConfiguration } from '../../types';
+import { createNewsletterI18n } from '../i18n/index';
 
 describe('FormRenderer', () => {
   let container: HTMLDivElement;
@@ -485,6 +486,37 @@ describe('FormRenderer', () => {
       renderer.reset();
 
       expect(checkbox.checked).toBe(false);
+    });
+  });
+
+  describe('Format errors in the widget language (nevent-work#40, FAN-047)', () => {
+    const spanish = createNewsletterI18n('es');
+    const translate = (key: string, params?: Record<string, string>) => spanish.t(key, params);
+
+    it.each([
+      ['email', 'no-es-un-email', 'Por favor, introduce un email válido'],
+      ['tel', '12', 'Por favor, introduce un teléfono válido'],
+      ['url', 'no es una url', 'Por favor, introduce una URL válida'],
+    ] as const)('a wrong %s shows the Spanish message', (type, value, expected) => {
+      const renderer = new FormRenderer(
+        [{ fieldName: 'f', displayName: 'Campo', hint: null, required: false, type }],
+        null,
+        translate
+      );
+      renderer.render(container);
+      (container.querySelector('[name="f"]') as HTMLInputElement).value = value;
+
+      renderer.validateFields();
+
+      expect(container.querySelector('.nevent-field-error')?.textContent).toBe(expected);
+    });
+
+    it('the default email field (no API configuration) is labelled in the widget language', () => {
+      const renderer = new FormRenderer([], null, translate);
+      renderer.render(container);
+
+      expect(container.textContent).toContain('Email');
+      expect((container.querySelector('input[type="email"]') as HTMLInputElement).placeholder).toBe('Tu email');
     });
   });
 

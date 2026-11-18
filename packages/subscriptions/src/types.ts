@@ -312,6 +312,12 @@ export interface ServerWidgetConfig {
    * send it, and then the widget keeps today's fallback.
    */
   tenantLanguage?: string;
+  /**
+   * The language of the default texts in this config, consent included: es or en (nevent-work#40). The API serves
+   * them in the language the widget asked for with `?language=` when it is es or en, else in the tenant's. Optional:
+   * older APIs do not send it.
+   */
+  textsLanguage?: string;
   theme?: string;
   primaryColor?: string;
   backgroundColor?: string;
@@ -364,6 +370,11 @@ export interface SubscriptionData {
   languageSource?: 'navigator';
   /** The locale the widget was shown in: its visual fallback, never the subscriber's preference. */
   displayLanguage?: string;
+  /**
+   * The `textsLanguage` of the config the widget showed (nevent-work#40): the API records the default consent text
+   * and answers the message in this language. Omitted with an older API.
+   */
+  textsLanguage?: string;
 }
 
 /**
