@@ -1,4 +1,4 @@
-import type { FeedbackRecord } from '../../contract/feedback'
+import type { FeedbackRecord, FeedbackState } from '../../contract/feedback'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act } from 'preact/test-utils'
 import { Panel } from '../Panel'
@@ -365,6 +365,37 @@ describe('Valoración de respuestas', () => {
     expect(transport.feedback).toHaveBeenLastCalledWith({ kind: 'ANSWER', messageId: 'answer', value: 1 })
     expect(up.getAttribute('aria-pressed')).toBe('true')
     expect(down.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('keeps a successful thumb while a team survey read completes', async () => {
+    vi.useFakeTimers()
+    try {
+      const transport = conversation()
+      transport.store.applyDurableEvent({
+        eventId: 'evt_v1_demo_4', schemaVersion: 1, conversationId: 'demo', occurredAt: '2026-07-18T14:00:05.000Z',
+        type: 'conversation.state_changed', payload: { state: 'RESOLVED' },
+      })
+      let finishSurveyRead: (response: FeedbackState) => void = () => {}
+      vi.mocked(transport.feedbackState)
+        .mockResolvedValueOnce({ ...empty,
+          teamSurvey: { status: 'ELIGIBLE', value: null, locale: 'es', expiresAt: null, availableAt: new Date(Date.now() + 2000).toISOString() },
+        })
+        .mockImplementationOnce(() => new Promise(resolve => { finishSurveyRead = resolve }))
+      vi.mocked(transport.feedback).mockResolvedValue({ feedback: { ...baseRecord, value: 1 }, nextAction: 'NONE' })
+      const { root } = await mountPanel({ config: { ...config, feedback: { ...config.feedback, teamSurvey: true } }, transport })
+      const up = root.querySelector<HTMLButtonElement>('[aria-label="Valorar positivamente"]')!
+      await act(async () => { await vi.advanceTimersByTimeAsync(2000) })
+      expect(transport.feedbackState).toHaveBeenCalledTimes(2)
+      await click(up)
+      await act(async () => {
+        finishSurveyRead({ ...empty, teamSurvey: { status: 'PENDING', value: null, locale: 'es', expiresAt: null } })
+        await Promise.resolve()
+      })
+      expect(root.querySelector('.team-survey')).not.toBeNull()
+      expect(up.getAttribute('aria-pressed')).toBe('true')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('restores the vote on opening without writing it again', async () => {

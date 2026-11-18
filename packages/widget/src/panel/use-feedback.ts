@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
-import type { FeedbackAction, FeedbackRequest, FeedbackState, FeedbackSurvey, WidgetFeedbackConfig } from '../contract/feedback'
+import type { FeedbackAction, FeedbackRecord, FeedbackRequest, FeedbackState, FeedbackSurvey, WidgetFeedbackConfig } from '../contract/feedback'
 import type { StoreState } from '../store/message-store'
 import type { Transport } from '../transport'
 import { FeedbackUnavailable } from '../transport/feedback'
@@ -13,6 +13,9 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
   const candidate = useRef<{ lastMessageId: string | undefined } | null>(null)
   const cancelPrompt = useRef<(() => void) | null>(null)
   const syncRequest = useRef<AbortController | null>(null)
+  const activeTransport = useRef(transport)
+  const answerRevision = useRef(0)
+  const savedAnswers = useRef(new Map<string, { revision: number; record: FeedbackRecord }>())
   const lastMessage = state.messages.at(-1)
   const lastMessageId = lastMessage?.id
   const initialLastMessageId = useRef(lastMessageId)
@@ -29,11 +32,16 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
   async function syncFeedback(afterWrittenAnswer = false): Promise<void> {
     syncRequest.current?.abort()
     const request = new AbortController()
+    const startedAt = answerRevision.current
     syncRequest.current = request
     try {
       const result = await transport.feedbackState(request.signal)
       if (request.signal.aborted) return
-      setFeedback(result)
+      const answers = new Map(result.answers.map(record => [record.messageId, record]))
+      for (const [messageId, saved] of savedAnswers.current) {
+        if (saved.revision > startedAt) answers.set(messageId, saved.record)
+      }
+      setFeedback({ ...result, answers: [...answers.values()] })
       if (result.resolutionSurvey?.status === 'ANSWERED') {
         setResolutionPrompt(previous => previous ? result.resolutionSurvey : previous)
         if (afterWrittenAnswer && result.resolutionSurvey.value === 0) {
@@ -52,6 +60,8 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
   useLayoutEffect(() => {
     if (!config?.resolutionSurvey && !config?.teamSurvey && !config?.answerFeedback) return
+    activeTransport.current = transport
+    savedAnswers.current.clear()
     setFeedback(null)
     setResolutionPrompt(null)
     setNextAction('NONE')
@@ -118,7 +128,8 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
   async function saveAnswer(request: Extract<FeedbackRequest, { kind: 'ANSWER' }>): Promise<void> {
     const result = await transport.feedback(request)
-    syncRequest.current?.abort()
+    if (activeTransport.current !== transport) return
+    savedAnswers.current.set(request.messageId, { revision: ++answerRevision.current, record: result.feedback })
     setFeedback(previous => previous && {
       ...previous,
       answers: [...previous.answers.filter(record => record.messageId !== request.messageId), result.feedback],
