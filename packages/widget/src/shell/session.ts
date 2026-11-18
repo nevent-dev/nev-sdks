@@ -1,4 +1,5 @@
 import type { WidgetConfig, WidgetSession } from '../contract/types'
+import type { WidgetFeedbackConfig } from '../contract/feedback'
 import { normalizeWelcome } from '../contract/normalize-welcome'
 import { resolveLocale } from '../contract/locale'
 import { STRINGS } from '../panel/strings'
@@ -67,7 +68,7 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
   const configRes = await fetchFn(`${installationBase}/config`)
   if (!configRes.ok) throw new Error(`config_failed:${configRes.status}`)
   const rawConfig = (await configRes.json()) as Record<string, unknown>
-  const { welcome: _rawWelcome, ...rawConfigWithoutWelcome } = rawConfig
+  const { welcome: _rawWelcome, feedback: rawFeedback, ...configFields } = rawConfig
   const welcome = normalizeWelcome(rawConfig['welcome'])
   // assistantName es otro campo NO CONFIABLE (drift de contrato cazado en
   // integración E2E, Task 17: el backend real puede omitirlo por completo).
@@ -84,7 +85,19 @@ export async function createSessionClient(opts: Options): Promise<SessionClient>
   const assistantName = typeof rawAssistantName === 'string' && rawAssistantName.trim().length > 0
     ? rawAssistantName
     : STRINGS[effectiveLocale].assistantFallback
-  const config: WidgetConfig = { ...(rawConfigWithoutWelcome as unknown as WidgetConfig), assistantName, ...(welcome ? { welcome } : {}) }
+  const config: WidgetConfig = {
+    ...(configFields as unknown as WidgetConfig),
+    assistantName,
+    ...(welcome ? { welcome } : {}),
+  }
+  if (rawFeedback && typeof rawFeedback === 'object') {
+    const feedback = rawFeedback as Partial<WidgetFeedbackConfig>
+    config.feedback = {
+      answerFeedback: feedback.answerFeedback === true,
+      resolutionSurvey: feedback.resolutionSurvey === true,
+      teamSurvey: feedback.teamSurvey === true,
+    }
+  }
 
   const sessionRes = await fetchFn(`${installationBase}/sessions`, {
     method: 'POST',

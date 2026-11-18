@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import type { VNode } from 'preact'
 import { WaitingCard, AgentJoinedSysline, TypingDots, ResolvedCard, NewConversationCard } from '../handoff'
-import { mount, rerender, cleanupMounted } from './test-utils'
+import { mount, cleanupMounted } from './test-utils'
+import { TeamSurvey } from '../FeedbackCards'
 
 afterEach(cleanupMounted)
 
@@ -43,23 +44,24 @@ describe('TypingDots', () => {
 })
 
 describe('ResolvedCard', () => {
-  it('Important #8 gap#5 — sin onFeedback (panel integrado, Task 13): NO renderiza los botones de feedback (nunca finge un éxito local)', async () => {
+  it('Important #8 gap#5 — sin encuesta, conserva la tarjeta de conversación resuelta', async () => {
     const root: HTMLElement = await mount(<ResolvedCard agentName="Laura" /> as VNode)
     expect(root.querySelector('.feedback')).toBeNull()
     expect(root.querySelector('.ttl')?.textContent).toBe('Conversación resuelta')
+    expect(root.textContent).toContain('Laura resolvió tu consulta.')
   })
-  it('con onFeedback (solo el harness de fixtures, Task 16): los botones llaman a onFeedback con up/down y marcan aria-pressed', async () => {
-    const onFeedback = vi.fn()
-    const root = await mount(<ResolvedCard agentName="Laura" onFeedback={onFeedback} />)
-    const up = root.querySelector<HTMLButtonElement>('[aria-label="Valorar positivamente"]')!
-    up.click()
-    // El click dispara useState fuera de act() (evento DOM nativo, no envuelto
-    // por mount()); preact difiere el commit a un microtask. rerender() (ya
-    // usado en MessageList.test.tsx) fuerza el flush de esa cola pendiente
-    // antes de leer el DOM — sin esto aria-pressed queda con el valor previo.
-    await rerender(<ResolvedCard agentName="Laura" onFeedback={onFeedback} />, root)
-    expect(onFeedback).toHaveBeenCalledWith('up')
-    expect(up.getAttribute('aria-pressed')).toBe('true')
+  it('renders the team rating when the survey is pending and records a rating immediately', async () => {
+    const onRate = vi.fn(async () => {})
+    const root = await mount(
+      <ResolvedCard agentName="Laura" feedbackEnabled>
+        <TeamSurvey survey={{ status: 'PENDING', value: null, locale: 'es', expiresAt: null }} onRate={onRate} onUnavailable={vi.fn()} />
+      </ResolvedCard>
+    )
+    const choices = [...root.querySelectorAll<HTMLButtonElement>('.feedback button')]
+    expect(choices.map(button => button.textContent?.trim())).toEqual(['😊 Bien', '😐 Regular', '😞 Mal'])
+    choices[1]?.click()
+    expect(onRate).toHaveBeenCalledWith(2)
+    expect(root.textContent).toContain('Laura ha resuelto tu consulta.')
   })
   it('sin agentName (edge: resuelto sin handoff), no rompe y no muestra "undefined"', async () => {
     const root = await mount(<ResolvedCard agentName={null} />)

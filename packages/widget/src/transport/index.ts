@@ -4,6 +4,7 @@ import { createSender } from './send'
 import { createEventsChannel, type Scheduler } from './events-channel'
 import { bindPageLifecycle } from '../shell/lifecycle'
 import type { Backoff } from './backoff'
+import { createFeedbackTransport } from './feedback'
 
 export interface TransportOptions {
   window?: Window
@@ -21,7 +22,7 @@ export interface TransportOptions {
   store?: MessageStore
 }
 
-export interface Transport {
+export interface Transport extends ReturnType<typeof createFeedbackTransport> {
   store: MessageStore
   send(text: string): Promise<void>
   retry(clientId: string): Promise<void>
@@ -57,6 +58,7 @@ export function createTransport(client: SessionClient, opts: TransportOptions = 
     : () => {}
 
   return {
+    ...createFeedbackTransport(client),
     store,
     send: (text) => sender.send(text),
     retry: (clientId) => sender.retry(clientId),

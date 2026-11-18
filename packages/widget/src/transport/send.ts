@@ -76,7 +76,9 @@ export function createSender(deps: SenderDeps): Sender {
         if (!began) { deps.store.beginBotTurn(turnId); began = true }
         deps.store.appendBotDelta(turnId, delta)
       },
-      onDone: (turnId, messageId) => deps.store.finishBotTurn(turnId, messageId),
+      onDone: (turnId, messageId) => {
+        if (messageId !== null) deps.store.finishBotTurn(turnId, messageId)
+      },
       onError: (_code) => {
         // error frame before `accepted`: no bot placeholder was ever created,
         // and nothing else will ever ack/fail this optimistic user message —

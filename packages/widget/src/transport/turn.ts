@@ -4,7 +4,7 @@ import { parseSSEStream } from './sse'
 export interface TurnHandlers {
   onAccepted(turnId: string, userMessageId: string): void
   onDelta(turnId: string, delta: string): void
-  onDone(turnId: string, messageId: string): void
+  onDone(turnId: string, messageId: string | null): void
   onError(code: string): void
 }
 
@@ -41,7 +41,7 @@ export async function runStreamingTurn(
     } else if (name === 'delta' || name === 'deltas') {
       handlers.onDelta(str(p['turnId']), str(p['delta']))
     } else if (name === 'done') {
-      handlers.onDone(str(p['turnId']), str(p['messageId']))
+      handlers.onDone(str(p['turnId']), str(p['messageId']) || null)
       settled = true
       return
     } else if (name === 'error') {

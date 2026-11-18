@@ -31,6 +31,10 @@ function fakeTransport(store: MessageStore): { transport: Transport; openChannel
   const transport: Transport = {
     store,
     send: vi.fn(async () => {}),
+    feedbackState: vi.fn(async () => ({ resolutionSurvey: null, teamSurvey: null, answers: [] })),
+    promptResolution: vi.fn(async () => ({ resolutionSurvey: null, teamSurvey: null, answers: [] })),
+    feedback: vi.fn(async () => { throw new Error('No feedback response configured') }),
+    acceptFeedbackHandoff: vi.fn(async () => {}),
     retry: vi.fn(async () => {}),
     cancel: vi.fn(),
     openChannel,

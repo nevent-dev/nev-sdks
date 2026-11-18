@@ -42,10 +42,24 @@ export interface WidgetStrings {
   handoffTitle: string
   handoffDesc: string
   joinedSuffix: string
-  resolvedByAgent: (agentName: string) => string
+  resolvedByAgent: (agentName: string, feedbackEnabled?: boolean) => string
   resolvedGeneric: string
   resolvedTail: string
   agentTyping: string
+  resolutionQuestion: string
+  yes: string
+  no: string
+  offerHandoff: string
+  acceptHandoff: string
+  declineHandoff: string
+  reformulate: string
+  teamQuestion: string
+  teamGood: string
+  teamFair: string
+  teamPoor: string
+  teamComment: string
+  commentPrivacy: string
+  feedbackThanks: string
   rateUp: string
   rateDown: string
   newConvTitle: string
@@ -91,10 +105,24 @@ const es: WidgetStrings = {
   handoffTitle: 'Te pasamos con el equipo',
   handoffDesc: 'El equipo te atenderá en breve. Puedes seguir escribiendo mientras tanto.',
   joinedSuffix: 'se ha unido',
-  resolvedByAgent: (agentName) => `${agentName} resolvió tu consulta.`,
+  resolvedByAgent: (agentName, feedbackEnabled) => `${agentName} ${feedbackEnabled ? 'ha resuelto' : 'resolvió'} tu consulta.`,
   resolvedGeneric: 'Tu consulta ha sido resuelta.',
   resolvedTail: 'Si necesitas algo más, escribe y volvemos al momento.',
   agentTyping: 'El agente está escribiendo',
+  resolutionQuestion: '¿Hemos resuelto tu consulta?',
+  yes: 'Sí',
+  no: 'No',
+  offerHandoff: '¿Te pasamos con una persona del equipo?',
+  acceptHandoff: 'Sí, con una persona',
+  declineHandoff: 'No, gracias',
+  reformulate: 'Escribe tu pregunta de otra forma y lo intentamos de nuevo.',
+  teamQuestion: '¿Qué tal te hemos atendido?',
+  teamGood: 'Bien',
+  teamFair: 'Regular',
+  teamPoor: 'Mal',
+  teamComment: '¿Qué podemos mejorar? (opcional)',
+  commentPrivacy: 'No incluyas datos personales.',
+  feedbackThanks: 'Gracias por tu valoración.',
   rateUp: 'Valorar positivamente',
   rateDown: 'Valorar negativamente',
   newConvTitle: 'Conversación nueva',
@@ -141,6 +169,20 @@ const en: WidgetStrings = {
   resolvedGeneric: 'Your query has been resolved.',
   resolvedTail: "If you need anything else, write to us and we'll be right back.",
   agentTyping: 'The agent is typing',
+  resolutionQuestion: 'Did we resolve your question?',
+  yes: 'Yes',
+  no: 'No',
+  offerHandoff: 'Would you like to talk to someone on the team?',
+  acceptHandoff: 'Yes, talk to someone',
+  declineHandoff: 'No, thanks',
+  reformulate: 'Try asking your question another way.',
+  teamQuestion: 'How was your support experience?',
+  teamGood: 'Good',
+  teamFair: 'Fair',
+  teamPoor: 'Poor',
+  teamComment: 'What could we improve? (optional)',
+  commentPrivacy: 'Do not include personal information.',
+  feedbackThanks: 'Thank you for your feedback.',
   rateUp: 'Rate positively',
   rateDown: 'Rate negatively',
   newConvTitle: 'New conversation',
@@ -187,6 +229,20 @@ const ca: WidgetStrings = {
   resolvedGeneric: "La teva consulta s'ha resolt.",
   resolvedTail: "Si necessites res més, escriu i tornem a l'instant.",
   agentTyping: "L'agent està escrivint",
+  resolutionQuestion: 'Hem resolt la teva consulta?',
+  yes: 'Sí',
+  no: 'No',
+  offerHandoff: 'Et passem amb una persona de l’equip?',
+  acceptHandoff: 'Sí, amb una persona',
+  declineHandoff: 'No, gràcies',
+  reformulate: 'Escriu la pregunta d’una altra manera i ho tornem a provar.',
+  teamQuestion: 'Com t’hem atès?',
+  teamGood: 'Bé',
+  teamFair: 'Regular',
+  teamPoor: 'Mal',
+  teamComment: 'Què podem millorar? (opcional)',
+  commentPrivacy: 'No hi incloguis dades personals.',
+  feedbackThanks: 'Gràcies per la teva valoració.',
   rateUp: 'Valora positivament',
   rateDown: 'Valora negativament',
   newConvTitle: 'Conversa nova',
@@ -233,6 +289,20 @@ const pt: WidgetStrings = {
   resolvedGeneric: 'O pedido foi resolvido.',
   resolvedTail: 'Se precisar de mais alguma coisa, escreva-nos e voltaremos em breve.',
   agentTyping: 'O agente está a escrever',
+  resolutionQuestion: 'Resolvemos a sua questão?',
+  yes: 'Sim',
+  no: 'Não',
+  offerHandoff: 'Quer falar com alguém da equipa?',
+  acceptHandoff: 'Sim, falar com alguém',
+  declineHandoff: 'Não, obrigado',
+  reformulate: 'Escreva a pergunta de outra forma e tentamos novamente.',
+  teamQuestion: 'Como avalia o nosso atendimento?',
+  teamGood: 'Bom',
+  teamFair: 'Razoável',
+  teamPoor: 'Mau',
+  teamComment: 'O que podemos melhorar? (opcional)',
+  commentPrivacy: 'Não inclua dados pessoais.',
+  feedbackThanks: 'Agradecemos a sua avaliação.',
   rateUp: 'Avaliar positivamente',
   rateDown: 'Avaliar negativamente',
   newConvTitle: 'Nova conversa',

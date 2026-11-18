@@ -5,7 +5,10 @@ import { useFocusTrap } from './focus-trap'
 import { useResizeReport } from './use-resize-report'
 import { useViewportHeight } from './use-viewport-height'
 import { computeViewState } from './view-state'
-import { useStrings } from './strings'
+import { STRINGS, StringsContext, useStrings } from './strings'
+import { resolveLocale } from '../contract/locale'
+import { ResolutionCard, TeamSurvey } from './FeedbackCards'
+import { useFeedback } from './use-feedback'
 import { Header } from './Header'
 import { ConnectionBanner } from './ConnectionBanner'
 import { MessageList } from './MessageList'
@@ -29,6 +32,13 @@ export interface PanelProps {
 export function Panel({ config, transport, onClose, onResize, viewportKind, viewportHeight }: PanelProps) {
   const strings = useStrings()
   const state = useStoreState(transport.store)
+  const feedback = useFeedback(config.feedback, transport, state, config.features.handoff)
+  const resolutionLocale = resolveLocale(feedback.resolutionPrompt?.locale ?? undefined)
+  const teamLocale = resolveLocale(feedback.teamSurvey?.locale ?? undefined)
+  const surveyAnnouncement = feedback.resolutionPrompt?.status === 'PENDING' && resolutionLocale
+    ? STRINGS[resolutionLocale].resolutionQuestion
+    : feedback.teamSurvey?.status === 'PENDING' && teamLocale ? STRINGS[teamLocale].teamQuestion : ''
+  const close = (): void => { feedback.stopWaiting(); onClose() }
   const isStreaming = state.messages.some((m) => m.streaming)
   // session.ts ya normaliza assistantName con fallback locale-aware
   // (STRINGS[locale].assistantFallback, Plan 4) en la frontera de red — este
@@ -52,7 +62,7 @@ export function Panel({ config, transport, onClose, onResize, viewportKind, view
   // trap en sí (Tab/Shift+Tab/Escape) sigue activo en ambos, decidido en
   // Task 4; aquí solo se decide si el AUTOFOCUS inicial se dispara, y se
   // decide con la señal del HOST (viewportKind), nunca con matchMedia local.
-  const containerRef = useFocusTrap(true, onClose, viewportKind === 'desktop')
+  const containerRef = useFocusTrap(true, close, viewportKind === 'desktop')
   useResizeReport(onResize)
   useViewportHeight(viewportKind === 'mobile' ? viewportHeight : null)
 
@@ -60,11 +70,26 @@ export function Panel({ config, transport, onClose, onResize, viewportKind, view
     <>
       {viewState.conversationPhase === 'waiting' && <WaitingCard />}
       {state.agentTyping && viewState.conversationPhase === 'agent' && <TypingDots />}
-      {/* Sin AgentJoinedSysline (gap #4 revertido, ver Task 8) y sin
-          onFeedback en ResolvedCard (gap #5): el panel integrado nunca
-          finge una cronología o un éxito que no persiste en ningún sitio —
-          la presencia del agente ya se ve en el cambio de cabecera. */}
-      {viewState.conversationPhase === 'resolved' && <ResolvedCard agentName={state.agentName} />}
+      {feedback.resolutionPrompt && resolutionLocale && (
+        <StringsContext.Provider value={STRINGS[resolutionLocale]}>
+          <div lang={resolutionLocale}>
+            <ResolutionCard survey={feedback.resolutionPrompt} nextAction={feedback.nextAction}
+              onAnswer={feedback.answerResolution} onHandoff={feedback.acceptHandoff}
+              onDismissHandoff={feedback.dismissHandoff} onUnavailable={feedback.expireResolution} />
+          </div>
+        </StringsContext.Provider>
+      )}
+      {viewState.conversationPhase === 'resolved' && (
+        <ResolvedCard agentName={state.agentName} feedbackEnabled={config.feedback !== undefined}>
+          {teamLocale && (feedback.teamSurvey?.status === 'PENDING' || feedback.teamSurvey?.status === 'ANSWERED') && (
+            <StringsContext.Provider value={STRINGS[teamLocale]}>
+              <div lang={teamLocale}>
+                <TeamSurvey survey={feedback.teamSurvey} onRate={feedback.rateTeam} onUnavailable={feedback.expireTeam} />
+              </div>
+            </StringsContext.Provider>
+          )}
+        </ResolvedCard>
+      )}
       {/* Task W4: newConversationNotice es un flag del STORE (reset tras un
           re-bootstrap silencioso), no una fase de conversationState — se
           pinta independientemente de la fase, igual que un aviso de sistema
@@ -75,15 +100,15 @@ export function Panel({ config, transport, onClose, onResize, viewportKind, view
 
   return (
     <section class="panel" data-part="panel" role="dialog" aria-label={assistantName} tabIndex={-1} ref={containerRef}>
-      <Header viewState={viewState} onClose={onClose} />
+      <Header viewState={viewState} onClose={close} />
       <ConnectionBanner kind={viewState.connectionBanner} />
       <MessageList
         config={config}
         messages={state.messages}
         agentName={state.agentName}
         agentAvatarUrl={state.agentAvatarUrl}
-        onRetry={(clientId) => transport.retry(clientId)}
-        onQuickReply={(text) => transport.send(text)}
+        onRetry={(clientId) => feedback.onSend(() => transport.retry(clientId))}
+        onQuickReply={(text) => feedback.onSend(() => transport.send(text))}
         trailing={trailing}
         // Defensa en profundidad (revisión Task-8): MessageList confía en
         // quien lo llama, así que Panel añade su PROPIA condición
@@ -92,7 +117,10 @@ export function Panel({ config, transport, onClose, onResize, viewportKind, view
         // cálculo de fase cambiara de criterio en el futuro.
         showWelcome={viewState.conversationPhase === 'idle' && state.messages.length === 0}
       />
-      <Composer viewState={viewState} onSend={(text) => transport.send(text)} onStop={() => transport.cancel()} uploadEnabled={config.features.upload} />
+      <div class="sr-only" role="status" lang={resolutionLocale ?? teamLocale ?? undefined}>{surveyAnnouncement}</div>
+      <Composer viewState={viewState} onSend={(text) => feedback.onSend(() => transport.send(text))}
+        onStop={() => { feedback.stopWaiting(); transport.cancel() }}
+        onType={feedback.stopWaiting} uploadEnabled={config.features.upload} />
     </section>
   )
 }

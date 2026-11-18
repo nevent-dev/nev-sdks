@@ -37,6 +37,21 @@ describe('createSender', () => {
     expect(new Headers(authorizedFetch.mock.calls[0]![1]?.headers).get('Idempotency-Key')).toBe('cid_1')
   })
 
+  it('acknowledges a written rating with no assistant reply', async () => {
+    const store = createMessageStore()
+    const authorizedFetch = vi.fn(async () => sse([
+      'event: accepted\ndata: {"turnId":"t1","userMessageId":"u1"}\n\n',
+      'event: done\ndata: {"turnId":"t1","messageId":null,"eventId":null}\n\n',
+    ]))
+    const sender = createSender({ client: { authorizedFetch }, store, streaming: true, uuid })
+
+    await sender.send('Sí')
+    expect(store.getState().messages).toEqual([
+      expect.objectContaining({ id: 'u1', role: 'user', status: 'sent', text: 'Sí' }),
+    ])
+    expect(authorizedFetch).toHaveBeenCalledOnce()
+  })
+
   it('a stream transport failure marks THIS message failed and does NOT auto-resend', async () => {
     n = 0
     const store = createMessageStore(() => '2026-07-17T15:00:00Z')
