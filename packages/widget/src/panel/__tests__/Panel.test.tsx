@@ -2,6 +2,7 @@ import type { FeedbackRecord, FeedbackState } from '../../contract/feedback'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act } from 'preact/test-utils'
 import { Panel } from '../Panel'
+import { STRINGS } from '../strings'
 import { createMessageStore } from '../../store/message-store'
 import { fixtureConfig } from '../../contract/fixtures'
 import type { Transport } from '../../transport'
@@ -153,12 +154,13 @@ describe('Encuestas de valoración', () => {
 
   afterEach(() => vi.useRealTimers())
 
-  async function ask(root: HTMLElement): Promise<HTMLTextAreaElement> {
+  async function ask(root: HTMLElement, text = '¿A qué hora abren?'): Promise<HTMLTextAreaElement> {
     const composer = root.querySelector<HTMLTextAreaElement>('.composer textarea')!
-    await act(() => {
-      composer.value = '¿A qué hora abren?'
+    await act(async () => {
+      composer.value = text
       composer.dispatchEvent(new Event('input', { bubbles: true }))
       composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      await Promise.resolve()
     })
     return composer
   }
@@ -225,13 +227,7 @@ describe('Encuestas de valoración', () => {
         nextAction: 'OFFER_HANDOFF',
       })
     const { root } = await mountPanel({ config, transport })
-    const composer = root.querySelector<HTMLTextAreaElement>('.composer textarea')!
-    await act(async () => {
-      composer.value = 'No era eso'
-      composer.dispatchEvent(new Event('input', { bubbles: true }))
-      composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
-      await Promise.resolve()
-    })
+    await ask(root, 'No era eso')
     expect(transport.send).toHaveBeenCalledWith('No era eso')
     expect(transport.feedbackState).toHaveBeenCalledTimes(2)
     expect(root.textContent).toContain('¿Te pasamos con una persona del equipo?')
@@ -241,6 +237,53 @@ describe('Encuestas de valoración', () => {
     await act(() => decline.click())
     await ask(root)
     expect(root.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
+    await cleanupMounted()
+    const { root: reopened } = await mountPanel({ config, transport })
+    await ask(reopened)
+    expect(reopened.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
+  })
+
+  it('does not replay an existing offer if the visitor types during the initial feedback read', async () => {
+    const transport = fakeTransport()
+    const existing = {
+      ...noFeedback,
+      resolutionSurvey: { ...pending, status: 'ANSWERED' as const, value: 0 },
+      nextAction: 'OFFER_HANDOFF' as const,
+    }
+    let finishInitialRead: () => void = () => {}
+    vi.mocked(transport.feedbackState)
+      .mockImplementationOnce(() => new Promise(resolve => { finishInitialRead = () => resolve(existing) }))
+      .mockResolvedValue(existing)
+    const { root } = await mountPanel({ config, transport })
+    await ask(root)
+    expect(transport.send).toHaveBeenCalledOnce()
+    await act(async () => { finishInitialRead(); await Promise.resolve() })
+    expect(transport.feedbackState).toHaveBeenCalledTimes(2)
+    expect(root.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
+  })
+
+  it('offers the new action after a subsequent episode is rated in the same session', async () => {
+    const transport = fakeTransport()
+    const firstVote = {
+      ...noFeedback,
+      resolutionSurvey: { ...pending, status: 'ANSWERED' as const, value: 0, expiresAt: '2026-07-20T14:00:00Z' },
+      nextAction: 'OFFER_HANDOFF' as const,
+    }
+    vi.mocked(transport.feedbackState)
+      .mockResolvedValueOnce(noFeedback)
+      .mockResolvedValueOnce(firstVote)
+      .mockResolvedValueOnce({
+        ...firstVote,
+        resolutionSurvey: { ...firstVote.resolutionSurvey, expiresAt: '2026-07-21T15:00:00Z' },
+        nextAction: 'REFORMULATE',
+      })
+    const { root } = await mountPanel({ config, transport })
+    await ask(root, 'No era eso')
+    expect(root.textContent).toContain('¿Te pasamos con una persona del equipo?')
+    const decline = [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'No, gracias')!
+    await act(() => decline.click())
+    await ask(root, 'No era eso')
+    expect(root.querySelector('.sr-only[role=status]')?.textContent).toBe(STRINGS.es.reformulate)
   })
 
   it('uses the server due time and records the team rating before the optional comment', async () => {
