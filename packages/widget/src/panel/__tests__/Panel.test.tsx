@@ -243,23 +243,26 @@ describe('Encuestas de valoración', () => {
     expect(reopened.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
   })
 
-  it('does not replay an existing offer if the visitor types during the initial feedback read', async () => {
+  it.each([true, false])('compares the survey before sending during a slow initial read (already answered: %s)', async alreadyAnswered => {
     const transport = fakeTransport()
-    const existing = {
+    const answered = {
       ...noFeedback,
       resolutionSurvey: { ...pending, status: 'ANSWERED' as const, value: 0 },
       nextAction: 'OFFER_HANDOFF' as const,
     }
+    let onServer = alreadyAnswered ? answered : noFeedback
+    vi.mocked(transport.send).mockImplementation(async () => { onServer = answered })
     let finishInitialRead: () => void = () => {}
     vi.mocked(transport.feedbackState)
-      .mockImplementationOnce(() => new Promise(resolve => { finishInitialRead = () => resolve(existing) }))
-      .mockResolvedValue(existing)
+      .mockImplementationOnce(() => new Promise(resolve => { finishInitialRead = () => resolve(onServer) }))
+      .mockImplementation(async () => onServer)
     const { root } = await mountPanel({ config, transport })
-    await ask(root)
-    expect(transport.send).toHaveBeenCalledOnce()
+    await ask(root, alreadyAnswered ? 'Otra pregunta' : 'No era eso')
+    expect(transport.send).not.toHaveBeenCalled()
     await act(async () => { finishInitialRead(); await Promise.resolve() })
+    expect(transport.send).toHaveBeenCalledOnce()
     expect(transport.feedbackState).toHaveBeenCalledTimes(2)
-    expect(root.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
+    expect(root.textContent?.includes('¿Te pasamos con una persona del equipo?')).toBe(!alreadyAnswered)
   })
 
   it('offers the new action after a subsequent episode is rated in the same session', async () => {
