@@ -118,6 +118,53 @@ describe('One language per visit (nevent-work#40)', () => {
     widget.destroy();
   });
 
+  it.each(['pt-PT', 'pt-BR'])('requests pt-PT texts for a %s browser and records the shown consent', async (locale) => {
+    browser([locale, 'es']);
+    const consent = 'Aceito o tratamento dos meus dados pessoais para receber comunicações comerciais.';
+    const fetchMock = mockFetch({ configResponse: {
+      tenantLanguage: 'es',
+      textsLanguage: 'pt',
+      messages: { title: 'Newsletter do festival', gdprText: consent },
+    } });
+    const { widget, container } = createWidget({ locale: undefined });
+    await widget.init();
+    expect(configUrl(fetchMock)).toContain('language=pt');
+    expect(widget.getLocale()).toBe('pt');
+    let shadow = getShadowRoot(container)!;
+    expect(shadow.querySelector('form')?.getAttribute('aria-label')).toBe('Formulário de subscrição da newsletter');
+    expect(shadow.textContent).toContain('Newsletter do festival');
+    expect(shadow.textContent).toContain(consent);
+
+    widget.setLocale('en');
+    shadow = getShadowRoot(container)!;
+    expect(shadow.querySelector('form')?.getAttribute('aria-label')).toBe('Newsletter subscription form');
+    expect(shadow.textContent).toContain(consent);
+    expect(fetchMock.mock.calls.filter((c: unknown[]) => String(c[0]).includes('/config'))).toHaveLength(1);
+
+    fillInput(shadow, 'input[name="email"]', 'fan@example.com');
+    toggleCheckbox(shadow, '.nevent-gdpr-checkbox', true);
+    submitForm(shadow);
+    await vi.advanceTimersByTimeAsync(100);
+    await flush();
+    const call = fetchMock.mock.calls.find((c: unknown[]) => String(c[0]).includes('/subscribe'));
+    const body = JSON.parse((call![1] as RequestInit).body as string);
+    expect(body.textsLanguage).toBe('pt');
+    expect(body.displayLanguage).toBe('en');
+    widget.destroy();
+  });
+
+  it('follows the actual texts of the previous API for an explicit Portuguese embed', async () => {
+    browser(['en-GB']);
+    const fetchMock = mockFetch({ configResponse: ENGLISH_TEXTS });
+    const { widget, container } = createWidget({ locale: 'pt-PT' });
+    await widget.init();
+
+    expect(configUrl(fetchMock)).toContain('language=pt');
+    expect(widget.getLocale()).toBe('en');
+    expect(getShadowRoot(container)?.textContent).toContain('I agree to the processing of my personal data');
+    widget.destroy();
+  });
+
   it('an older API (no textsLanguage) keeps the negotiation of nevent-work#279 and no textsLanguage is sent', async () => {
     browser(['en-GB']);
     const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'es' } });
@@ -142,7 +189,7 @@ describe('preferredWidgetLocale and visitLocale', () => {
     expect(preferredWidgetLocale(['en-GB'], undefined)).toBe('en');
     expect(preferredWidgetLocale(['fr-FR', 'ca-ES', 'en'], undefined)).toBe('en');
     expect(preferredWidgetLocale(['ca-ES'], undefined)).toBeUndefined();
-    expect(preferredWidgetLocale(['pt-BR', 'es'], undefined)).toBe('es');
+    expect(preferredWidgetLocale(['pt-BR', 'es'], undefined)).toBe('pt');
     expect(preferredWidgetLocale(['en-GB'], 'ca')).toBe('ca');
     expect(preferredWidgetLocale(['en-GB'], 'es')).toBe('es');
     expect(preferredWidgetLocale(['fr-FR'], 'xx')).toBeUndefined();
@@ -156,7 +203,9 @@ describe('preferredWidgetLocale and visitLocale', () => {
     // a Catalan or Portuguese browser follows the language of the texts, never Catalan around Spanish
     expect(visitLocale(['ca-ES'], 'es', undefined, 'es')).toBe('es');
     expect(visitLocale(['pt-BR'], 'en', undefined, 'en')).toBe('en');
-    // an explicit locale of the embed is the operator's choice and still wins
+    expect(visitLocale(['en-GB'], 'es', 'pt-PT', 'es')).toBe('es');
+    expect(visitLocale(['en-GB'], 'es', 'pt-BR', 'pt')).toBe('pt');
+    // Legacy explicit Catalan remains the operator's choice
     expect(visitLocale(['en-GB'], 'es', 'ca', 'es')).toBe('ca');
     expect(visitLocale(['de-DE'], 'pt-PT', undefined, undefined)).toBe('pt');
     expect(visitLocale(['en-GB'], undefined, undefined, undefined)).toBeUndefined();

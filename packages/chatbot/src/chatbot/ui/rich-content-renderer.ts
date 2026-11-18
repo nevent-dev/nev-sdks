@@ -24,6 +24,7 @@
  * responsible for lifecycle management (removing the element on clear/destroy).
  */
 
+import { rendererLabel } from './renderer-labels';
 import type { RichContent, ActionButton, ActionButtonType } from '../../types';
 import { I18nManager } from '../i18n-manager';
 import { MessageSanitizer } from '../message-sanitizer';
@@ -686,14 +687,7 @@ export class RichContentRenderer {
    * @returns Localised carousel label string.
    */
   private getCarouselAriaLabel(): string {
-    const locale = this.i18n.getLocale();
-    const labels: Record<string, string> = {
-      es: 'Carrusel de tarjetas',
-      en: 'Card carousel',
-      ca: 'Carrusel de targetes',
-      pt: 'Carrossel de cartões',
-    };
-    return labels[locale] ?? 'Card carousel';
+    return rendererLabel(this.i18n.getLocale(), 'carousel');
   }
 
   /**
@@ -703,25 +697,7 @@ export class RichContentRenderer {
    * @returns Localised nav button label string.
    */
   private getCarouselNavAriaLabel(direction: 'prev' | 'next'): string {
-    const locale = this.i18n.getLocale();
-
-    if (direction === 'prev') {
-      const labels: Record<string, string> = {
-        es: 'Tarjeta anterior',
-        en: 'Previous card',
-        ca: 'Targeta anterior',
-        pt: 'Cartão anterior',
-      };
-      return labels[locale] ?? 'Previous card';
-    }
-
-    const labels: Record<string, string> = {
-      es: 'Tarjeta siguiente',
-      en: 'Next card',
-      ca: 'Targeta següent',
-      pt: 'Próximo cartão',
-    };
-    return labels[locale] ?? 'Next card';
+    return rendererLabel(this.i18n.getLocale(), direction === 'prev' ? 'previousCard' : 'nextCard');
   }
 
   /**
@@ -730,14 +706,7 @@ export class RichContentRenderer {
    * @returns Localised "open image" label string.
    */
   private getOpenImageLabel(): string {
-    const locale = this.i18n.getLocale();
-    const labels: Record<string, string> = {
-      es: 'Abrir imagen en nueva pestaña',
-      en: 'Open image in new tab',
-      ca: 'Obrir imatge en una nova pestanya',
-      pt: 'Abrir imagem em nova aba',
-    };
-    return labels[locale] ?? 'Open image in new tab';
+    return rendererLabel(this.i18n.getLocale(), 'openImage');
   }
 
   /**
@@ -746,13 +715,6 @@ export class RichContentRenderer {
    * @returns Localised broken-image label string.
    */
   private getBrokenImageLabel(): string {
-    const locale = this.i18n.getLocale();
-    const labels: Record<string, string> = {
-      es: 'Imagen no disponible',
-      en: 'Image not available',
-      ca: 'Imatge no disponible',
-      pt: 'Imagem não disponível',
-    };
-    return labels[locale] ?? 'Image not available';
+    return rendererLabel(this.i18n.getLocale(), 'brokenImage');
   }
 }

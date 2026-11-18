@@ -7,7 +7,7 @@ import { useStoreState } from '../panel/use-store'
 import { useUnreadCount, type LastSeen } from '../panel/use-unread-count'
 import { Panel } from '../panel/Panel'
 import { Launcher } from '../panel/Launcher'
-import { resolveLocale } from '../contract/locale'
+import { resolveLocale, WIDGET_TITLES } from '../contract/locale'
 import { resolveSurfaceColor } from '../panel/theme'
 import { STRINGS, StringsContext } from '../panel/strings'
 
@@ -105,6 +105,12 @@ export function App({ client: initialClient, bus, resumedSession = false, create
   const rebuildingRef = useRef(false)          // single-flight: colapsa disparos concurrentes (sender + canal) en UN rebuild
   const lastRebuildAtRef = useRef<number | null>(null) // rate-limit: ver SESSION_REBUILD_COOLDOWN_MS
   const justRebuiltRef = useRef(false)         // consumido por el efecto de abajo para forzar un openChannel() tras el swap
+
+  useEffect(() => {
+    document.documentElement.lang = locale
+    document.title = WIDGET_TITLES[locale]
+    bus.emit('locale', locale)
+  }, [bus, locale])
 
   useEffect(() => {
     bus.onCommand((type, payload) => {

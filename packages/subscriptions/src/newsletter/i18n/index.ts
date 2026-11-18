@@ -49,10 +49,7 @@ export const DEFAULT_LOCALE = 'es';
 export function createNewsletterI18n(
   locale?: string
 ): I18nManager<NewsletterLabels> {
-  const detected = locale || I18nManager.detectLocale();
-  const resolvedLocale = NEWSLETTER_LOCALES[detected]
-    ? detected
-    : DEFAULT_LOCALE;
+  const resolvedLocale = initialLocale(locale);
 
   const i18n = new I18nManager<NewsletterLabels>(
     NEWSLETTER_LOCALES,
@@ -69,6 +66,13 @@ function baseLanguage(tag: string | null | undefined): string | undefined {
   return base ? base : undefined;
 }
 
+function initialLocale(locale?: string | null): string {
+  const detected = baseLanguage(locale || I18nManager.detectLocale());
+  return detected && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, detected)
+    ? detected
+    : DEFAULT_LOCALE;
+}
+
 /**
  * The locale an anonymous visitor sees the widget in (nevent-work#279, decision 4 of #274, option B):
  * 1. a locale the operator set in the embed, if the widget has labels for it;
@@ -77,7 +81,7 @@ function baseLanguage(tag: string | null | undefined): string | undefined {
  * 3. the tenant's language (`tenantLanguage` of the public config), if the widget has labels for it;
  * 4. English — never a fixed Spanish.
  * Without `tenantLanguage` (an API that does not send it yet) it is exactly today's choice, {@link createNewsletterI18n}:
- * the explicit locale or the base of `navigator.language`, matched exactly, else {@link DEFAULT_LOCALE} (M1 of
+ * the explicit locale or the browser language, negotiated to its base, else {@link DEFAULT_LOCALE} (M1 of
  * i18n-rev2: an old API changes nothing).
  */
 export function negotiateWidgetLocale(
@@ -86,8 +90,7 @@ export function negotiateWidgetLocale(
   explicitLocale?: string | null
 ): string {
   if (tenantLanguage === undefined || tenantLanguage === null || tenantLanguage.trim() === '') {
-    const detected = explicitLocale || I18nManager.detectLocale();
-    return NEWSLETTER_LOCALES[detected] ? detected : DEFAULT_LOCALE;
+    return initialLocale(explicitLocale);
   }
   const has = (l: string | undefined): l is string => !!l && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, l);
   const explicit = baseLanguage(explicitLocale);
@@ -108,11 +111,11 @@ export function negotiateWidgetLocale(
  * The languages the API has default texts for (title, button, messages, consent): the widget can only show a visit in
  * one language if the API serves its texts in it (nevent-work#40).
  */
-export const API_TEXT_LANGUAGES: readonly string[] = ['es', 'en'];
+export const API_TEXT_LANGUAGES: readonly string[] = ['es', 'en', 'pt'];
 
 /**
  * The language the widget asks the API for, before it reads the config (nevent-work#40), as `?language=`: the embed's
- * explicit locale if the widget has labels for it, else the first browser language the API has texts for (es or en),
+ * explicit locale if the widget has labels for it, else the first browser language the API has texts for,
  * so a Catalan browser that also reads English gets English, not Catalan around Spanish texts. `undefined` when
  * neither matches: then the API answers in the organisation's language and the widget follows it.
  */
@@ -137,7 +140,7 @@ export function preferredWidgetLocale(
  * The one locale of a visit (nevent-work#40). With an API that says the language of its default texts
  * (`textsLanguage`), the visit is in that language, so title, fields, consent, errors and messages never mix two; only
  * an explicit locale of the embed overrides it (the operator chose it, and usually wrote the newsletter's own texts in
- * it). Without `textsLanguage` (an older API), {@link negotiateWidgetLocale} as before.
+ * it). If the API reports a different language for a Portuguese request, follow the reported one. Without `textsLanguage`, {@link negotiateWidgetLocale} as before.
  */
 export function visitLocale(
   browserLanguages: readonly string[],
@@ -148,6 +151,9 @@ export function visitLocale(
   const texts = baseLanguage(textsLanguage);
   if (texts && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, texts)) {
     const explicit = baseLanguage(explicitLocale);
+    // An older API may have fallen back to its tenant language for a Portuguese request.
+    // Follow the actual texts so the form and the consent have the same language.
+    if (explicit === 'pt') return texts;
     return explicit && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, explicit) ? explicit : texts;
   }
   if (tenantLanguage === undefined || tenantLanguage === null || tenantLanguage.trim() === '') {

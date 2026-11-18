@@ -404,9 +404,16 @@ export function getStatusMessage(shadowRoot: ShadowRoot): {
   isSuccess: boolean;
   isError: boolean;
 } {
-  const status = shadowRoot.querySelector(
-    '.nevent-status-message'
-  ) as HTMLElement | null;
+  const success = shadowRoot.querySelector<HTMLElement>('.nevent-newsletter-success-message');
+  if (success) {
+    return {
+      text: success.textContent?.trim() || '',
+      visible: success.style.display !== 'none',
+      isSuccess: true,
+      isError: false,
+    };
+  }
+  const status = shadowRoot.querySelector<HTMLElement>('.nevent-status-message');
 
   if (!status) {
     return { text: '', visible: false, isSuccess: false, isError: false };

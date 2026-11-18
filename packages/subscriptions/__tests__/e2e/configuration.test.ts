@@ -390,7 +390,7 @@ describe('Configuration Variations (E2E)', () => {
 
     it('should use custom success message', async () => {
       mockFetch({
-        subscriptionResponse: {
+        subscriptionData: {
           success: true,
           message: 'Welcome to the club!',
         },
@@ -410,6 +410,7 @@ describe('Configuration Variations (E2E)', () => {
       const status = getStatusMessage(shadow);
       expect(status.visible).toBe(true);
       expect(status.isSuccess).toBe(true);
+      expect(status.text).toBe('Welcome to the club!');
 
       widget.destroy();
     });

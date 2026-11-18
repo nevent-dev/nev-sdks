@@ -14,7 +14,7 @@ export const LOADER_TO_SHELL = ['init', 'open', 'close', 'toggle', 'update', 'de
 // sesión en el dominio anfitrión (cookie/localStorage) tras crear/resumir
 // sesión — el loader es quien tiene acceso de primera parte al storage del
 // host, el shell (iframe) no.
-export const SHELL_TO_LOADER = ['ready', 'opened', 'closed', 'unread_changed', 'error', 'resize', 'session_persist'] as const
+export const SHELL_TO_LOADER = ['ready', 'opened', 'closed', 'unread_changed', 'error', 'resize', 'session_persist', 'locale'] as const
 
 export function seal<T>(type: string, payload: T, instanceId: string): Envelope<T> {
   return { ns: PROTOCOL_NS, v: PROTOCOL_VERSION, instanceId, type, payload }

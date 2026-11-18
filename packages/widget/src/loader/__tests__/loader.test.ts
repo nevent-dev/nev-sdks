@@ -745,6 +745,10 @@ describe('loader', () => {
       const iframe = document.querySelector('iframe')!
       expect(new URL(iframe.src).searchParams.has('lang')).toBe(false)
       expect(iframe.title).toBe('Chat de ayuda')
+      fakeShellMessage('locale', 'pt', bootedInstanceId())
+      expect(iframe.title).toBe('Chat de apoio')
+      fakeShellMessage('locale', '__proto__', bootedInstanceId())
+      expect(iframe.title).toBe('Chat de apoio')
     })
 
     it('lang del host no soportado (p.ej. "fr"): igual que sin lang — nunca se inventa un idioma soportado más cercano', () => {

@@ -1,18 +1,7 @@
 import { installGlobalStub, drainQueue, type ApiStub } from './api-queue'
 import { seal, open as openEnvelope, isCommand, SHELL_TO_LOADER } from '../protocol/envelope'
 import { readSessionBlob, writeSessionBlob, parseLastSeen } from './session-storage'
-import { resolveLocale, type WidgetLocale } from '../contract/locale'
-
-// Mapa MÍNIMO propio de títulos para iframe.title (Plan 4) — deliberadamente
-// NO importa panel/strings.ts: ese módulo trae los diccionarios completos de
-// las 4 traducciones y engordaría el bundle IIFE del loader (vite.loader.config.ts)
-// para una única clave que el loader necesita fuera de la propia shell.
-const LOADER_TITLES: Record<WidgetLocale, string> = {
-  es: 'Chat de ayuda',
-  en: 'Help chat',
-  ca: "Xat d'ajuda",
-  pt: 'Chat de ajuda',
-}
+import { resolveLocale, WIDGET_TITLES } from '../contract/locale'
 
 interface LoaderOptions { shellUrl: string }
 
@@ -32,7 +21,7 @@ const DARK_SCHEME_QUERY = '(prefers-color-scheme: dark)'
 // Validación PROPIA del surface que llega del shell por postMessage (frontera
 // no confiable, spec §7) — mismo allowlist hex3/hex6 que panel/theme.ts
 // #isSafeColor, duplicado a propósito: importar panel/ engordaría el bundle
-// IIFE del loader (mismo criterio que LOADER_TITLES arriba) y cada capa
+// IIFE del loader (mismo criterio que WIDGET_TITLES arriba) y cada capa
 // valida su propio lado del contrato (mismo patrón que parseLastSeenPayload
 // en shell/main.tsx).
 const SAFE_HEX = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
@@ -177,7 +166,7 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
     // de los 4 soportados: la shell cae a config.locale/'es', igual que
     // antes de esta task.
     const hostLocale = resolveLocale(w.document.documentElement.lang)
-    iframe.title = LOADER_TITLES[hostLocale ?? 'es']
+    iframe.title = WIDGET_TITLES[hostLocale ?? 'es']
     // allow-popups(+escape): el powered-by y los enlaces http(s) del bot abren
     // en pestaña nueva; sin escape heredarían el sandbox y quedarían en blanco.
     iframe.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox')
@@ -220,6 +209,11 @@ export function bootLoader(w: Window, opts: LoaderOptions): void {
         const session = readSessionBlob(w.document, w, instance.installationId)
         sendToShell('init', { installationId: instance.installationId, opts: instance.opts, session })
         sendViewport()
+        return
+      }
+      if (env.type === 'locale') {
+        const locale = typeof env.payload === 'string' ? resolveLocale(env.payload) : null
+        if (locale) instance.iframe.title = WIDGET_TITLES[locale]
         return
       }
       if (env.type === 'session_persist') {

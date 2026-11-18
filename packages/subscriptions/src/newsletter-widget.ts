@@ -836,6 +836,7 @@ export class NewsletterWidget {
    * inform the user instead of either erroring out or showing a broken form.
    */
   private renderUnavailable(): void {
+    if (this.hostElement) this.hostElement.lang = this.i18n.getLocale();
     const root = this.getRenderRoot();
     const message = this.i18n.t('widgetUnavailable');
     root.innerHTML = `
@@ -1355,6 +1356,7 @@ export class NewsletterWidget {
    * and renders either a dynamic (API-driven) or static form layout.
    */
   private render(): void {
+    if (this.hostElement) this.hostElement.lang = this.i18n.getLocale();
     const root = this.getRenderRoot();
     if (!root) {
       return;

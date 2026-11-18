@@ -140,36 +140,26 @@ describe('Widget Lifecycle (E2E)', () => {
       widget.destroy();
     });
 
-    it('should fall back to defaults when config endpoint fails', async () => {
+    it('shows unavailable and no form when the config endpoint returns 500', async () => {
       mockFetch({ configOk: false, configStatus: 500 });
       const { widget, container } = createWidget();
-
       await widget.init();
 
       const shadow = getShadowRoot(container)!;
-      const form = shadow.querySelector('form');
-      expect(form).not.toBeNull();
-
-      // Should still render at least an email field
-      const emailInput = shadow.querySelector('input[name="email"]');
-      expect(emailInput).not.toBeNull();
+      expect(shadow.querySelector('form')).toBeNull();
+      expect(shadow.querySelector('.nevent-widget-unavailable')?.getAttribute('role')).toBe('status');
 
       widget.destroy();
     });
 
-    it('should fall back to defaults when config endpoint throws network error', async () => {
-      vi.stubGlobal(
-        'fetch',
-        vi.fn().mockRejectedValue(new Error('Network error'))
-      );
+    it('shows unavailable and no form when the config endpoint has a network error', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
       const { widget, container } = createWidget();
-
       await widget.init();
 
       const shadow = getShadowRoot(container)!;
-      // Widget should still render with default fields
-      const form = shadow.querySelector('form');
-      expect(form).not.toBeNull();
+      expect(shadow.querySelector('form')).toBeNull();
+      expect(shadow.querySelector('.nevent-widget-unavailable')?.getAttribute('role')).toBe('status');
 
       widget.destroy();
     });

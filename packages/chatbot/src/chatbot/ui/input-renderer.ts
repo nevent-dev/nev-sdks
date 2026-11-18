@@ -30,6 +30,7 @@
  * coordinating uploads, clearing the input, and re-enabling it after send.
  */
 
+import { rendererLabel } from './renderer-labels';
 import type { FileAttachment, InputStyles } from '../../types';
 import { I18nManager } from '../i18n-manager';
 import { MessageSanitizer } from '../message-sanitizer';
@@ -466,14 +467,7 @@ export class InputRenderer {
    * @returns Localized keyboard hint string
    */
   private getKeyboardHint(): string {
-    const locale = this.i18n.getLocale ? this.i18n.getLocale() : 'en';
-    const hints: Record<string, string> = {
-      es: 'Pulsa Intro para enviar, Mayus+Intro para nueva linea.',
-      en: 'Press Enter to send, Shift+Enter for a new line.',
-      ca: 'Prem Intro per enviar, Maj+Intro per nova linia.',
-      pt: 'Pressione Enter para enviar, Shift+Enter para nova linha.',
-    };
-    return hints[locale] ?? hints['en']!;
+    return rendererLabel(this.i18n.getLocale?.(), 'keyboardHint');
   }
 
   /**

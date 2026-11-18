@@ -27,6 +27,7 @@
  * and updateMessage() with ChatMessage objects.
  */
 
+import { rendererLabel } from './renderer-labels';
 import type {
   ActionButton,
   ChatMessage,
@@ -886,14 +887,7 @@ export class MessageRenderer {
    * @returns Localized scroll to bottom label
    */
   private getScrollToBottomLabel(): string {
-    const locale = this.i18n.getLocale();
-    const labels: Record<string, string> = {
-      es: 'Ir al final de la conversación',
-      en: 'Scroll to bottom',
-      ca: 'Anar al final de la conversa',
-      pt: 'Ir para o final da conversa',
-    };
-    return labels[locale] ?? 'Scroll to bottom';
+    return rendererLabel(this.i18n.getLocale(), 'scrollToBottom');
   }
 
   /**
@@ -904,13 +898,7 @@ export class MessageRenderer {
    * @returns Localized sender label string
    */
   private getUserLabel(locale: string): string {
-    const labels: Record<string, string> = {
-      es: 'Tú dijiste',
-      en: 'You said',
-      ca: 'Has dit',
-      pt: 'Você disse',
-    };
-    return labels[locale] ?? 'You said';
+    return rendererLabel(locale, 'user');
   }
 
   /**
@@ -921,13 +909,7 @@ export class MessageRenderer {
    * @returns Localized sender label string
    */
   private getBotLabel(locale: string): string {
-    const labels: Record<string, string> = {
-      es: 'El bot dijo',
-      en: 'Bot said',
-      ca: 'El bot ha dit',
-      pt: 'O bot disse',
-    };
-    return labels[locale] ?? 'Bot said';
+    return rendererLabel(locale, 'bot');
   }
 
   /**
@@ -1683,19 +1665,15 @@ export class MessageRenderer {
     const isYesterday = this.isSameDay(date, yesterday);
 
     if (isToday) {
-      // Use "Hoy" / "Today" depending on locale
-      const locale = this.i18n.getLocale();
-      const todayLabels: Record<string, string> = {
-        es: 'Hoy',
-        en: 'Today',
-        ca: 'Avui',
-        pt: 'Hoje',
-      };
-      return todayLabels[locale] ?? 'Today';
+      return rendererLabel(this.i18n.getLocale(), 'today');
     }
 
     if (isYesterday) {
       return this.i18n.t('yesterday');
+    }
+
+    if (this.i18n.getLocale() === 'pt' && Number.isFinite(date.getTime())) {
+      return new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
     }
 
     // Format as DD/MM/YYYY
@@ -1756,7 +1734,10 @@ export class MessageRenderer {
       return this.i18n.format('hoursAgo', { n: diffHours });
     }
 
-    const timeStr = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+    const portuguese = this.i18n.getLocale() === 'pt' && Number.isFinite(date.getTime());
+    const timeStr = portuguese
+      ? new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit' }).format(date)
+      : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
@@ -1764,6 +1745,10 @@ export class MessageRenderer {
       return `${this.i18n.t('yesterday')} ${timeStr}`;
     }
 
+    if (portuguese) {
+      const dayAndMonth = new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: '2-digit' }).format(date);
+      return `${dayAndMonth} ${timeStr}`;
+    }
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     return `${day}/${month} ${timeStr}`;
