@@ -33,11 +33,19 @@ export function Panel({ config, transport, onClose, onResize, viewportKind, view
   const strings = useStrings()
   const state = useStoreState(transport.store)
   const feedback = useFeedback(config.feedback, transport, state, config.features.handoff)
-  const resolutionLocale = resolveLocale(feedback.resolutionPrompt?.locale ?? undefined)
+  const resolutionLocale = resolveLocale(feedback.resolutionPrompt?.locale ?? feedback.actionLocale)
   const teamLocale = resolveLocale(feedback.teamSurvey?.locale ?? undefined)
-  const surveyAnnouncement = feedback.resolutionPrompt?.status === 'PENDING' && resolutionLocale
-    ? STRINGS[resolutionLocale].resolutionQuestion
-    : feedback.teamSurvey?.status === 'PENDING' && teamLocale ? STRINGS[teamLocale].teamQuestion : ''
+  const resolutionStrings = resolutionLocale ? STRINGS[resolutionLocale] : null
+  let surveyAnnouncement = ''
+  if (feedback.nextAction === 'OFFER_HANDOFF' && resolutionStrings) {
+    surveyAnnouncement = resolutionStrings.offerHandoff
+  } else if (feedback.nextAction === 'REFORMULATE' && resolutionStrings) {
+    surveyAnnouncement = resolutionStrings.reformulate
+  } else if (feedback.resolutionPrompt?.status === 'PENDING' && resolutionStrings) {
+    surveyAnnouncement = resolutionStrings.resolutionQuestion
+  } else if (feedback.teamSurvey?.status === 'PENDING' && teamLocale) {
+    surveyAnnouncement = STRINGS[teamLocale].teamQuestion
+  }
   const close = (): void => { feedback.stopWaiting(); onClose() }
   const isStreaming = state.messages.some((m) => m.streaming)
   // session.ts ya normaliza assistantName con fallback locale-aware
@@ -70,7 +78,7 @@ export function Panel({ config, transport, onClose, onResize, viewportKind, view
     <>
       {viewState.conversationPhase === 'waiting' && <WaitingCard />}
       {state.agentTyping && viewState.conversationPhase === 'agent' && <TypingDots />}
-      {feedback.resolutionPrompt && resolutionLocale && (
+      {(feedback.resolutionPrompt || feedback.nextAction !== 'NONE') && resolutionLocale && (
         <StringsContext.Provider value={STRINGS[resolutionLocale]}>
           <div lang={resolutionLocale}>
             <ResolutionCard survey={feedback.resolutionPrompt} nextAction={feedback.nextAction}

@@ -30,6 +30,7 @@ export interface FeedbackState {
   resolutionSurvey: FeedbackSurvey | null
   teamSurvey: FeedbackSurvey | null
   answers: FeedbackRecord[]
+  nextAction?: FeedbackAction
 }
 
 export type FeedbackRequest =

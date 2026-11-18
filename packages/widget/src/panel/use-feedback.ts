@@ -10,6 +10,8 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
   const [resolutionPrompt, setResolutionPrompt] = useState<FeedbackSurvey | null>(null)
   const [nextAction, setNextAction] = useState<FeedbackAction>('NONE')
+  const [actionLocale, setActionLocale] = useState<string | null>(null)
+  const offeredAction = useRef(false)
   const candidate = useRef<{ lastMessageId: string | undefined } | null>(null)
   const cancelPrompt = useRef<(() => void) | null>(null)
   const syncRequest = useRef<AbortController | null>(null)
@@ -25,7 +27,7 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     cancelPrompt.current?.()
   }
 
-  async function syncFeedback(afterWrittenAnswer = false): Promise<void> {
+  async function syncFeedback(afterSend = false, hadPrompt = false): Promise<void> {
     syncRequest.current?.abort()
     const request = new AbortController()
     syncRequest.current = request
@@ -35,8 +37,12 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
       setFeedback(result)
       if (result.resolutionSurvey?.status === 'ANSWERED') {
         setResolutionPrompt(previous => previous ? result.resolutionSurvey : previous)
-        if (afterWrittenAnswer && result.resolutionSurvey.value === 0) {
-          setNextAction(handoffAvailable ? 'OFFER_HANDOFF' : 'REFORMULATE')
+        if (afterSend && !offeredAction.current && result.resolutionSurvey.value === 0) {
+          const legacyAction = hadPrompt ? (handoffAvailable ? 'OFFER_HANDOFF' : 'REFORMULATE') : 'NONE'
+          const action = result.nextAction ?? legacyAction
+          offeredAction.current = action !== 'NONE'
+          setActionLocale(result.resolutionSurvey.locale)
+          setNextAction(action)
         }
       } else if (result.resolutionSurvey?.status !== 'PENDING') {
         setResolutionPrompt(previous => previous?.status === 'PENDING' ? null : previous)
@@ -50,10 +56,12 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
   }
 
   useLayoutEffect(() => {
-    if (!config?.resolutionSurvey && !config?.teamSurvey && !config?.answerFeedback) return
     setFeedback(null)
     setResolutionPrompt(null)
     setNextAction('NONE')
+    setActionLocale(null)
+    offeredAction.current = false
+    if (!config?.resolutionSurvey && !config?.teamSurvey && !config?.answerFeedback) return
     if (!teamResolved || !config.teamSurvey) void syncFeedback()
     return () => syncRequest.current?.abort()
   }, [transport, config])
@@ -79,6 +87,7 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
   useEffect(() => {
     if (!botActive || state.newConversationNotice) {
+      if (state.newConversationNotice) offeredAction.current = false
       stopWaiting()
       setResolutionPrompt(null)
       setNextAction('NONE')
@@ -109,13 +118,16 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
   function onSend(send: () => Promise<void>): void {
     stopWaiting()
+    setNextAction('NONE')
     if (config?.resolutionSurvey && botActive && !resolutionPrompt) {
       candidate.current = { lastMessageId }
     }
 
-    const afterWrittenAnswer = resolutionPrompt?.status === 'PENDING'
+    const hadPrompt = resolutionPrompt?.status === 'PENDING'
     void send().finally(() => {
-      if (afterWrittenAnswer || (teamResolved && config?.teamSurvey)) void syncFeedback(afterWrittenAnswer)
+      if (config?.resolutionSurvey || (teamResolved && config?.teamSurvey)) {
+        void syncFeedback(true, hadPrompt)
+      }
     })
   }
 
@@ -123,7 +135,9 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     const result = await transport.feedback({ kind: 'RESOLVED', value })
     syncRequest.current?.abort()
     setResolutionPrompt(previous => previous && { ...previous, status: 'ANSWERED', value: result.feedback.value })
+    offeredAction.current = result.nextAction !== 'NONE'
     setNextAction(result.nextAction)
+    setActionLocale(resolutionPrompt?.locale ?? null)
   }
 
   async function rateTeam(value: 1 | 2 | 3, comment?: string): Promise<void> {
@@ -143,10 +157,11 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     resolutionPrompt,
     teamSurvey,
     nextAction,
+    actionLocale,
     stopWaiting,
     onSend,
     answerResolution,
-    expireResolution: () => setResolutionPrompt(null),
+    expireResolution: () => { setResolutionPrompt(null); setNextAction('NONE') },
     rateTeam,
     expireTeam: () => setFeedback(previous => previous && { ...previous, teamSurvey: null }),
     acceptHandoff,
