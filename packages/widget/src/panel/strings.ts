@@ -414,6 +414,8 @@ const fr: WidgetStrings = {
   timeLocale: 'fr-FR',
 }
 
+const italianInteger = new Intl.NumberFormat('it-IT')
+
 const it: WidgetStrings = {
   launcherOpen: 'Apri la chat di assistenza',
   headerClose: 'Chiudi',
@@ -441,7 +443,7 @@ const it: WidgetStrings = {
   retry: 'Riprova',
   today: 'Oggi',
   jumpLatest: 'Vai all’ultimo messaggio',
-  pill: (count) => `${count} ${count === 1 ? 'nuovo messaggio' : 'nuovi messaggi'}, vai all’ultimo`,
+  pill: (count) => `${italianInteger.format(count)} ${count === 1 ? 'nuovo messaggio' : 'nuovi messaggi'}, vai all’ultimo`,
   welcomeTitle: 'Ciao 👋 Come possiamo aiutarti?',
   welcomeSubtitle: 'Scrivici e ti risponderemo subito.',
   handoffTitle: 'Ti mettiamo in contatto con il team',
@@ -450,7 +452,7 @@ const it: WidgetStrings = {
   resolvedByAgent: (agentName) => `${agentName} ha risolto la tua richiesta.`,
   resolvedGeneric: 'Abbiamo risolto la tua richiesta.',
   resolvedTail: 'Se hai altre domande, scrivici. Ti risponderemo subito.',
-  agentTyping: 'Stanno scrivendo',
+  agentTyping: 'Una persona del team sta scrivendo',
   resolutionQuestion: 'Abbiamo risolto la tua richiesta?',
   yes: 'Sì',
   no: 'No',

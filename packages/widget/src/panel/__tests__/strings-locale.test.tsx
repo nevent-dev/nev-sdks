@@ -61,7 +61,7 @@ describe('locale — el árbol respeta STRINGS.en vía StringsContext.Provider',
 })
 
 describe('STRINGS — paridad de claves entre locales (nunca una traducción a medias)', () => {
-  it('es/en/ca/pt/fr exponen exactamente las mismas claves', () => {
+  it('es/en/ca/pt/fr/it exponen exactamente las mismas claves', () => {
     const keysOf = (o: WidgetStrings): string[] => Object.keys(o).sort()
     const es = keysOf(STRINGS.es)
     expect(es.length).toBeGreaterThan(0)
@@ -70,5 +70,12 @@ describe('STRINGS — paridad de claves entre locales (nunca una traducción a m
     expect(keysOf(STRINGS.pt)).toEqual(es)
     expect(keysOf(STRINGS.fr)).toEqual(es)
     expect(STRINGS.fr.timeLocale).toBe('fr-FR')
+    expect(keysOf(STRINGS.it)).toEqual(es)
+    expect(STRINGS.it.timeLocale).toBe('it-IT')
   })
+})
+
+it('localizes the Italian unread count while keeping singular and plural', () => {
+  expect(STRINGS.it.pill(1)).toBe('1 nuovo messaggio, vai all’ultimo')
+  expect(STRINGS.it.pill(12345)).toBe('12.345 nuovi messaggi, vai all’ultimo')
 })

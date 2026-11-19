@@ -98,6 +98,10 @@ test('it rejects another language and spaces before punctuation', () => {
   assert.deepEqual(localeMapProblems('chatbot', entries, ['es', 'it'], ['title']), [
     'chatbot.it: invalid Italian typography: Apri l’{{item}}.',
   ]);
+  entries.it = "    title: 'Benvenut* in Nevent.',";
+  assert.deepEqual(localeMapProblems('chatbot', entries, ['es', 'it'], ['title']), [
+    'chatbot.it: invalid Italian typography: Benvenut* in Nevent.',
+  ]);
   entries.it = "    title: 'Apri l’app: «Aiuto».',";
   assert.deepEqual(localeMapProblems('chatbot', entries, ['es', 'it'], ['title']), []);
 });
