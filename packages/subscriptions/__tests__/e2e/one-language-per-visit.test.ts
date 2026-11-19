@@ -216,6 +216,24 @@ describe('One language per visit (nevent-work#40)', () => {
     widget.destroy();
   });
 
+  it('shows the complete French validation message for an invalid email', async () => {
+    browser(['fr-FR']);
+    const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'fr', textsLanguage: 'fr', fieldConfigurations: [] } });
+    const { widget, container } = createWidget({ locale: 'fr' });
+    await widget.init();
+
+    const shadow = getShadowRoot(container)!;
+    fillInput(shadow, 'input[name="email"]', 'adresse-invalide');
+    toggleCheckbox(shadow, '.nevent-gdpr-checkbox', true);
+    submitForm(shadow);
+    await vi.advanceTimersByTimeAsync(100);
+    await flush();
+
+    expect(shadow.querySelector('.nevent-field-error')?.textContent).toBe('Saisissez une adresse e-mail valide.');
+    expect(fetchMock.mock.calls.some((call: unknown[]) => String(call[0]).includes('/subscribe'))).toBe(false);
+    widget.destroy();
+  });
+
   it('an older API (no textsLanguage) keeps the negotiation of nevent-work#279 and no textsLanguage is sent', async () => {
     browser(['en-GB']);
     const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'es' } });

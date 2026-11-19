@@ -28,11 +28,11 @@ export const fr: NewsletterLabels = {
   birthDatePlaceholder: 'Date de naissance',
 
   fieldRequired: 'Champ obligatoire : {{fieldName}}',
-  fieldInvalid: 'Valeur non valide pour {{fieldName}}',
-  invalidEmailFormat: 'Saisissez une adresse e-mail valide',
-  invalidPhoneFormat: 'Saisissez un numéro de téléphone valide',
-  invalidNumberFormat: 'Saisissez un numéro valide',
-  invalidUrlFormat: 'Saisissez une URL valide',
+  fieldInvalid: 'Valeur non valide pour {{fieldName}}.',
+  invalidEmailFormat: 'Saisissez une adresse e-mail valide.',
+  invalidPhoneFormat: 'Saisissez un numéro de téléphone valide.',
+  invalidNumberFormat: 'Saisissez un numéro valide.',
+  invalidUrlFormat: 'Saisissez une URL valide.',
 
   statusRegionLabel: 'État du formulaire',
   errorPrefix: 'Erreur :',
