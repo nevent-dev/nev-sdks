@@ -13,6 +13,7 @@ import { es } from './es';
 import { en } from './en';
 import { ca } from './ca';
 import { pt } from './pt';
+import { fr } from './fr';
 
 export type { NewsletterLabels } from './types';
 
@@ -24,6 +25,7 @@ export const NEWSLETTER_LOCALES: Record<string, NewsletterLabels> = {
   en,
   ca,
   pt,
+  fr,
 };
 
 /**
@@ -77,7 +79,7 @@ function initialLocale(locale?: string | null): string {
  * The locale an anonymous visitor sees the widget in (nevent-work#279, decision 4 of #274, option B):
  * 1. a locale the operator set in the embed, if the widget has labels for it;
  * 2. the first browser language whose labels the widget has (it negotiates among the tenant's language and the
- *    widget's own: es, en, ca, pt);
+ *    widget's own: es, en, ca, pt, fr);
  * 3. the tenant's language (`tenantLanguage` of the public config), if the widget has labels for it;
  * 4. English — never a fixed Spanish.
  * Without `tenantLanguage` (an API that does not send it yet) it is exactly today's choice, {@link createNewsletterI18n}:
@@ -111,7 +113,7 @@ export function negotiateWidgetLocale(
  * The languages the API has default texts for (title, button, messages, consent): the widget can only show a visit in
  * one language if the API serves its texts in it (nevent-work#40).
  */
-export const API_TEXT_LANGUAGES: readonly string[] = ['es', 'en', 'pt'];
+export const API_TEXT_LANGUAGES: readonly string[] = ['es', 'en', 'pt', 'fr'];
 
 /**
  * The language the widget asks the API for, before it reads the config (nevent-work#40), as `?language=`: the embed's
@@ -140,7 +142,7 @@ export function preferredWidgetLocale(
  * The one locale of a visit (nevent-work#40). With an API that says the language of its default texts
  * (`textsLanguage`), the visit is in that language, so title, fields, consent, errors and messages never mix two; only
  * an explicit locale of the embed overrides it (the operator chose it, and usually wrote the newsletter's own texts in
- * it). If the API reports a different language for a Portuguese request, follow the reported one. Without `textsLanguage`, {@link negotiateWidgetLocale} as before.
+ * it). For Portuguese and French requests, follow the reported language during API rollouts. Without `textsLanguage`, {@link negotiateWidgetLocale} as before.
  */
 export function visitLocale(
   browserLanguages: readonly string[],
@@ -151,9 +153,9 @@ export function visitLocale(
   const texts = baseLanguage(textsLanguage);
   if (texts && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, texts)) {
     const explicit = baseLanguage(explicitLocale);
-    // An older API may have fallen back to its tenant language for a Portuguese request.
+    // An older API may have fallen back to its tenant language for Portuguese or French.
     // Follow the actual texts so the form and the consent have the same language.
-    if (explicit === 'pt') return texts;
+    if (explicit === 'pt' || explicit === 'fr') return texts;
     return explicit && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, explicit) ? explicit : texts;
   }
   if (tenantLanguage === undefined || tenantLanguage === null || tenantLanguage.trim() === '') {

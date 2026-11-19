@@ -75,6 +75,7 @@ export interface WidgetStrings {
   // van el icono, el valor y el botón: el nombre del canal no se pinta.
   contactAction: Record<ContactChannel, string>
   contactChannel: Record<ContactChannel, string>
+  contactSeparator: string
   timeLocale: string
 }
 
@@ -141,6 +142,7 @@ const es: WidgetStrings = {
   newConvDesc: 'La conversación anterior expiró. Cuéntanos en qué te ayudamos.',
   contactAction: { WHATSAPP: 'Abrir WhatsApp', PHONE: 'Llamar', EMAIL: 'Escribir un email' },
   contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Teléfono', EMAIL: 'Email' },
+  contactSeparator: ': ',
   timeLocale: 'es-ES',
 }
 
@@ -207,6 +209,7 @@ const en: WidgetStrings = {
   newConvDesc: 'The previous conversation expired. Tell us how we can help.',
   contactAction: { WHATSAPP: 'Open WhatsApp', PHONE: 'Call', EMAIL: 'Send an email' },
   contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Phone', EMAIL: 'Email' },
+  contactSeparator: ': ',
   timeLocale: 'en-GB',
 }
 
@@ -273,6 +276,7 @@ const ca: WidgetStrings = {
   newConvDesc: "La conversa anterior va caducar. Explica'ns en què et podem ajudar.",
   contactAction: { WHATSAPP: 'Obre WhatsApp', PHONE: 'Truca', EMAIL: 'Envia un correu' },
   contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Telèfon', EMAIL: 'Correu electrònic' },
+  contactSeparator: ': ',
   timeLocale: 'ca-ES',
 }
 
@@ -339,10 +343,78 @@ const pt: WidgetStrings = {
   newConvDesc: 'A conversa anterior expirou. Diga-nos como podemos ajudar.',
   contactAction: { WHATSAPP: 'Abrir o WhatsApp', PHONE: 'Ligar', EMAIL: 'Enviar email' },
   contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Telefone', EMAIL: 'Email' },
+  contactSeparator: ': ',
   timeLocale: 'pt-PT',
 }
 
-export const STRINGS: Record<WidgetLocale, WidgetStrings> = { es, en, ca, pt }
+const fr: WidgetStrings = {
+  launcherOpen: 'Ouvrir le chat d’assistance',
+  headerClose: 'Fermer',
+  stateOnline: 'En ligne',
+  stateInstant: 'Réponse instantanée',
+  stateTyping: 'Saisie en cours…',
+  stateTeamSoon: 'L’équipe vous répondra bientôt',
+  stateResolved: 'Conversation résolue',
+  team: 'L’équipe',
+  assistantFallback: 'Assistant',
+  placeholderIdle: 'Saisissez votre question…',
+  placeholderTeam: 'Écrivez à l’équipe…',
+  placeholderAgent: (agentName) => `Écrivez à ${agentName}…`,
+  composerAria: 'Saisissez votre message',
+  attach: 'Joindre un fichier',
+  attachSoon: 'Bientôt disponible',
+  send: 'Envoyer',
+  stop: 'Arrêter la réponse',
+  poweredPrefix: 'Une technologie',
+  connReconnecting: 'Reconnexion…',
+  connOffline: 'Hors ligne. Nouvelle tentative…',
+  connShortOffline: 'Hors ligne',
+  thinking: 'Réflexion en cours…',
+  notSent: 'Non envoyé',
+  retry: 'Réessayer',
+  today: 'Aujourd’hui',
+  jumpLatest: 'Aller au dernier message',
+  pill: (count) => `${count} ${count === 1 ? 'nouveau message' : 'nouveaux messages'}, aller au dernier message`,
+  welcomeTitle: 'Bonjour 👋 Comment pouvons-nous vous aider ?',
+  welcomeSubtitle: 'Écrivez-nous et nous vous répondrons tout de suite.',
+  handoffTitle: 'Mise en relation avec l’équipe',
+  handoffDesc: 'L’équipe vous répondra bientôt. Vous pouvez continuer à écrire en attendant.',
+  joinedSuffix: 'a rejoint la conversation',
+  resolvedByAgent: (agentName) => `${agentName} a résolu votre demande.`,
+  resolvedGeneric: 'Votre demande a été résolue.',
+  resolvedTail: 'Si vous avez une autre question, écrivez-nous. Nous vous répondrons tout de suite.',
+  agentTyping: 'Votre interlocuteur écrit',
+  resolutionQuestion: 'Avons-nous répondu à votre question ?',
+  yes: 'Oui',
+  no: 'Non',
+  offerHandoff: 'Souhaitez-vous parler à un membre de l’équipe ?',
+  acceptHandoff: 'Oui, parler à un membre de l’équipe',
+  declineHandoff: 'Non, merci',
+  reformulate: 'Reformulez votre question pour réessayer.',
+  teamQuestion: 'Comment évaluez-vous notre assistance ?',
+  teamGood: 'Bonne',
+  teamFair: 'Moyenne',
+  teamPoor: 'Mauvaise',
+  teamComment: 'Que pouvons-nous améliorer ? (facultatif)',
+  commentPrivacy: 'N’indiquez aucune donnée personnelle.',
+  feedbackThanks: 'Merci pour votre évaluation.',
+  answerQuestion: 'Qu’est-ce qui n’a pas fonctionné ?',
+  answerIncorrect: 'La réponse est incorrecte',
+  answerOutdated: 'La réponse n’est plus à jour',
+  answerIrrelevant: 'La réponse ne répond pas à ma question',
+  answerOther: 'Autre raison',
+  answerComment: 'Précisez votre réponse (facultatif)',
+  rateUp: 'Évaluer positivement',
+  rateDown: 'Évaluer négativement',
+  newConvTitle: 'Nouvelle conversation',
+  newConvDesc: 'La conversation précédente a expiré. Dites-nous comment nous pouvons vous aider.',
+  contactAction: { WHATSAPP: 'Ouvrir WhatsApp', PHONE: 'Appeler', EMAIL: 'Envoyer un e-mail' },
+  contactChannel: { WHATSAPP: 'WhatsApp', PHONE: 'Téléphone', EMAIL: 'E-mail' },
+  contactSeparator: ' : ',
+  timeLocale: 'fr-FR',
+}
+
+export const STRINGS: Record<WidgetLocale, WidgetStrings> = { es, en, ca, pt, fr }
 
 // Español por defecto: el mismo criterio que el resto del shell cuando nadie
 // (host ni config) declara un locale soportado (Plan 4, prioridad host >

@@ -66,13 +66,15 @@ async function flushPromises(ticks = 5): Promise<void> {
 describe('MessageRenderer — rendering', () => {
   let renderer: MessageRenderer;
   let container: HTMLElement;
+  let i18n: I18nManager;
 
   beforeEach(() => {
     document.body.innerHTML = '';
+    i18n = createI18n();
     renderer = new MessageRenderer(
       undefined,
       undefined,
-      createI18n(),
+      i18n,
       MessageSanitizer
     );
     container = renderer.render();
@@ -124,6 +126,18 @@ describe('MessageRenderer — rendering', () => {
       '.nevent-chatbot-message--assistant'
     );
     expect(messageEl).not.toBeNull();
+  });
+
+  it('renders French message labels, dates and timestamps', () => {
+    i18n.setLocale('fr');
+    const sent = new Date(2020, 6, 14, 18, 9);
+    renderer.addMessage(createMockMessage({ timestamp: sent.toISOString() }));
+
+    const separator = container.querySelector('.nevent-chatbot-date-separator');
+    const timestamp = container.querySelector('.nevent-chatbot-message-timestamp');
+    expect(separator?.textContent).toContain('14/07/2020');
+    expect(timestamp?.textContent).toContain('14/07 18:09');
+    expect(container.querySelector('.nevent-chatbot-message--user')?.getAttribute('aria-label')).toContain('Message envoyé : ');
   });
 
   it('should render multiple messages in order', () => {

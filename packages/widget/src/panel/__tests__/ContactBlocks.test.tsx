@@ -39,15 +39,17 @@ describe('ContactBlocks — textos del catálogo (nevent-work#15)', () => {
     en: { action: ['Open WhatsApp', 'Call', 'Send an email'], aria: ['WhatsApp', 'Phone', 'Email'] },
     ca: { action: ['Obre WhatsApp', 'Truca', 'Envia un correu'], aria: ['WhatsApp', 'Telèfon', 'Correu electrònic'] },
     pt: { action: ['Abrir o WhatsApp', 'Ligar', 'Enviar email'], aria: ['WhatsApp', 'Telefone', 'Email'] },
+    fr: { action: ['Ouvrir WhatsApp', 'Appeler', 'Envoyer un e-mail'], aria: ['WhatsApp', 'Téléphone', 'E-mail'] },
   }
 
-  for (const locale of ['es', 'en', 'ca', 'pt'] as const) {
+  for (const locale of ['es', 'en', 'ca', 'pt', 'fr'] as const) {
     it(`${locale}: botón y aria del bloque por canal`, async () => {
       for (const [i, block] of [wa, tel, mail].entries()) {
         const root = await mount(inLocale(locale, [block]))
         const group = root.querySelector('.cblock')!
         expect(group.getAttribute('role')).toBe('group')
-        expect(group.getAttribute('aria-label')).toBe(`${catalog[locale].aria[i]}: ${block.display}`)
+        const separator = locale === 'fr' ? ' : ' : ': '
+        expect(group.getAttribute('aria-label')).toBe(`${catalog[locale].aria[i]}${separator}${block.display}`)
         expect(root.querySelector('a.act')?.textContent).toBe(catalog[locale].action[i])
       }
     })

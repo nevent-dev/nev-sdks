@@ -132,6 +132,11 @@ export function compare(found, baseline) {
 
 const PORTUGUESE_COPY = /(?<![\p{L}\p{M}])(?:você|vocês|conosco|arquivo|celular|conectando|reconectando|contato|senha|nova aba|subscripci[oó]n|subscricao|politica de privacidade|e-mail|tu|teu|tua)(?![\p{L}\p{M}])/iu;
 
+const REQUIRED_LOCALES = ['es', 'en', 'ca', 'pt', 'fr'];
+const FRENCH_COPY = /(?<![\p{L}\p{M}])(?:haz clic|introduce tu|sin conexión|tu cuenta|todos los derechos reservados|click here|type a message|your account|new conversation|sem ligação|tente novamente|courriel)(?![\p{L}\p{M}])/iu;
+const FRENCH_TYPOGRAPHY = /(?:\p{L}'\p{L}|\.{3}|«(?!\u00a0)|(?<!\u00a0)»|[\p{L}\p{N}] *(?:[;!?%]|:(?![/\d])))/u;
+const CATALOG_LITERAL = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
+
 function objectBody(code, name) {
   return new RegExp(`^\\w*\\s*const ${name}(?::[^\\n]+)? = \\{\\n([\\s\\S]*?)^\\}`, 'm').exec(code)?.[1] ?? '';
 }
@@ -151,6 +156,14 @@ export function localeMapProblems(name, entries, languages, keys, indent = 4) {
     if (locale === 'pt') {
       const expression = body.match(PORTUGUESE_COPY)?.[0];
       if (expression) problems.push(`${name}.pt: ${expression}`);
+    }
+    if (locale === 'fr') {
+      for (const [, , literal] of body.matchAll(CATALOG_LITERAL)) {
+        const visible = literal.replace(/\$\{[^}]*\}|\{\{?[A-Za-z]\w*\}\}?/g, ' ');
+        const expression = visible.match(FRENCH_COPY)?.[0];
+        if (expression) problems.push(`${name}.fr: ${expression}`);
+        if (FRENCH_TYPOGRAPHY.test(visible)) problems.push(`${name}.fr: invalid French typography: ${literal}`);
+      }
     }
   }
   return problems;
@@ -179,7 +192,7 @@ export function scanLocaleMaps(repo = REPO) {
   const panelLocales = /\bconst STRINGS: [^=]+ = \{ ([^}]+) \}/.exec(panel)?.[1].split(/,\s*/) ?? [];
   const panelCatalogs = Object.fromEntries(panelLocales.map(locale => [locale, objectBody(panel, locale)]));
   const maps = [
-    ['newsletter', newsletter, [...new Set([...newsletterLocales, 'pt'])], 2],
+    ['newsletter', newsletter, newsletterLocales, 2],
     ['chatbot', catalog, chatbotLocales, 4],
     ['chatbot-renderers', renderer, chatbotLocales, 4],
     ['support-panel', panelCatalogs, widgetLocales, 2],
@@ -187,6 +200,6 @@ export function scanLocaleMaps(repo = REPO) {
   ];
   return maps.flatMap(([name, entries, locales, indent]) => [
     ...(!entries.es?.trim() ? [`${name}: Spanish reference catalogue missing`] : []),
-    ...localeMapProblems(name, entries, locales, indent ? keysAt(entries.es ?? '', indent) : undefined, indent),
+    ...localeMapProblems(name, entries, [...new Set([...locales, ...REQUIRED_LOCALES])], indent ? keysAt(entries.es ?? '', indent) : undefined, indent),
   ]);
 }

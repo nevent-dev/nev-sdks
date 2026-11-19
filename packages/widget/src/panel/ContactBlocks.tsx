@@ -35,7 +35,7 @@ export function ContactBlocks({ blocks }: ContactBlocksProps) {
         const action = strings.contactAction[b.channel]
         const external = b.channel === 'WHATSAPP' || touch
         return (
-          <div class="cblock" role="group" aria-label={`${strings.contactChannel[b.channel]}: ${b.display}`} key={`${b.channel}:${b.value}:${i}`}>
+          <div class="cblock" role="group" aria-label={`${strings.contactChannel[b.channel]}${strings.contactSeparator}${b.display}`} key={`${b.channel}:${b.value}:${i}`}>
             <div class="v">
               <span class={`ic ic-${b.channel.toLowerCase()}`}><ContactChannelIcon channel={b.channel} /></span>
               <span class="val">{b.display}</span>

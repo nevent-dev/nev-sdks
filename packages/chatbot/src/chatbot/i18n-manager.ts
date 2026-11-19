@@ -212,6 +212,45 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     brandingAriaLabel: 'Desenvolvido pela Nevent. Chatbot com IA para eventos',
     defaultWelcomeMessage: 'Olá! Como posso ajudar?',
   },
+  /** French (France) (fr) */
+  fr: {
+    inputPlaceholder: 'Saisissez un message…',
+    sendButton: 'Envoyer',
+    defaultTitle: 'Discuter avec nous',
+    statusOnline: 'En ligne',
+    statusConnecting: 'Connexion…',
+    statusOffline: 'Hors ligne',
+    typingIndicator: 'Réflexion en cours…',
+    messageSendError: 'Impossible d’envoyer le message. Réessayez.',
+    connectionError: 'Erreur de connexion. Nouvelle tentative…',
+    rateLimitError: 'Trop de messages. Patientez un instant.',
+    rateLimitCountdown: 'Trop de messages. Patientez {seconds} secondes.',
+    rateLimitCountdownOne: 'Trop de messages. Patientez une seconde.',
+    poweredBy: 'Une technologie Nevent',
+    newConversation: 'Nouvelle conversation',
+    closeChat: 'Fermer la discussion',
+    minimizeChat: 'Réduire la discussion',
+    openChat: 'Ouvrir la discussion',
+    retry: 'Réessayer',
+    justNow: 'À l’instant',
+    minutesAgo: 'il y a {n} min',
+    hoursAgo: 'il y a {n} h',
+    yesterday: 'Hier',
+    connectionOffline: 'Pas de connexion Internet',
+    connectionReconnecting: 'Reconnexion…',
+    connectionReconnected: 'Connexion rétablie',
+    attachFile: 'Joindre un fichier',
+    removeFile: 'Supprimer',
+    uploading: 'Envoi en cours',
+    fileTooBig: 'Le fichier dépasse la taille maximale de {maxMB} Mo.',
+    fileTypeNotAllowed: 'Type de fichier non autorisé.',
+    uploadFailed: 'Impossible d’envoyer le fichier. Réessayez.',
+    dragDropHint: 'Déposez les fichiers ici',
+    agentTyping: '{name} écrit…',
+    someoneTyping: 'Une personne écrit…',
+    brandingAriaLabel: 'Une technologie Nevent. Chatbot IA pour les événements',
+    defaultWelcomeMessage: 'Bonjour ! Comment puis-je vous aider ?',
+  },
 };
 
 /**
@@ -222,6 +261,7 @@ const SUPPORTED_LOCALES: ReadonlyArray<SupportedLocale> = [
   'en',
   'ca',
   'pt',
+  'fr',
 ];
 
 /**
@@ -306,7 +346,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * After calling this method, all subsequent calls to `t()` and `format()`
    * will return strings in the new locale.
    *
-   * @param locale - A supported locale code ('es' | 'en' | 'ca' | 'pt')
+   * @param locale - A supported locale code ('es' | 'en' | 'ca' | 'pt' | 'fr')
    *
    * @example
    * ```typescript
@@ -321,7 +361,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
   /**
    * Returns the currently active locale code.
    *
-   * @returns The active locale (e.g., 'es', 'en', 'ca', 'pt')
+   * @returns The active locale (e.g., 'es', 'en', 'ca', 'pt', 'fr')
    *
    * @example
    * ```typescript
@@ -450,7 +490,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * it to the nearest supported locale. If no match is found, returns the
    * default locale ('es').
    *
-   * @returns A supported locale code ('es' | 'en' | 'ca' | 'pt')
+   * @returns A supported locale code ('es' | 'en' | 'ca' | 'pt' | 'fr')
    *
    * @example
    * ```typescript
@@ -463,7 +503,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * // navigator.language = 'ca'
    * I18nManager.detectLocale(); // 'ca'
    *
-   * // navigator.language = 'fr-FR' (unsupported)
+   * // navigator.language = 'de-DE' (unsupported)
    * I18nManager.detectLocale(); // 'es' (default fallback)
    * ```
    */

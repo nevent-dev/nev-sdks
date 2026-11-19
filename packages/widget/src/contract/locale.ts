@@ -1,8 +1,8 @@
-// Los 4 locales soportados por el widget (Plan 4). Vive en su propio módulo,
+// Los locales soportados por el widget (Plan 4). Vive en su propio módulo,
 // SIN diccionarios (esos están en panel/strings.ts) — lo importa también el
 // loader (IIFE, ver vite.loader.config.ts), que no puede permitirse cargar
 // las traducciones completas solo para detectar el idioma del host.
-export type WidgetLocale = 'es' | 'en' | 'ca' | 'pt'
+export type WidgetLocale = 'es' | 'en' | 'ca' | 'pt' | 'fr'
 
 // Shared by the frame and its loader without bundling the panel strings.
 export const WIDGET_TITLES: Record<WidgetLocale, string> = {
@@ -10,6 +10,7 @@ export const WIDGET_TITLES: Record<WidgetLocale, string> = {
   en: 'Help chat',
   ca: "Xat d'ajuda",
   pt: 'Chat de apoio',
+  fr: 'Chat d’assistance',
 }
 
 // Normaliza un candidato crudo (document.documentElement.lang del host,

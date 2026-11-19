@@ -664,7 +664,8 @@ export class NewsletterWidget {
     try {
       // nevent-work#40: ask for the default texts in the visitor's locale, so the whole form is in one language
       const preferred = preferredWidgetLocale(browserLanguages(), this.config.locale);
-      const language = preferred ? `&language=${encodeURIComponent(preferred)}` : '';
+      // New embeds opt in to the tenant's full catalogue when they have no visitor language to request.
+      const language = `&language=${encodeURIComponent(preferred ?? 'auto')}`;
       const url = `${this.config.apiUrl}/public/widget/${this.config.newsletterId}/config?tenantId=${this.config.tenantId}${language}`;
 
       // Use a single retry for config loading (non-critical, falls back to defaults)

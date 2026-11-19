@@ -224,8 +224,15 @@ describe('I18nManager', () => {
       expect(I18nManager.detectLocale()).toBe('pt');
     });
 
+    it.each(['fr-FR', 'fr-CA', 'fr-CH'])('negotiates %s to the French catalogue', (language) => {
+      vi.stubGlobal('navigator', { language });
+      const i18n = new I18nManager();
+      expect(i18n.getLocale()).toBe('fr');
+      expect(i18n.t('sendButton')).toBe('Envoyer');
+    });
+
     it("should fallback to 'es' for unsupported locale", () => {
-      vi.stubGlobal('navigator', { language: 'fr-FR' });
+      vi.stubGlobal('navigator', { language: 'de-DE' });
       expect(I18nManager.detectLocale()).toBe('es');
     });
 
