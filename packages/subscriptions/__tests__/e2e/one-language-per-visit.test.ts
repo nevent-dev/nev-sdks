@@ -178,13 +178,16 @@ describe('One language per visit (nevent-work#40)', () => {
   });
 
   it.each([
-    { browserLocale: 'de-DE', explicit: undefined, requested: 'auto' },
-    { browserLocale: 'en-GB', explicit: 'fr-BE', requested: 'fr' },
-  ])('keeps French config, local labels and consent aligned ($requested)', async ({ browserLocale, explicit, requested }) => {
+    { browserLocale: 'fr-CA', tenantLanguage: 'es', explicit: undefined, requested: 'fr' },
+    { browserLocale: 'de-DE', tenantLanguage: 'fr', explicit: undefined, requested: 'auto' },
+    { browserLocale: 'en-GB', tenantLanguage: 'fr', explicit: 'fr-BE', requested: 'fr' },
+  ])('keeps French config, local labels and consent aligned ($browserLocale, $requested)', async ({
+    browserLocale, tenantLanguage, explicit, requested,
+  }) => {
     browser([browserLocale]);
     const consent = 'J’accepte le traitement de mes données personnelles.';
     const fetchMock = mockFetch({ configResponse: {
-      tenantLanguage: 'fr',
+      tenantLanguage,
       textsLanguage: 'fr',
       messages: { title: 'Newsletter du festival', gdprText: consent },
     } });
@@ -256,12 +259,12 @@ describe('One language per visit (nevent-work#40)', () => {
 describe('preferredWidgetLocale and visitLocale', () => {
   it('the embed locale, else the first browser language the API has texts for, else none', () => {
     expect(preferredWidgetLocale(['en-GB'], undefined)).toBe('en');
-    expect(preferredWidgetLocale(['fr-FR', 'ca-ES', 'en'], undefined)).toBe('en');
+    expect(preferredWidgetLocale(['fr-CH', 'ca-ES', 'en'], undefined)).toBe('fr');
     expect(preferredWidgetLocale(['ca-ES'], undefined)).toBeUndefined();
     expect(preferredWidgetLocale(['pt-BR', 'es'], undefined)).toBe('pt');
     expect(preferredWidgetLocale(['en-GB'], 'ca')).toBe('ca');
     expect(preferredWidgetLocale(['en-GB'], 'es')).toBe('es');
-    expect(preferredWidgetLocale(['fr-FR'], 'xx')).toBeUndefined();
+    expect(preferredWidgetLocale(['de-DE'], 'xx')).toBeUndefined();
     expect(preferredWidgetLocale([], undefined)).toBeUndefined();
   });
 
