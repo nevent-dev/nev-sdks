@@ -5,11 +5,15 @@ import type { Transport } from '../transport'
 import { FeedbackUnavailable } from '../transport/feedback'
 
 const SURVEY_DELAY_MS = 120_000
+const INITIAL_READ_TIMEOUT_MS = 2_000
 
 export function useFeedback(config: WidgetFeedbackConfig | undefined, transport: Transport, state: StoreState, handoffAvailable: boolean) {
   const [feedback, setFeedback] = useState<FeedbackState | null>(null)
   const [resolutionPrompt, setResolutionPrompt] = useState<FeedbackSurvey | null>(null)
   const [nextAction, setNextAction] = useState<FeedbackAction>('NONE')
+  const [actionLocale, setActionLocale] = useState<string | null>(null)
+  const lastResolution = useRef<FeedbackSurvey | null | undefined>(undefined)
+  const initialRead = useRef<Promise<void> | null>(null)
   const candidate = useRef<{ lastMessageId: string | undefined } | null>(null)
   const cancelPrompt = useRef<(() => void) | null>(null)
   const syncRequest = useRef<AbortController | null>(null)
@@ -25,20 +29,35 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     cancelPrompt.current?.()
   }
 
-  async function syncFeedback(afterWrittenAnswer = false): Promise<void> {
+  async function syncFeedback({ afterSend = false, hadPrompt = false, initial = false } = {}): Promise<void> {
     syncRequest.current?.abort()
     const request = new AbortController()
     syncRequest.current = request
+    let timeout: ReturnType<typeof setTimeout> | undefined
     try {
-      const result = await transport.feedbackState(request.signal)
-      if (request.signal.aborted) return
+      const pending = transport.feedbackState(request.signal)
+      const result = initial ? await Promise.race([
+        pending,
+        new Promise<null>(resolve => {
+          timeout = setTimeout(() => { resolve(null); request.abort() }, INITIAL_READ_TIMEOUT_MS)
+        }),
+      ]) : await pending
+      if (!result || request.signal.aborted) return
       setFeedback(result)
-      if (result.resolutionSurvey?.status === 'ANSWERED') {
-        setResolutionPrompt(previous => previous ? result.resolutionSurvey : previous)
-        if (afterWrittenAnswer && result.resolutionSurvey.value === 0) {
-          setNextAction(handoffAvailable ? 'OFFER_HANDOFF' : 'REFORMULATE')
+      const survey = result.resolutionSurvey
+      const previousSurvey = lastResolution.current
+      lastResolution.current = survey
+      if (survey?.status === 'ANSWERED') {
+        setResolutionPrompt(previous => previous ? survey : previous)
+        const newVote = previousSurvey !== undefined
+          && (previousSurvey?.status !== 'ANSWERED' || previousSurvey.expiresAt !== survey.expiresAt)
+        if (afterSend && newVote && survey.value === 0) {
+          const legacyAction = hadPrompt ? (handoffAvailable ? 'OFFER_HANDOFF' : 'REFORMULATE') : 'NONE'
+          const action = result.nextAction ?? legacyAction
+          setActionLocale(survey.locale)
+          setNextAction(action)
         }
-      } else if (result.resolutionSurvey?.status !== 'PENDING') {
+      } else if (survey?.status !== 'PENDING') {
         setResolutionPrompt(previous => previous?.status === 'PENDING' ? null : previous)
       }
     } catch (error) {
@@ -46,16 +65,23 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
         setFeedback(null)
         setResolutionPrompt(null)
       }
+    } finally {
+      clearTimeout(timeout)
     }
   }
 
   useLayoutEffect(() => {
-    if (!config?.resolutionSurvey && !config?.teamSurvey && !config?.answerFeedback) return
     setFeedback(null)
     setResolutionPrompt(null)
     setNextAction('NONE')
-    if (!teamResolved || !config.teamSurvey) void syncFeedback()
-    return () => syncRequest.current?.abort()
+    setActionLocale(null)
+    lastResolution.current = undefined
+    if (!config?.resolutionSurvey && !config?.teamSurvey && !config?.answerFeedback) return
+    initialRead.current = !teamResolved || !config.teamSurvey ? syncFeedback({ initial: true }) : Promise.resolve()
+    return () => {
+      initialRead.current = null
+      syncRequest.current?.abort()
+    }
   }, [transport, config])
 
   useLayoutEffect(() => {
@@ -79,6 +105,7 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
   useEffect(() => {
     if (!botActive || state.newConversationNotice) {
+      if (state.newConversationNotice) lastResolution.current = null
       stopWaiting()
       setResolutionPrompt(null)
       setNextAction('NONE')
@@ -93,6 +120,7 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
       try {
         const result = await transport.promptResolution(request.signal)
         if (!request.signal.aborted && result.resolutionSurvey?.status === 'PENDING') {
+          lastResolution.current = result.resolutionSurvey
           setResolutionPrompt(result.resolutionSurvey)
         }
       } catch {
@@ -109,21 +137,32 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
   function onSend(send: () => Promise<void>): void {
     stopWaiting()
+    setNextAction('NONE')
     if (config?.resolutionSurvey && botActive && !resolutionPrompt) {
       candidate.current = { lastMessageId }
     }
 
-    const afterWrittenAnswer = resolutionPrompt?.status === 'PENDING'
-    void send().finally(() => {
-      if (afterWrittenAnswer || (teamResolved && config?.teamSurvey)) void syncFeedback(afterWrittenAnswer)
+    const hadPrompt = resolutionPrompt?.status === 'PENDING'
+    const baseline = initialRead.current
+    // The initial read must reach the server before the message can record a vote.
+    const delivery = config?.resolutionSurvey && baseline ? baseline.then(send) : send()
+    void delivery.finally(() => {
+      if (baseline === initialRead.current && (config?.resolutionSurvey || (teamResolved && config?.teamSurvey))) {
+        void syncFeedback({ afterSend: true, hadPrompt })
+      }
     })
   }
 
   async function answerResolution(value: 0 | 1): Promise<void> {
     const result = await transport.feedback({ kind: 'RESOLVED', value })
     syncRequest.current?.abort()
-    setResolutionPrompt(previous => previous && { ...previous, status: 'ANSWERED', value: result.feedback.value })
+    if (resolutionPrompt) {
+      const survey = { ...resolutionPrompt, status: 'ANSWERED' as const, value: result.feedback.value }
+      lastResolution.current = survey
+      setResolutionPrompt(survey)
+    }
     setNextAction(result.nextAction)
+    setActionLocale(resolutionPrompt?.locale ?? null)
   }
 
   async function rateTeam(value: 1 | 2 | 3, comment?: string): Promise<void> {
@@ -143,10 +182,11 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     resolutionPrompt,
     teamSurvey,
     nextAction,
+    actionLocale,
     stopWaiting,
     onSend,
     answerResolution,
-    expireResolution: () => setResolutionPrompt(null),
+    expireResolution: () => { setResolutionPrompt(null); setNextAction('NONE') },
     rateTeam,
     expireTeam: () => setFeedback(previous => previous && { ...previous, teamSurvey: null }),
     acceptHandoff,

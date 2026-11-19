@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { act } from 'preact/test-utils'
 import { Panel } from '../Panel'
+import { STRINGS } from '../strings'
 import { createMessageStore } from '../../store/message-store'
 import { fixtureConfig } from '../../contract/fixtures'
 import type { Transport } from '../../transport'
@@ -152,12 +153,13 @@ describe('Encuestas de valoración', () => {
 
   afterEach(() => vi.useRealTimers())
 
-  async function ask(root: HTMLElement): Promise<HTMLTextAreaElement> {
+  async function ask(root: HTMLElement, text = '¿A qué hora abren?'): Promise<HTMLTextAreaElement> {
     const composer = root.querySelector<HTMLTextAreaElement>('.composer textarea')!
-    await act(() => {
-      composer.value = '¿A qué hora abren?'
+    await act(async () => {
+      composer.value = text
       composer.dispatchEvent(new Event('input', { bubbles: true }))
       composer.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      await Promise.resolve()
     })
     return composer
   }
@@ -169,6 +171,10 @@ describe('Encuestas de valoración', () => {
         type: 'message.created', payload: { messageId: 'reply', role: 'bot', text: 'A las 18:00' },
       })
     })
+  }
+
+  async function flushDelivery(): Promise<void> {
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)) })
   }
 
   it('reserves the question after two minutes and sends No and handoff outside the model', async () => {
@@ -212,6 +218,104 @@ describe('Encuestas de valoración', () => {
     await mountPanel({ config, transport })
     await act(async () => { await vi.advanceTimersByTimeAsync(120_000) })
     expect(transport.promptResolution).not.toHaveBeenCalled()
+  })
+
+  it('offers handoff after an unprompted negative reply without showing a resolution question', async () => {
+    const transport = fakeTransport()
+    vi.mocked(transport.feedbackState)
+      .mockResolvedValueOnce(noFeedback)
+      .mockResolvedValue({
+        ...noFeedback,
+        resolutionSurvey: { ...pending, status: 'ANSWERED', value: 0 },
+        nextAction: 'OFFER_HANDOFF',
+      })
+    const { root } = await mountPanel({ config, transport })
+    await ask(root, 'No era eso')
+    await flushDelivery()
+    expect(transport.send).toHaveBeenCalledWith('No era eso')
+    expect(transport.feedbackState).toHaveBeenCalledTimes(2)
+    expect(root.textContent).toContain('¿Te pasamos con una persona del equipo?')
+    expect(root.textContent).not.toContain('¿Hemos resuelto tu consulta?')
+    expect(transport.feedback).not.toHaveBeenCalled()
+    const decline = [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'No, gracias')!
+    await act(() => decline.click())
+    await ask(root)
+    await flushDelivery()
+    expect(root.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
+    await cleanupMounted()
+    const { root: reopened } = await mountPanel({ config, transport })
+    await ask(reopened)
+    await flushDelivery()
+    expect(reopened.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
+  })
+
+  it.each([true, false])('compares the survey before sending during a slow initial read (already answered: %s)', async alreadyAnswered => {
+    const transport = fakeTransport()
+    const answered = {
+      ...noFeedback,
+      resolutionSurvey: { ...pending, status: 'ANSWERED' as const, value: 0 },
+      nextAction: 'OFFER_HANDOFF' as const,
+    }
+    let onServer = alreadyAnswered ? answered : noFeedback
+    vi.mocked(transport.send).mockImplementation(async () => { onServer = answered })
+    let finishInitialRead: () => void = () => {}
+    vi.mocked(transport.feedbackState)
+      .mockImplementationOnce(() => new Promise(resolve => { finishInitialRead = () => resolve(onServer) }))
+      .mockImplementation(async () => onServer)
+    const { root } = await mountPanel({ config, transport })
+    await ask(root, alreadyAnswered ? 'Otra pregunta' : 'No era eso')
+    expect(transport.send).not.toHaveBeenCalled()
+    finishInitialRead()
+    await flushDelivery()
+    expect(transport.send).toHaveBeenCalledOnce()
+    expect(transport.feedbackState).toHaveBeenCalledTimes(2)
+    expect(root.textContent?.includes('¿Te pasamos con una persona del equipo?')).toBe(!alreadyAnswered)
+  })
+
+  it('delivers the first message if the initial feedback endpoint stalls', async () => {
+    vi.useFakeTimers()
+    const transport = fakeTransport()
+    vi.mocked(transport.feedbackState)
+      .mockImplementationOnce(() => new Promise(() => {}))
+      .mockResolvedValue({
+        ...noFeedback,
+        resolutionSurvey: { ...pending, status: 'ANSWERED', value: 0 },
+        nextAction: 'OFFER_HANDOFF',
+      })
+    const { root } = await mountPanel({ config, transport })
+    await ask(root)
+    expect(transport.send).not.toHaveBeenCalled()
+    await act(async () => { await vi.advanceTimersByTimeAsync(2_000) })
+    const request = vi.mocked(transport.feedbackState).mock.calls[0]?.[0]
+    expect(request?.aborted).toBe(true)
+    expect(transport.send).toHaveBeenCalledWith('¿A qué hora abren?')
+    expect(root.textContent).not.toContain('¿Te pasamos con una persona del equipo?')
+  })
+
+  it('offers the new action after a subsequent episode is rated in the same session', async () => {
+    const transport = fakeTransport()
+    const firstVote = {
+      ...noFeedback,
+      resolutionSurvey: { ...pending, status: 'ANSWERED' as const, value: 0, expiresAt: '2026-07-20T14:00:00Z' },
+      nextAction: 'OFFER_HANDOFF' as const,
+    }
+    vi.mocked(transport.feedbackState)
+      .mockResolvedValueOnce(noFeedback)
+      .mockResolvedValueOnce(firstVote)
+      .mockResolvedValueOnce({
+        ...firstVote,
+        resolutionSurvey: { ...firstVote.resolutionSurvey, expiresAt: '2026-07-21T15:00:00Z' },
+        nextAction: 'REFORMULATE',
+      })
+    const { root } = await mountPanel({ config, transport })
+    await ask(root, 'No era eso')
+    await flushDelivery()
+    expect(root.textContent).toContain('¿Te pasamos con una persona del equipo?')
+    const decline = [...root.querySelectorAll('button')].find(button => button.textContent?.trim() === 'No, gracias')!
+    await act(() => decline.click())
+    await ask(root, 'No era eso')
+    await flushDelivery()
+    expect(root.querySelector('.sr-only[role=status]')?.textContent).toBe(STRINGS.es.reformulate)
   })
 
   it('uses the server due time and records the team rating before the optional comment', async () => {
