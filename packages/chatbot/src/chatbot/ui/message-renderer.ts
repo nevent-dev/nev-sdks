@@ -1759,6 +1759,7 @@ export class MessageRenderer {
     if (!Number.isFinite(date.getTime())) return undefined;
     const language = this.i18n.getLocale();
     if (language === 'pt') return 'pt-PT';
+    if (language === 'it') return 'it-IT';
     return language === 'fr' ? 'fr-FR' : undefined;
   }
 

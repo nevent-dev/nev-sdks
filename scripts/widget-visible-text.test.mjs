@@ -82,3 +82,14 @@ test('contraexperimento: fr requiere todas las claves, la traducción y espacio 
     'chatbot.fr: invalid French typography: Une question ?',
   ]);
 });
+
+
+test('it rejects another language and spaces before punctuation', () => {
+  const entries = { es: "    title: 'Escribe un mensaje',", it: "    title: 'Type a message ?',"};
+  assert.deepEqual(localeMapProblems('chatbot', entries, ['es', 'it'], ['title']), [
+    'chatbot.it: Type a message',
+    'chatbot.it: invalid Italian typography: Type a message ?',
+  ]);
+  entries.it = "    title: 'Apri l’app: «Aiuto».',";
+  assert.deepEqual(localeMapProblems('chatbot', entries, ['es', 'it'], ['title']), []);
+});

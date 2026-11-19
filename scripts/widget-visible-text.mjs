@@ -132,9 +132,11 @@ export function compare(found, baseline) {
 
 const PORTUGUESE_COPY = /(?<![\p{L}\p{M}])(?:você|vocês|conosco|arquivo|celular|conectando|reconectando|contato|senha|nova aba|subscripci[oó]n|subscricao|politica de privacidade|e-mail|tu|teu|tua)(?![\p{L}\p{M}])/iu;
 
-const REQUIRED_LOCALES = ['es', 'en', 'ca', 'pt', 'fr'];
+const REQUIRED_LOCALES = ['es', 'en', 'ca', 'pt', 'fr', 'it'];
 const FRENCH_COPY = /(?<![\p{L}\p{M}])(?:haz clic|introduce tu|sin conexión|tu cuenta|todos los derechos reservados|click here|type a message|your account|new conversation|sem ligação|tente novamente|courriel)(?![\p{L}\p{M}])/iu;
 const FRENCH_TYPOGRAPHY = /(?:\p{L}'\p{L}|\.{3}|«(?!\u00a0)|(?<!\u00a0)»|[\p{L}\p{N}] *(?:[;!?%]|:(?![/\d])))/u;
+const ITALIAN_COPY = /(?<![\p{L}\p{M}])(?:haz clic|introduce tu|sin conexión|tu cuenta|click here|type a message|your account|new conversation|sem ligação|tente novamente|cliquez ici|saisissez votre|vous êtes hors ligne|nouvelle conversation)(?![\p{L}\p{M}])/iu;
+const ITALIAN_TYPOGRAPHY = /(?:\p{L}'\p{L}|\.{3}|—|[ \u00a0\u202f]+[:;!?]|«\s|\s»)/u;
 const CATALOG_LITERAL = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
 function objectBody(code, name) {
@@ -157,12 +159,15 @@ export function localeMapProblems(name, entries, languages, keys, indent = 4) {
       const expression = body.match(PORTUGUESE_COPY)?.[0];
       if (expression) problems.push(`${name}.pt: ${expression}`);
     }
-    if (locale === 'fr') {
+    if (locale === 'fr' || locale === 'it') {
+      const copy = locale === 'fr' ? FRENCH_COPY : ITALIAN_COPY;
+      const typography = locale === 'fr' ? FRENCH_TYPOGRAPHY : ITALIAN_TYPOGRAPHY;
+      const language = locale === 'fr' ? 'French' : 'Italian';
       for (const [, , literal] of body.matchAll(CATALOG_LITERAL)) {
         const visible = literal.replace(/\$\{[^}]*\}|\{\{?[A-Za-z]\w*\}\}?/g, ' ');
-        const expression = visible.match(FRENCH_COPY)?.[0];
-        if (expression) problems.push(`${name}.fr: ${expression}`);
-        if (FRENCH_TYPOGRAPHY.test(visible)) problems.push(`${name}.fr: invalid French typography: ${literal}`);
+        const expression = visible.match(copy)?.[0];
+        if (expression) problems.push(`${name}.${locale}: ${expression}`);
+        if (typography.test(visible)) problems.push(`${name}.${locale}: invalid ${language} typography: ${literal}`);
       }
     }
   }

@@ -13,7 +13,7 @@
  * - **`detectLocale()`**: Returns `SupportedLocale` (typed union) instead
  *   of core's plain `string` return type.
  *
- * Supports Spanish (es), English (en), Catalan (ca), and Portuguese (pt).
+ * Supports Spanish (es), English (en), Catalan (ca), Portuguese (pt), French (fr), and Italian (it).
  *
  * @remarks
  * Default locale: 'es' (Spanish)
@@ -251,6 +251,46 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     brandingAriaLabel: 'Une technologie Nevent. Chatbot IA pour les événements',
     defaultWelcomeMessage: 'Bonjour ! Comment puis-je vous aider ?',
   },
+
+  /** Italian (Italy) (it) */
+  it: {
+    inputPlaceholder: 'Scrivi un messaggio…',
+    sendButton: 'Invia',
+    defaultTitle: 'Chatta con noi',
+    statusOnline: 'Online',
+    statusConnecting: 'Connessione in corso…',
+    statusOffline: 'Offline',
+    typingIndicator: 'Sto pensando…',
+    messageSendError: 'Impossibile inviare il messaggio. Riprova.',
+    connectionError: 'Errore di connessione. Nuovo tentativo in corso…',
+    rateLimitError: 'Troppi messaggi. Aspetta un momento.',
+    rateLimitCountdown: 'Troppi messaggi. Aspetta {seconds} secondi.',
+    rateLimitCountdownOne: 'Troppi messaggi. Aspetta 1 secondo.',
+    poweredBy: 'Con tecnologia Nevent',
+    newConversation: 'Nuova conversazione',
+    closeChat: 'Chiudi la chat',
+    minimizeChat: 'Riduci la chat',
+    openChat: 'Apri la chat',
+    retry: 'Riprova',
+    justNow: 'Adesso',
+    minutesAgo: '{n} min fa',
+    hoursAgo: '{n} h fa',
+    yesterday: 'Ieri',
+    connectionOffline: 'Connessione a Internet assente',
+    connectionReconnecting: 'Riconnessione in corso…',
+    connectionReconnected: 'Connessione ripristinata',
+    attachFile: 'Allega un file',
+    removeFile: 'Rimuovi',
+    uploading: 'Caricamento',
+    fileTooBig: 'Il file è troppo grande. Il limite è {maxMB} MB.',
+    fileTypeNotAllowed: 'Tipo di file non consentito.',
+    uploadFailed: 'Impossibile caricare il file. Riprova.',
+    dragDropHint: 'Rilascia qui i file',
+    agentTyping: '{name} sta scrivendo…',
+    someoneTyping: 'Qualcuno sta scrivendo…',
+    brandingAriaLabel: 'Con tecnologia Nevent, chatbot IA per eventi',
+    defaultWelcomeMessage: 'Ciao! Come posso aiutarti?',
+  },
 };
 
 /**
@@ -262,6 +302,7 @@ const SUPPORTED_LOCALES: ReadonlyArray<SupportedLocale> = [
   'ca',
   'pt',
   'fr',
+  'it',
 ];
 
 /**
@@ -346,7 +387,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * After calling this method, all subsequent calls to `t()` and `format()`
    * will return strings in the new locale.
    *
-   * @param locale - A supported locale code ('es' | 'en' | 'ca' | 'pt' | 'fr')
+   * @param locale - A supported locale code ('es' | 'en' | 'ca' | 'pt' | 'fr' | 'it')
    *
    * @example
    * ```typescript
@@ -361,7 +402,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
   /**
    * Returns the currently active locale code.
    *
-   * @returns The active locale (e.g., 'es', 'en', 'ca', 'pt', 'fr')
+   * @returns The active locale (e.g., 'es', 'en', 'ca', 'pt', 'fr', 'it')
    *
    * @example
    * ```typescript
@@ -490,7 +531,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * it to the nearest supported locale. If no match is found, returns the
    * default locale ('es').
    *
-   * @returns A supported locale code ('es' | 'en' | 'ca' | 'pt' | 'fr')
+   * @returns A supported locale code ('es' | 'en' | 'ca' | 'pt' | 'fr' | 'it')
    *
    * @example
    * ```typescript

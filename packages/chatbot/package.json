@@ -1,6 +1,6 @@
 {
   "name": "@nevent/chatbot",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Nevent embeddable chatbot widget SDK",
   "author": "Nevent Team",
   "license": "MIT",

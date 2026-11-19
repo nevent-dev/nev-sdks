@@ -177,6 +177,18 @@ describe('One language per visit (nevent-work#40)', () => {
     widget.destroy();
   });
 
+  it('falls back to the actual texts of the previous API for an explicit Italian embed', async () => {
+    browser(['en-GB']);
+    const fetchMock = mockFetch({ configResponse: ENGLISH_TEXTS });
+    const { widget, container } = createWidget({ locale: 'it-CH' });
+    await widget.init();
+
+    expect(configUrl(fetchMock)).toContain('language=it');
+    expect(widget.getLocale()).toBe('en');
+    expect(getShadowRoot(container)?.textContent).toContain('I agree to the processing of my personal data');
+    widget.destroy();
+  });
+
   it.each([
     { browserLocale: 'fr-CA', tenantLanguage: 'es', explicit: undefined, requested: 'fr' },
     { browserLocale: 'de-DE', tenantLanguage: 'fr', explicit: undefined, requested: 'auto' },
@@ -215,6 +227,51 @@ describe('One language per visit (nevent-work#40)', () => {
     const call = fetchMock.mock.calls.find((c: unknown[]) => String(c[0]).includes('/subscribe'));
     const body = JSON.parse((call![1] as RequestInit).body as string);
     expect(body.textsLanguage).toBe('fr');
+    expect(body.displayLanguage).toBe('en');
+    widget.destroy();
+  });
+
+  it.each([
+    { browserLocale: 'de-DE', tenantLanguage: 'it', explicit: undefined, requested: 'auto' },
+    { browserLocale: 'en-GB', tenantLanguage: 'it', explicit: 'it-CH', requested: 'it' },
+  ])('keeps Italian config, local labels and consent aligned ($browserLocale, $requested)', async ({
+    browserLocale, tenantLanguage, explicit, requested,
+  }) => {
+    browser([browserLocale]);
+    const consent = 'Acconsento al trattamento dei miei dati personali.';
+    const fetchMock = mockFetch({ configResponse: {
+      tenantLanguage,
+      textsLanguage: 'it',
+      messages: { title: 'Newsletter del festival', gdprText: consent },
+    } });
+    const { widget, container } = createWidget({ locale: explicit });
+    await widget.init();
+
+    const config = new URL(configUrl(fetchMock));
+    expect(config.searchParams.get('language')).toBe(requested);
+    expect(config.searchParams.get('sdkLanguages')?.split(',').sort()).toEqual(
+      requested === 'auto' ? ['ca', 'en', 'es', 'fr', 'it', 'pt'] : undefined
+    );
+    expect(widget.getLocale()).toBe('it');
+    let shadow = getShadowRoot(container)!;
+    expect(shadow.host.getAttribute('lang')).toBe('it');
+    expect(shadow.querySelector('form')?.getAttribute('aria-label')).toBe('Modulo di iscrizione alla newsletter');
+    expect(shadow.textContent).toContain('Newsletter del festival');
+    expect(shadow.textContent).toContain(consent);
+    widget.setLocale('en');
+    shadow = getShadowRoot(container)!;
+    expect(shadow.querySelector('form')?.getAttribute('aria-label')).toBe('Newsletter subscription form');
+    expect(shadow.textContent).toContain(consent);
+    expect(fetchMock.mock.calls.filter((call: unknown[]) => String(call[0]).includes('/config'))).toHaveLength(1);
+
+    fillInput(shadow, 'input[name="email"]', 'fan@example.com');
+    toggleCheckbox(shadow, '.nevent-gdpr-checkbox', true);
+    submitForm(shadow);
+    await vi.advanceTimersByTimeAsync(100);
+    await flush();
+    const call = fetchMock.mock.calls.find((c: unknown[]) => String(c[0]).includes('/subscribe'));
+    const body = JSON.parse((call![1] as RequestInit).body as string);
+    expect(body.textsLanguage).toBe('it');
     expect(body.displayLanguage).toBe('en');
     widget.destroy();
   });
