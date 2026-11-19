@@ -115,7 +115,7 @@ export function negotiateWidgetLocale(
  * The languages the API has default texts for (title, button, messages, consent): the widget can only show a visit in
  * one language if the API serves its texts in it (nevent-work#40).
  */
-export const API_TEXT_LANGUAGES: readonly string[] = ['es', 'en', 'pt', 'fr'];
+export const API_TEXT_LANGUAGES: readonly string[] = ['es', 'en', 'pt', 'fr', 'it'];
 
 /**
  * The language the widget asks the API for, before it reads the config (nevent-work#40), as `?language=`: the embed's

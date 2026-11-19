@@ -232,6 +232,7 @@ describe('One language per visit (nevent-work#40)', () => {
   });
 
   it.each([
+    { browserLocale: 'it-CH', tenantLanguage: 'es', explicit: undefined, requested: 'it' },
     { browserLocale: 'de-DE', tenantLanguage: 'it', explicit: undefined, requested: 'auto' },
     { browserLocale: 'en-GB', tenantLanguage: 'it', explicit: 'it-CH', requested: 'it' },
   ])('keeps Italian config, local labels and consent aligned ($browserLocale, $requested)', async ({
