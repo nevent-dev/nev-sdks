@@ -6,6 +6,7 @@ interface RendererLabels {
   user: string;
   bot: string;
   today: string;
+  labelSeparator: string;
   quickReplies: string;
   carousel: string;
   previousCard: string;
@@ -21,6 +22,7 @@ const LABELS: Record<SupportedLocale, RendererLabels> = {
     user: 'Tú dijiste',
     bot: 'El bot dijo',
     today: 'Hoy',
+    labelSeparator: ': ',
     quickReplies: 'Respuestas rápidas',
     carousel: 'Carrusel de tarjetas',
     previousCard: 'Tarjeta anterior',
@@ -34,6 +36,7 @@ const LABELS: Record<SupportedLocale, RendererLabels> = {
     user: 'You said',
     bot: 'Bot said',
     today: 'Today',
+    labelSeparator: ': ',
     quickReplies: 'Quick replies',
     carousel: 'Card carousel',
     previousCard: 'Previous card',
@@ -47,6 +50,7 @@ const LABELS: Record<SupportedLocale, RendererLabels> = {
     user: 'Has dit',
     bot: 'El bot ha dit',
     today: 'Avui',
+    labelSeparator: ': ',
     quickReplies: 'Respostes ràpides',
     carousel: 'Carrusel de targetes',
     previousCard: 'Targeta anterior',
@@ -60,12 +64,27 @@ const LABELS: Record<SupportedLocale, RendererLabels> = {
     user: 'Mensagem enviada',
     bot: 'Mensagem do assistente',
     today: 'Hoje',
+    labelSeparator: ': ',
     quickReplies: 'Respostas rápidas',
     carousel: 'Carrossel de cartões',
     previousCard: 'Cartão anterior',
     nextCard: 'Cartão seguinte',
     openImage: 'Abrir imagem num novo separador',
     brokenImage: 'Imagem não disponível',
+  },
+  fr: {
+    keyboardHint: 'Appuyez sur Entrée pour envoyer ou sur Maj+Entrée pour insérer un saut de ligne.',
+    scrollToBottom: 'Aller à la fin de la conversation',
+    user: 'Message envoyé',
+    bot: 'Message de l’assistant',
+    today: 'Aujourd’hui',
+    labelSeparator: ' : ',
+    quickReplies: 'Réponses rapides',
+    carousel: 'Carrousel de cartes',
+    previousCard: 'Carte précédente',
+    nextCard: 'Carte suivante',
+    openImage: 'Ouvrir l’image dans un nouvel onglet',
+    brokenImage: 'Image indisponible',
   },
 };
 

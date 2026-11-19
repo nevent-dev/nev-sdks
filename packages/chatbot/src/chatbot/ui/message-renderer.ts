@@ -505,7 +505,7 @@ export class MessageRenderer {
     const locale = this.i18n.getLocale();
     wrapper.setAttribute(
       'aria-label',
-      `${this.getBotLabel(locale)}: ${finalContent}`
+      `${this.getBotLabel(locale)}${rendererLabel(locale, 'labelSeparator')}${finalContent}`
     );
 
     this.scrollToBottom(true);
@@ -1161,7 +1161,7 @@ export class MessageRenderer {
       message.role === 'user'
         ? this.getUserLabel(locale)
         : this.getBotLabel(locale);
-    wrapper.setAttribute('aria-label', `${senderLabel}: ${message.content}`);
+    wrapper.setAttribute('aria-label', `${senderLabel}${rendererLabel(locale, 'labelSeparator')}${message.content}`);
     wrapper.setAttribute('aria-setsize', '-1'); // Unknown total; use -1 per spec
 
     const isUser = message.role === 'user';
@@ -1672,8 +1672,9 @@ export class MessageRenderer {
       return this.i18n.t('yesterday');
     }
 
-    if (this.i18n.getLocale() === 'pt' && Number.isFinite(date.getTime())) {
-      return new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
+    const regionalLocale = this.regionalFormatLocale(date);
+    if (regionalLocale) {
+      return new Intl.DateTimeFormat(regionalLocale, { day: '2-digit', month: '2-digit', year: 'numeric' }).format(date);
     }
 
     // Format as DD/MM/YYYY
@@ -1734,9 +1735,9 @@ export class MessageRenderer {
       return this.i18n.format('hoursAgo', { n: diffHours });
     }
 
-    const portuguese = this.i18n.getLocale() === 'pt' && Number.isFinite(date.getTime());
-    const timeStr = portuguese
-      ? new Intl.DateTimeFormat('pt-PT', { hour: '2-digit', minute: '2-digit' }).format(date)
+    const regionalLocale = this.regionalFormatLocale(date);
+    const timeStr = regionalLocale
+      ? new Intl.DateTimeFormat(regionalLocale, { hour: '2-digit', minute: '2-digit' }).format(date)
       : `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
 
     const yesterday = new Date(now);
@@ -1745,13 +1746,20 @@ export class MessageRenderer {
       return `${this.i18n.t('yesterday')} ${timeStr}`;
     }
 
-    if (portuguese) {
-      const dayAndMonth = new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: '2-digit' }).format(date);
+    if (regionalLocale) {
+      const dayAndMonth = new Intl.DateTimeFormat(regionalLocale, { day: '2-digit', month: '2-digit' }).format(date);
       return `${dayAndMonth} ${timeStr}`;
     }
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
     return `${day}/${month} ${timeStr}`;
+  }
+
+  private regionalFormatLocale(date: Date): string | undefined {
+    if (!Number.isFinite(date.getTime())) return undefined;
+    const language = this.i18n.getLocale();
+    if (language === 'pt') return 'pt-PT';
+    return language === 'fr' ? 'fr-FR' : undefined;
   }
 
   // --------------------------------------------------------------------------

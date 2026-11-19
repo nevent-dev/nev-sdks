@@ -14,8 +14,11 @@ describe('resolveLocale — normaliza un candidato crudo (host lang, config.loca
   it("'pt-BR' → 'pt'", () => {
     expect(resolveLocale('pt-BR')).toBe('pt')
   })
-  it("'fr' (no soportado) → null — nunca se inventa un idioma soportado más cercano", () => {
-    expect(resolveLocale('fr')).toBeNull()
+  it.each(['fr', 'fr-CA', 'fr-BE', 'fr-CH'])('negocia %s a fr', (language) => {
+    expect(resolveLocale(language)).toBe('fr')
+  })
+  it("'de' (no soportado) → null", () => {
+    expect(resolveLocale('de')).toBeNull()
   })
   it("'' (cadena vacía) → null", () => {
     expect(resolveLocale('')).toBeNull()

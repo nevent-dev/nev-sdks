@@ -640,20 +640,23 @@ describe("App — 'opened' lleva el --surface resuelto (backplate del loader, te
 })
 
 
-it('uses the API locale for the shell language and frame title when the host has no lang', async () => {
-  const store = createMessageStore()
-  vi.spyOn(transportModule, 'createTransport').mockReturnValue(fakeTransport(store).transport)
-  const client = fakeClient({ getConfig: () => ({ ...fixtureConfig(), locale: 'pt' }) })
-  const { bus } = fakeBus()
-  const emit = vi.spyOn(bus, 'emit')
-  const original = { lang: document.documentElement.lang, title: document.title }
-  try {
-    await mount(<App client={client} bus={bus} />)
-    expect(document.documentElement.lang).toBe('pt')
-    expect(document.title).toBe('Chat de apoio')
-    expect(emit).toHaveBeenCalledWith('locale', 'pt')
-  } finally {
-    document.documentElement.lang = original.lang
-    document.title = original.title
-  }
-})
+it.each([['pt', 'Chat de apoio'], ['fr', 'Chat d’assistance']] as const)(
+  'uses the API locale (%s) for the shell language and frame title when the host has no lang',
+  async (locale, title) => {
+    const store = createMessageStore()
+    vi.spyOn(transportModule, 'createTransport').mockReturnValue(fakeTransport(store).transport)
+    const client = fakeClient({ getConfig: () => ({ ...fixtureConfig(), locale }) })
+    const { bus } = fakeBus()
+    const emit = vi.spyOn(bus, 'emit')
+    const original = { lang: document.documentElement.lang, title: document.title }
+    try {
+      await mount(<App client={client} bus={bus} />)
+      expect(document.documentElement.lang).toBe(locale)
+      expect(document.title).toBe(title)
+      expect(emit).toHaveBeenCalledWith('locale', locale)
+    } finally {
+      document.documentElement.lang = original.lang
+      document.title = original.title
+    }
+  },
+)

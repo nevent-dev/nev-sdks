@@ -61,12 +61,14 @@ describe('locale — el árbol respeta STRINGS.en vía StringsContext.Provider',
 })
 
 describe('STRINGS — paridad de claves entre locales (nunca una traducción a medias)', () => {
-  it('es/en/ca/pt exponen exactamente las mismas claves', () => {
+  it('es/en/ca/pt/fr exponen exactamente las mismas claves', () => {
     const keysOf = (o: WidgetStrings): string[] => Object.keys(o).sort()
     const es = keysOf(STRINGS.es)
     expect(es.length).toBeGreaterThan(0)
     expect(keysOf(STRINGS.en)).toEqual(es)
     expect(keysOf(STRINGS.ca)).toEqual(es)
     expect(keysOf(STRINGS.pt)).toEqual(es)
+    expect(keysOf(STRINGS.fr)).toEqual(es)
+    expect(STRINGS.fr.timeLocale).toBe('fr-FR')
   })
 })

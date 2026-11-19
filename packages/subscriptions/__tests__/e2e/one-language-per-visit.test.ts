@@ -101,19 +101,19 @@ describe('One language per visit (nevent-work#40)', () => {
     const { widget } = createWidget({ locale: undefined });
     await widget.init();
 
-    expect(configUrl(fetchMock)).not.toContain('language=');
+    expect(configUrl(fetchMock)).toContain('language=auto');
     expect(widget.getLocale()).toBe('es');
     widget.destroy();
   });
 
   it('a browser the widget has no labels for gets the language of the texts, not a second one', async () => {
-    browser(['fr-FR']);
-    const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'fr', textsLanguage: 'es' } });
+    browser(['de-DE']);
+    const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'de', textsLanguage: 'es' } });
     const { widget } = createWidget({ locale: undefined });
     await widget.init();
 
-    expect(configUrl(fetchMock)).not.toContain('language=');
-    // Before nevent-work#40 the widget showed English (no labels for fr) around Spanish texts from the API.
+    expect(configUrl(fetchMock)).toContain('language=auto');
+    // Before nevent-work#40 the widget showed English (no labels for de) around Spanish texts from the API.
     expect(widget.getLocale()).toBe('es');
     widget.destroy();
   });
@@ -162,6 +162,57 @@ describe('One language per visit (nevent-work#40)', () => {
     expect(configUrl(fetchMock)).toContain('language=pt');
     expect(widget.getLocale()).toBe('en');
     expect(getShadowRoot(container)?.textContent).toContain('I agree to the processing of my personal data');
+    widget.destroy();
+  });
+
+  it('falls back to the actual texts of the previous API for an explicit French embed', async () => {
+    browser(['en-GB']);
+    const fetchMock = mockFetch({ configResponse: ENGLISH_TEXTS });
+    const { widget, container } = createWidget({ locale: 'fr-CA' });
+    await widget.init();
+
+    expect(configUrl(fetchMock)).toContain('language=fr');
+    expect(widget.getLocale()).toBe('en');
+    expect(getShadowRoot(container)?.textContent).toContain('I agree to the processing of my personal data');
+    widget.destroy();
+  });
+
+  it.each([
+    { browserLocale: 'de-DE', explicit: undefined, requested: 'auto' },
+    { browserLocale: 'en-GB', explicit: 'fr-BE', requested: 'fr' },
+  ])('keeps French config, local labels and consent aligned ($requested)', async ({ browserLocale, explicit, requested }) => {
+    browser([browserLocale]);
+    const consent = 'J’accepte le traitement de mes données personnelles.';
+    const fetchMock = mockFetch({ configResponse: {
+      tenantLanguage: 'fr',
+      textsLanguage: 'fr',
+      messages: { title: 'Newsletter du festival', gdprText: consent },
+    } });
+    const { widget, container } = createWidget({ locale: explicit });
+    await widget.init();
+
+    expect(configUrl(fetchMock)).toContain(`language=${requested}`);
+    expect(widget.getLocale()).toBe('fr');
+    let shadow = getShadowRoot(container)!;
+    expect(shadow.host.getAttribute('lang')).toBe('fr');
+    expect(shadow.querySelector('form')?.getAttribute('aria-label')).toBe('Formulaire d’inscription à la newsletter');
+    expect(shadow.textContent).toContain('Newsletter du festival');
+    expect(shadow.textContent).toContain(consent);
+    widget.setLocale('en');
+    shadow = getShadowRoot(container)!;
+    expect(shadow.querySelector('form')?.getAttribute('aria-label')).toBe('Newsletter subscription form');
+    expect(shadow.textContent).toContain(consent);
+    expect(fetchMock.mock.calls.filter((call: unknown[]) => String(call[0]).includes('/config'))).toHaveLength(1);
+
+    fillInput(shadow, 'input[name="email"]', 'fan@example.com');
+    toggleCheckbox(shadow, '.nevent-gdpr-checkbox', true);
+    submitForm(shadow);
+    await vi.advanceTimersByTimeAsync(100);
+    await flush();
+    const call = fetchMock.mock.calls.find((c: unknown[]) => String(c[0]).includes('/subscribe'));
+    const body = JSON.parse((call![1] as RequestInit).body as string);
+    expect(body.textsLanguage).toBe('fr');
+    expect(body.displayLanguage).toBe('en');
     widget.destroy();
   });
 

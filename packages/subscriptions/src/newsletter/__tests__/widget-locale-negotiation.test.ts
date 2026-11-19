@@ -7,27 +7,28 @@ import { createNewsletterI18n, negotiateWidgetLocale } from '../i18n/index';
 
 describe('negotiateWidgetLocale (decision 4, option B)', () => {
   it.each([
-    ['fr-FR · Spanish tenant', ['fr-FR'], 'es', 'es'],
-    ['fr-FR · British tenant', ['fr-FR'], 'en-GB', 'en'],
+    ['fr-FR · Spanish tenant', ['fr-FR'], 'es', 'fr'],
+    ['fr-FR · British tenant', ['fr-FR'], 'en-GB', 'fr'],
     ['de-DE · Portuguese tenant', ['de-DE'], 'pt-PT', 'pt'],
     ['ar-SA · Saudi tenant (no widget labels in ar)', ['ar-SA'], 'ar', 'en'],
     ['en-GB · Spanish tenant', ['en-GB'], 'es', 'en'],
     ['pt-BR · Spanish tenant', ['pt-BR'], 'es', 'pt'],
     ['no browser language · British tenant', [], 'en-GB', 'en'],
-    ['the first browser language with labels wins', ['fr-FR', 'ca-ES', 'en'], 'es', 'ca'],
+    ['the first browser language with labels wins', ['de-DE', 'ca-ES', 'en'], 'es', 'ca'],
   ])('%s', (_case, browser, tenant, expected) => {
     expect(negotiateWidgetLocale(browser, tenant)).toBe(expected);
   });
 
   it('an explicit embed locale with labels wins over everything; one without labels is ignored', () => {
     expect(negotiateWidgetLocale(['en-GB'], 'es', 'pt')).toBe('pt');
-    expect(negotiateWidgetLocale(['en-GB'], 'es', 'fr')).toBe('en');
+    expect(negotiateWidgetLocale(['en-GB'], 'es', 'fr-CA')).toBe('fr');
+    expect(negotiateWidgetLocale(['en-GB'], 'es', 'de')).toBe('en');
   });
 
   afterEach(() => vi.unstubAllGlobals());
 
   it('M1 of i18n-rev2: without tenantLanguage the choice is exactly today\'s, over a grid of explicit × browser', () => {
-    const explicits = [undefined, 'en', 'en-GB', 'EN', 'pt', 'ca', 'xx', 'es-MX'];
+    const explicits = [undefined, 'en', 'en-GB', 'EN', 'pt', 'ca', 'fr-CH', 'xx', 'es-MX'];
     const browsers = [['en-US'], ['fr-FR', 'en-US'], ['es'], ['pt-BR'], ['ca'], ['xx'], ['EN'], []];
     const differences: string[] = [];
     for (const explicit of explicits) {

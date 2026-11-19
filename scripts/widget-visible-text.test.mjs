@@ -70,3 +70,15 @@ test('contraexperimento: un idioma, una clave o una traducción pt-PT que falta 
     'chatbot.pt: conosco',
   ]);
 });
+
+test('contraexperimento: fr requiere todas las claves, la traducción y espacio de no separación', () => {
+  const entries = {
+    es: "    title: 'Bienvenida',",
+    fr: "    body: 'Type a message',\n    hint: 'Une question ?',",
+  };
+  assert.deepEqual(localeMapProblems('chatbot', entries, ['es', 'fr'], ['title']), [
+    'chatbot.fr: translation keys differ',
+    'chatbot.fr: Type a message',
+    'chatbot.fr: invalid French typography: Une question ?',
+  ]);
+});
