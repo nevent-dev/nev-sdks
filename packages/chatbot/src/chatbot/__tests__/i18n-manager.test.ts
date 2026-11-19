@@ -231,6 +231,13 @@ describe('I18nManager', () => {
       expect(i18n.t('sendButton')).toBe('Envoyer');
     });
 
+    it.each(['it-IT', 'it-CH'])('negotiates %s to the Italian catalogue', (language) => {
+      vi.stubGlobal('navigator', { language });
+      const i18n = new I18nManager();
+      expect(i18n.getLocale()).toBe('it');
+      expect(i18n.t('sendButton')).toBe('Invia');
+    });
+
     it("should fallback to 'es' for unsupported locale", () => {
       vi.stubGlobal('navigator', { language: 'de-DE' });
       expect(I18nManager.detectLocale()).toBe('es');

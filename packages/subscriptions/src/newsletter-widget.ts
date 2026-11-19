@@ -35,6 +35,7 @@ import {
 } from './newsletter/font-format';
 import {
   createNewsletterI18n,
+  NEWSLETTER_LOCALES,
   browserLanguages,
   preferredWidgetLocale,
   visitLocale,
@@ -665,8 +666,9 @@ export class NewsletterWidget {
       // nevent-work#40: ask for the default texts in the visitor's locale, so the whole form is in one language
       const preferred = preferredWidgetLocale(browserLanguages(), this.config.locale);
       // New embeds opt in to the tenant's full catalogue when they have no visitor language to request.
-      const language = `&language=${encodeURIComponent(preferred ?? 'auto')}`;
-      const url = `${this.config.apiUrl}/public/widget/${this.config.newsletterId}/config?tenantId=${this.config.tenantId}${language}`;
+      const query = new URLSearchParams({ tenantId: this.config.tenantId, language: preferred ?? 'auto' });
+      if (!preferred) query.set('sdkLanguages', Object.keys(NEWSLETTER_LOCALES).join(','));
+      const url = `${this.config.apiUrl}/public/widget/${this.config.newsletterId}/config?${query}`;
 
       // Use a single retry for config loading (non-critical, falls back to defaults)
       const response = await this.fetchWithRetry(

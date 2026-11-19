@@ -128,8 +128,11 @@ describe('MessageRenderer — rendering', () => {
     expect(messageEl).not.toBeNull();
   });
 
-  it('renders French message labels, dates and timestamps', () => {
-    i18n.setLocale('fr');
+  it.each([
+    ['fr', 'Message envoyé : '],
+    ['it', 'Messaggio inviato: '],
+  ])('renders %s message labels, dates and timestamps', (locale, userLabel) => {
+    i18n.setLocale(locale);
     const sent = new Date(2020, 6, 14, 18, 9);
     renderer.addMessage(createMockMessage({ timestamp: sent.toISOString() }));
 
@@ -137,7 +140,7 @@ describe('MessageRenderer — rendering', () => {
     const timestamp = container.querySelector('.nevent-chatbot-message-timestamp');
     expect(separator?.textContent).toContain('14/07/2020');
     expect(timestamp?.textContent).toContain('14/07 18:09');
-    expect(container.querySelector('.nevent-chatbot-message--user')?.getAttribute('aria-label')).toContain('Message envoyé : ');
+    expect(container.querySelector('.nevent-chatbot-message--user')?.getAttribute('aria-label')).toContain(userLabel);
   });
 
   it('should render multiple messages in order', () => {

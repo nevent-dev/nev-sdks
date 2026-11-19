@@ -86,6 +86,20 @@ const LABELS: Record<SupportedLocale, RendererLabels> = {
     openImage: 'Ouvrir l’image dans un nouvel onglet',
     brokenImage: 'Image indisponible',
   },
+  it: {
+    keyboardHint: 'Premi Invio per inviare o Maiusc + Invio per andare a capo.',
+    scrollToBottom: 'Vai alla fine della conversazione',
+    user: 'Messaggio inviato',
+    bot: 'Messaggio dell’assistente',
+    today: 'Oggi',
+    labelSeparator: ': ',
+    quickReplies: 'Risposte rapide',
+    carousel: 'Carosello di schede',
+    previousCard: 'Scheda precedente',
+    nextCard: 'Scheda successiva',
+    openImage: 'Apri l’immagine in una nuova scheda',
+    brokenImage: 'Immagine non disponibile',
+  },
 };
 
 export function rendererLabel(locale: string | undefined, key: keyof RendererLabels): string {

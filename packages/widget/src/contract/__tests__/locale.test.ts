@@ -17,6 +17,9 @@ describe('resolveLocale — normaliza un candidato crudo (host lang, config.loca
   it.each(['fr', 'fr-CA', 'fr-BE', 'fr-CH'])('negocia %s a fr', (language) => {
     expect(resolveLocale(language)).toBe('fr')
   })
+  it.each(['it', 'it-IT', 'it-CH'])('negocia %s a it', (language) => {
+    expect(resolveLocale(language)).toBe('it')
+  })
   it("'de' (no soportado) → null", () => {
     expect(resolveLocale('de')).toBeNull()
   })
