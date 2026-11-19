@@ -6,6 +6,8 @@ export type MessageStatus = 'pending' | 'sent' | 'failed'
 export type ConnectionStatus = 'idle' | 'live' | 'reconnecting' | 'polling' | 'offline'
 
 export interface StoredMessage {
+  readonly feedbackEligible?: boolean
+  readonly feedbackLocale?: string | null
   readonly id: string
   readonly role: 'user' | 'bot' | 'agent'
   readonly text: string
@@ -82,6 +84,14 @@ export interface MessageStore {
   setConnection(status: ConnectionStatus): void
 }
 
+function feedbackProperties(message: { feedbackEligible?: boolean; feedbackLocale?: string | null }) {
+  if (typeof message.feedbackEligible !== 'boolean') return {}
+  return {
+    feedbackEligible: message.feedbackEligible,
+    feedbackLocale: typeof message.feedbackLocale === 'string' ? message.feedbackLocale : null,
+  }
+}
+
 // Display order: durable events strictly by seq among themselves; anything
 // without a seq (snapshot history / optimistic / streaming) by its timestamp.
 function compareMessages(a: StoredMessage, b: StoredMessage): number {
@@ -153,6 +163,9 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
           const content = resolveContactContent(m)
           if (content.contactBlocks.length > 0) next[existing] = { ...known, ...content }
         }
+        if (typeof m.feedbackEligible === 'boolean') {
+          next[existing] = { ...next[existing]!, ...feedbackProperties(m) }
+        }
         continue
       }
       const content = resolveContactContent(m)
@@ -162,6 +175,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
         authorName: m.authorName ?? null,
         authorAvatarUrl: m.authorAvatarUrl ?? null,
         contactBlocks: content.contactBlocks,
+        ...feedbackProperties(m),
       })
     }
     return next
@@ -174,10 +188,11 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
     advanceCursor(event.eventId)
     if (event.type === 'message.created') {
       const { text, contactBlocks } = resolveContactContent(event.payload)
+      const feedback = feedbackProperties(event.payload)
       const i = indexOf((m) => m.id === event.payload.messageId)
       if (i !== -1) {
         const next = messages.slice()
-        next[i] = { ...next[i]!, text, contactBlocks, seq, status: 'sent', streaming: false, turnId: null }
+        next[i] = { ...next[i]!, ...feedback, text, contactBlocks, seq, status: 'sent', streaming: false, turnId: null }
         setMessages(next)
       } else {
         // No exact id match. A degraded non-streaming ack (server response had no
@@ -191,7 +206,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
           m.role === event.payload.role && Date.parse(event.occurredAt) >= Date.parse(m.createdAt))
         const next = messages.slice()
         if (pi !== -1) {
-          next[pi] = { ...next[pi]!, id: event.payload.messageId, text, contactBlocks, seq, status: 'sent', streaming: false, turnId: null }
+          next[pi] = { ...next[pi]!, ...feedback, id: event.payload.messageId, text, contactBlocks, seq, status: 'sent', streaming: false, turnId: null }
         } else {
           next.push({
             id: event.payload.messageId, role: event.payload.role, text,
@@ -204,6 +219,7 @@ export function createMessageStore(now: () => string = () => new Date().toISOStr
             // Same reasoning: authorAvatarUrl is snapshot-only too.
             authorAvatarUrl: null,
             contactBlocks,
+            ...feedback,
           })
         }
         setMessages(next)

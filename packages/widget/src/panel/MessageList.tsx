@@ -1,3 +1,5 @@
+import type { FeedbackRecord } from '../contract/feedback'
+import type { SubmitAnswerFeedback } from './AnswerFeedback'
 import { useEffect, useRef, useState } from 'preact/hooks'
 import type { ComponentChildren, RefObject } from 'preact'
 import type { StoredMessage } from '../store/message-store'
@@ -17,6 +19,8 @@ export interface MessageListProps {
   onQuickReply: (text: string) => void
   trailing?: ComponentChildren
   showWelcome: boolean
+  ratings?: FeedbackRecord[] | undefined
+  submitRating?: SubmitAnswerFeedback | undefined
 }
 
 const NEAR_BOTTOM_THRESHOLD_PX = 48
@@ -146,12 +150,13 @@ function pillLabel(count: number, strings: WidgetStrings): string {
   return strings.pill(count)
 }
 
-export function MessageList({ config, messages, agentName, agentAvatarUrl, onRetry, onQuickReply, trailing, showWelcome }: MessageListProps) {
+export function MessageList({ config, messages, agentName, agentAvatarUrl, onRetry, onQuickReply, trailing, showWelcome, ratings, submitRating }: MessageListProps) {
   const strings = useStrings()
   const containerRef = useRef<HTMLDivElement | null>(null)
   const innerRef = useRef<HTMLDivElement | null>(null)
   const { atBottom, newBelowCount, jumpToBottom } = useBottomAnchoredScroll(containerRef, innerRef, messages)
   const announcement = useAnnouncement(messages)
+  const ratingsByMessage = new Map(ratings?.map(rating => [rating.messageId, rating]))
 
   return (
     <div class="msgs-wrap">
@@ -161,7 +166,8 @@ export function MessageList({ config, messages, agentName, agentAvatarUrl, onRet
           {messages.length > 0 && <div class="day">{strings.today}</div>}
           {messages.map((m, i) => (
             <MessageBubble key={m.id} message={m} agentName={agentName} agentAvatarUrl={agentAvatarUrl} onRetry={onRetry}
-              compact={i > 0 && messages[i - 1]?.role === m.role} logoUrl={config.theme.logoUrl ?? null} />
+              compact={i > 0 && messages[i - 1]?.role === m.role} logoUrl={config.theme.logoUrl ?? null}
+              rating={ratingsByMessage.get(m.id)} submitRating={submitRating} />
           ))}
           {trailing}
         </div>

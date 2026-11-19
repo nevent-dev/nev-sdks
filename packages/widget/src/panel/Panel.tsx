@@ -118,6 +118,8 @@ export function Panel({ config, transport, onClose, onResize, viewportKind, view
         onRetry={(clientId) => feedback.onSend(() => transport.retry(clientId))}
         onQuickReply={(text) => feedback.onSend(() => transport.send(text))}
         trailing={trailing}
+        ratings={feedback.answers}
+        submitRating={feedback.answerRatingsEnabled ? feedback.saveAnswer : undefined}
         // Defensa en profundidad (revisión Task-8): MessageList confía en
         // quien lo llama, así que Panel añade su PROPIA condición
         // messages.length === 0 en vez de depender solo de conversationPhase

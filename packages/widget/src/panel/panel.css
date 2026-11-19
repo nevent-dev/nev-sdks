@@ -339,3 +339,20 @@ button, input, textarea, select { font-family: inherit; }
   padding-right: env(safe-area-inset-right);
 }
 [data-viewport="mobile"] .head { padding-top: calc(10px + env(safe-area-inset-top)); }
+
+.assistant-meta { display: flex; align-items: flex-start; gap: 8px; }
+.answer-feedback-locale { min-inline-size: 0; }
+.answer-votes { display: flex; gap: 2px; }
+.answer-votes button, .answer-reasons-head button {
+  display: inline-grid; place-items: center; width: 26px; height: 26px;
+  border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer;
+}
+.answer-votes button[aria-pressed="true"] { color: var(--brand-text); background: var(--brand-soft); }
+.answer-votes button svg, .answer-reasons-head button svg { width: 16px; height: 16px; }
+.answer-reasons {
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface);
+  padding: 10px; margin-top: 4px; color: var(--ink); font-size: 12px;
+}
+.answer-reasons-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-weight: 600; }
+.answer-reasons .feedback { justify-content: flex-start; margin-top: 6px; }
+.answer-reasons .dsc, .answer-thanks { font-size: 12px; color: var(--muted); }

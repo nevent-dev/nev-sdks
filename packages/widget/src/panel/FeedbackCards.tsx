@@ -3,7 +3,7 @@ import type { FeedbackAction, FeedbackSurvey } from '../contract/feedback'
 import { FeedbackUnavailable } from '../transport/feedback'
 import { useStrings } from './strings'
 
-function useSubmission(onUnavailable: () => void) {
+export function useSubmission(onUnavailable: () => void) {
   const inFlight = useRef(false)
   const [busy, setBusy] = useState(false)
   const [retry, setRetry] = useState<(() => void) | null>(null)
@@ -27,7 +27,7 @@ function useSubmission(onUnavailable: () => void) {
   return { busy, retry, submit }
 }
 
-function FeedbackError({ retry }: { retry: (() => void) | null }) {
+export function FeedbackError({ retry }: { retry: (() => void) | null }) {
   const strings = useStrings()
   return retry ? (
     <p class="feedback-error" role="alert">

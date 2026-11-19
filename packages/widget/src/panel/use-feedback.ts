@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks'
-import type { FeedbackAction, FeedbackState, FeedbackSurvey, WidgetFeedbackConfig } from '../contract/feedback'
+import type { FeedbackAction, FeedbackRecord, FeedbackRequest, FeedbackState, FeedbackSurvey, WidgetFeedbackConfig } from '../contract/feedback'
 import type { StoreState } from '../store/message-store'
 import type { Transport } from '../transport'
 import { FeedbackUnavailable } from '../transport/feedback'
@@ -17,8 +17,12 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
   const candidate = useRef<{ lastMessageId: string | undefined } | null>(null)
   const cancelPrompt = useRef<(() => void) | null>(null)
   const syncRequest = useRef<AbortController | null>(null)
+  const activeTransport = useRef(transport)
+  const answerRevision = useRef(0)
+  const savedAnswers = useRef(new Map<string, { revision: number; record: FeedbackRecord }>())
   const lastMessage = state.messages.at(-1)
   const lastMessageId = lastMessage?.id
+  const initialLastMessageId = useRef(lastMessageId)
   const completedBotReply = lastMessage?.role === 'bot' && lastMessage.status === 'sent' && !lastMessage.streaming
   const teamResolved = state.conversationState === 'RESOLVED'
   const botActive = state.conversationState === 'BOT_ACTIVE' || state.conversationState === null
@@ -32,6 +36,7 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
   async function syncFeedback({ afterSend = false, hadPrompt = false, initial = false } = {}): Promise<void> {
     syncRequest.current?.abort()
     const request = new AbortController()
+    const startedAt = answerRevision.current
     syncRequest.current = request
     let timeout: ReturnType<typeof setTimeout> | undefined
     try {
@@ -43,7 +48,11 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
         }),
       ]) : await pending
       if (!result || request.signal.aborted) return
-      setFeedback(result)
+      const answers = new Map(result.answers.map(record => [record.messageId, record]))
+      for (const [messageId, saved] of savedAnswers.current) {
+        if (saved.revision > startedAt) answers.set(messageId, saved.record)
+      }
+      setFeedback({ ...result, answers: [...answers.values()] })
       const survey = result.resolutionSurvey
       const previousSurvey = lastResolution.current
       lastResolution.current = survey
@@ -71,6 +80,8 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
   }
 
   useLayoutEffect(() => {
+    activeTransport.current = transport
+    savedAnswers.current.clear()
     setFeedback(null)
     setResolutionPrompt(null)
     setNextAction('NONE')
@@ -135,6 +146,24 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
     return cancel
   }, [config?.resolutionSurvey, lastMessageId, completedBotReply, botActive, state.newConversationNotice, transport])
 
+  const answerRatingsEnabled = !!config?.answerFeedback && feedback !== null
+
+  useEffect(() => {
+    if (config?.answerFeedback && !answerRatingsEnabled && lastMessage?.feedbackEligible && initialLastMessageId.current !== lastMessageId) {
+      void syncFeedback()
+    }
+  }, [config?.answerFeedback, lastMessage?.feedbackEligible, lastMessageId])
+
+  async function saveAnswer(request: Extract<FeedbackRequest, { kind: 'ANSWER' }>): Promise<void> {
+    const result = await transport.feedback(request)
+    if (activeTransport.current !== transport) return
+    savedAnswers.current.set(request.messageId, { revision: ++answerRevision.current, record: result.feedback })
+    setFeedback(previous => previous && {
+      ...previous,
+      answers: [...previous.answers.filter(record => record.messageId !== request.messageId), result.feedback],
+    })
+  }
+
   function onSend(send: () => Promise<void>): void {
     stopWaiting()
     setNextAction('NONE')
@@ -180,6 +209,9 @@ export function useFeedback(config: WidgetFeedbackConfig | undefined, transport:
 
   return {
     resolutionPrompt,
+    answerRatingsEnabled,
+    answers: feedback?.answers,
+    saveAnswer,
     teamSurvey,
     nextAction,
     actionLocale,
