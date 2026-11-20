@@ -1760,6 +1760,7 @@ export class MessageRenderer {
     const language = this.i18n.getLocale();
     if (language === 'pt') return 'pt-PT';
     if (language === 'it') return 'it-IT';
+    if (language === 'de') return 'de-DE';
     return language === 'fr' ? 'fr-FR' : undefined;
   }
 

@@ -9,7 +9,7 @@
  *   npm run build && npm run test:perf
  *
  * Size budgets (uncompressed):
- * - ESM bundle  (nevent-chatbot.js)      < 480 KB
+ * - ESM bundle  (nevent-chatbot.js)      < 484 KiB
  * - UMD bundle  (nevent-chatbot.umd.cjs) < 230 KB
  *
  * Gzip budget:
@@ -45,8 +45,8 @@ const DIST_DIR = resolve(__dirname, '../../../../dist');
 // Size budgets (bytes)
 // ============================================================================
 
-/** ESM bundle uncompressed size limit */
-const ESM_UNCOMPRESSED_LIMIT = 480 * 1024; // 480 KB
+// nevent-work#442 D21: 484 KiB for German. Split catalogues by language before adding another locale.
+const ESM_UNCOMPRESSED_LIMIT = 484 * 1024;
 
 /** UMD bundle uncompressed size limit */
 const UMD_UNCOMPRESSED_LIMIT = 230 * 1024; // 230 KB

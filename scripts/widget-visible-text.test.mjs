@@ -105,3 +105,18 @@ test('it rejects another language and spaces before punctuation', () => {
   entries.it = "    title: 'Apri l’app: «Aiuto».',";
   assert.deepEqual(localeMapProblems('chatbot', entries, ['es', 'it'], ['title']), []);
 });
+
+test('de checks text, register, typography, compounds and short label length', () => {
+  const es = "    title: 'Ayuda',";
+  const captures = (title) => localeMapProblems('chatbot', { es, de: `    title: '${title}',` }, ['es', 'de'], ['title']);
+  assert.deepEqual(captures('Hilfe'), []);
+  assert.ok(captures('Type a message').includes('chatbot.de: Type a message'));
+  assert.ok(captures('Brauchst du Hilfe?').some(problem => problem.includes('informal register')));
+  assert.ok(captures('Klicken sie auf ihr Konto.').some(problem => problem.includes('informal register')));
+  assert.ok(captures('Öffnen sie das Ticket.').some(problem => problem.includes('informal register')));
+  assert.ok(!captures('Öffnen Sie das Ticket.').some(problem => problem.includes('informal register')));
+  assert.ok(captures('„Hilfe ?“').some(problem => problem.includes('invalid German typography')));
+  assert.ok(captures('Hilfe ?').some(problem => problem.includes('invalid German typography')));
+  assert.ok(captures('E-Mail Adresse').some(problem => problem.includes('invalid German compound')));
+  assert.ok(captures('Unterstützung').some(problem => problem.includes('label exceeds')));
+});

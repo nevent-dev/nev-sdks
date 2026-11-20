@@ -291,6 +291,45 @@ const TRANSLATIONS: Record<SupportedLocale, ChatbotTranslations> = {
     brandingAriaLabel: 'Con tecnologia Nevent, chatbot IA per eventi',
     defaultWelcomeMessage: 'Ciao! Come posso aiutarti?',
   },
+  /** German (Germany) (de) */
+  de: {
+    inputPlaceholder: 'Nachricht schreiben…',
+    sendButton: 'Senden',
+    defaultTitle: 'Chat mit uns',
+    statusOnline: 'Online',
+    statusConnecting: 'Wird verbunden…',
+    statusOffline: 'Offline',
+    typingIndicator: 'Ich denke nach…',
+    messageSendError: 'Die Nachricht konnte nicht gesendet werden. Versuchen Sie es erneut.',
+    connectionError: 'Verbindungsfehler. Ein neuer Versuch läuft…',
+    rateLimitError: 'Zu viele Nachrichten. Warten Sie einen Moment.',
+    rateLimitCountdown: 'Zu viele Nachrichten. Warten Sie {seconds} Sekunden.',
+    rateLimitCountdownOne: 'Zu viele Nachrichten. Warten Sie 1 Sekunde.',
+    poweredBy: 'Technologie von Nevent',
+    newConversation: 'Neuer Chat',
+    closeChat: 'Chat schließen',
+    minimizeChat: 'Chat minimieren',
+    openChat: 'Chat öffnen',
+    retry: 'Erneut versuchen',
+    justNow: 'Gerade eben',
+    minutesAgo: 'vor {n} Min.',
+    hoursAgo: 'vor {n} Std.',
+    yesterday: 'Gestern',
+    connectionOffline: 'Keine Internetverbindung',
+    connectionReconnecting: 'Verbindung wird erneut aufgebaut…',
+    connectionReconnected: 'Verbindung wiederhergestellt',
+    attachFile: 'Datei anhängen',
+    removeFile: 'Entfernen',
+    uploading: 'Wird hochgeladen',
+    fileTooBig: 'Die Datei ist zu groß. Maximal sind {maxMB} MB erlaubt.',
+    fileTypeNotAllowed: 'Dieser Dateityp ist nicht zulässig.',
+    uploadFailed: 'Die Datei konnte nicht hochgeladen werden. Versuchen Sie es erneut.',
+    dragDropHint: 'Dateien hier ablegen',
+    agentTyping: '{name} schreibt…',
+    someoneTyping: 'Jemand schreibt…',
+    brandingAriaLabel: 'Technologie von Nevent, KI-Chatbot für Events',
+    defaultWelcomeMessage: 'Hallo! Wie kann ich Ihnen helfen?',
+  },
 };
 
 /**
@@ -303,6 +342,7 @@ const SUPPORTED_LOCALES: ReadonlyArray<SupportedLocale> = [
   'pt',
   'fr',
   'it',
+  'de',
 ];
 
 /**
@@ -544,7 +584,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * // navigator.language = 'ca'
    * I18nManager.detectLocale(); // 'ca'
    *
-   * // navigator.language = 'de-DE' (unsupported)
+   * // navigator.language = 'nl-NL' (unsupported)
    * I18nManager.detectLocale(); // 'es' (default fallback)
    * ```
    */

@@ -132,13 +132,18 @@ export function compare(found, baseline) {
 
 const PORTUGUESE_COPY = /(?<![\p{L}\p{M}])(?:você|vocês|conosco|arquivo|celular|conectando|reconectando|contato|senha|nova aba|subscripci[oó]n|subscricao|politica de privacidade|e-mail|tu|teu|tua)(?![\p{L}\p{M}])/iu;
 
-const REQUIRED_LOCALES = ['es', 'en', 'ca', 'pt', 'fr', 'it'];
+const REQUIRED_LOCALES = ['es', 'en', 'ca', 'pt', 'fr', 'it', 'de'];
 const FRENCH_COPY = /(?<![\p{L}\p{M}])(?:haz clic|introduce tu|sin conexión|tu cuenta|todos los derechos reservados|click here|type a message|your account|new conversation|sem ligação|tente novamente|courriel)(?![\p{L}\p{M}])/iu;
 const FRENCH_TYPOGRAPHY = /(?:\p{L}'\p{L}|\.{3}|«(?!\u00a0)|(?<!\u00a0)»|[\p{L}\p{N}] *(?:[;!?%]|:(?![/\d])))/u;
 const ITALIAN_COPY = /(?<![\p{L}\p{M}])(?:haz clic|introduce tu|sin conexión|tu cuenta|click here|type a message|your account|new conversation|sem ligação|tente novamente|cliquez ici|saisissez votre|vous êtes hors ligne|nouvelle conversation)(?![\p{L}\p{M}])/iu;
 const ITALIAN_TYPOGRAPHY = /(?:\p{L}'\p{L}|\.{3}|—|[ \u00a0\u202f]+[:;!?]|«\s|\s»|\p{L}[*əƏ](?!\p{L}))/u;
 const ITALIAN_ELISION = /\p{L}[’']\s*(?:\$\{|\{)/u;
 const ITALIAN_REGISTER = /(?:\b(?:Lei|Suo|Sua|Suoi|Sue)\b|\b[Ll]a preghiamo\b|(?:^|[.!?]\s+)\s*(?:[Ff]are clic|[Ss]elezionare)\b)/u;
+const GERMAN_COPY = /(?<![\p{L}\p{M}])(?:haz clic|tu cuenta|escribe un mensaje|sin conexión|type a message|your account|new conversation|try again|sem ligação|tente novamente|saisissez votre|nouvelle conversation|scrivi un messaggio|nuova conversazione)(?![\p{L}\p{M}])/iu;
+const GERMAN_REGISTER = /\b(?:du|dich|dir|dein(?:e[mnrs]?)?)\b/iu;
+const GERMAN_FORMAL_CASE = /(?<![\p{L}\p{M}])(?:(?:Klicken|Geben|Wählen|Öffnen|Melden|Schreiben|Versuchen|Prüfen|Formulieren|Warten|Drücken) sie|(?:Sie|sie) (?:auf )?ihr(?:e[nmrs]?)? (?:Konto|Passwort|Ticket|E-Mail-Adresse))(?![\p{L}\p{M}])/u;
+const GERMAN_TYPOGRAPHY = /(?:["«»“”„‘‚]|\.{3}|—|[ \u00a0\u202f]+[:;!?]|\p{L}[:*_]innen\b|\p{L}Innen\b)/u;
+const GERMAN_COMPOUND = /\b(?:(?:E-Mail|QR|SMS|App|Nevent|Support) (?:Adresse|Code|Kampagne|Benachrichtigung|Logo|Chat|Konto)|(?:e-mail|qr-code|nachricht|datei|frage|datenschutzerklärung))\b/u;
 const CATALOG_LITERAL = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
 function objectBody(code, name) {
@@ -147,6 +152,42 @@ function objectBody(code, name) {
 
 function keysAt(body, indent) {
   return [...body.matchAll(new RegExp(`^${' '.repeat(indent)}([A-Za-z][\\w]*):`, 'gm'))].map(match => match[1]).sort();
+}
+
+const SHORT_LABEL = /(?:aria|hint|title|label|placeholder|button|status|close|send|retry|^(?:yes|no|today|attach|stop|nextCard|previousCard|jumpLatest)$)/i;
+
+// No shorter standard word. Keep the exact copy and verify the space in the browser (#442, t442-edge).
+const GERMAN_LENGTH_EXCEPTIONS = {
+  'chatbot-renderers.today': 'Heute',
+  'support-panel.today': 'Heute',
+  'support-panel.no': 'Nein',
+};
+
+function checkGerman(name, spanish, german, indent) {
+  const problems = [];
+  for (const [, , literal] of german.matchAll(CATALOG_LITERAL)) {
+    const visible = literal.replace(/\$\{[^}]*\}|\{\{?[A-Za-z]\w*\}\}?/g, 'x');
+    const expression = visible.match(GERMAN_COPY)?.[0];
+    if (expression) problems.push(`${name}.de: ${expression}`);
+    if (GERMAN_REGISTER.test(visible) || GERMAN_FORMAL_CASE.test(visible)) problems.push(`${name}.de: informal register: ${literal}`);
+    if (GERMAN_TYPOGRAPHY.test(visible.replace(/„([^„“]*)“/g, '$1').replace(/‚([^‚‘]*)‘/g, '$1'))) {
+      problems.push(`${name}.de: invalid German typography: ${literal}`);
+    }
+    if (GERMAN_COMPOUND.test(visible)) problems.push(`${name}.de: invalid German compound or case: ${literal}`);
+  }
+  const labels = body => {
+    const pattern = new RegExp(`^${' '.repeat(indent)}([A-Za-z][\\w]*):\\s*'([^'\\n]*)',?`, 'gm');
+    return new Map([...body.matchAll(pattern)].map(([, key, value]) => [key, value]));
+  };
+  const reference = labels(spanish);
+  for (const [key, label] of labels(german)) {
+    const source = reference.get(key);
+    if (SHORT_LABEL.test(key) && source?.length <= 25 && label.length > 1.6 * source.length
+        && GERMAN_LENGTH_EXCEPTIONS[`${name}.${key}`] !== label) {
+      problems.push(`${name}.de.${key}: label exceeds 1.6 times the Spanish length`);
+    }
+  }
+  return problems;
 }
 
 export function localeMapProblems(name, entries, languages, keys, indent = 4) {
@@ -161,6 +202,7 @@ export function localeMapProblems(name, entries, languages, keys, indent = 4) {
       const expression = body.match(PORTUGUESE_COPY)?.[0];
       if (expression) problems.push(`${name}.pt: ${expression}`);
     }
+    if (locale === 'de') problems.push(...checkGerman(name, entries.es ?? '', body, indent));
     if (locale === 'fr' || locale === 'it') {
       const copy = locale === 'fr' ? FRENCH_COPY : ITALIAN_COPY;
       const typography = locale === 'fr' ? FRENCH_TYPOGRAPHY : ITALIAN_TYPOGRAPHY;
@@ -190,6 +232,9 @@ export function scanLocaleMaps(repo = REPO) {
   const chatbot = 'packages/chatbot/src';
   const supported = /\btype SupportedLocale = ([^;\n]+)/.exec(read(`${chatbot}/types.ts`))?.[1] ?? '';
   const chatbotLocales = [...supported.matchAll(/'([a-z]{2})'/g)].map(([, locale]) => locale);
+  const config = read(`${chatbot}/chatbot/config-manager.ts`);
+  const configLocales = /\bconst SUPPORTED_LOCALES[^=]+=(.*?);/s.exec(config)?.[1] ?? '';
+  const acceptedChatbotLocales = [...configLocales.matchAll(/'([a-z]{2})'/g)].map(([, locale]) => locale);
   const catalog = collect(objectBody(read(`${chatbot}/chatbot/i18n-manager.ts`), 'TRANSLATIONS'), /^  ([a-z]{2}): \{\n([\s\S]*?)^  \},/gm);
   const renderer = collect(objectBody(read(`${chatbot}/chatbot/ui/renderer-labels.ts`), 'LABELS'), /^  ([a-z]{2}): \{\n([\s\S]*?)^  \},/gm);
 
@@ -208,8 +253,10 @@ export function scanLocaleMaps(repo = REPO) {
     ['support-panel', panelCatalogs, widgetLocales, 2],
     ['support-title', titles, widgetLocales, 0],
   ];
-  return maps.flatMap(([name, entries, locales, indent]) => [
+  const problems = chatbotLocales.slice().sort().join(',') === acceptedChatbotLocales.sort().join(',')
+    ? [] : ['chatbot config: supported locales differ'];
+  return problems.concat(maps.flatMap(([name, entries, locales, indent]) => [
     ...(!entries.es?.trim() ? [`${name}: Spanish reference catalogue missing`] : []),
     ...localeMapProblems(name, entries, [...new Set([...locales, ...REQUIRED_LOCALES])], indent ? keysAt(entries.es ?? '', indent) : undefined, indent),
-  ]);
+  ]));
 }

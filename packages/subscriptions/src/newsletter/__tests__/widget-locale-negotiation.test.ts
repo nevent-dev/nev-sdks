@@ -9,12 +9,14 @@ describe('negotiateWidgetLocale (decision 4, option B)', () => {
   it.each([
     ['fr-FR · Spanish tenant', ['fr-FR'], 'es', 'fr'],
     ['fr-FR · British tenant', ['fr-FR'], 'en-GB', 'fr'],
-    ['de-DE · Portuguese tenant', ['de-DE'], 'pt-PT', 'pt'],
+    ['de-DE · Portuguese tenant', ['de-DE'], 'pt-PT', 'de'],
+    ['de-AT · Spanish tenant', ['de-AT'], 'es', 'de'],
+    ['de-CH · Spanish tenant', ['de-CH'], 'es', 'de'],
     ['ar-SA · Saudi tenant (no widget labels in ar)', ['ar-SA'], 'ar', 'en'],
     ['en-GB · Spanish tenant', ['en-GB'], 'es', 'en'],
     ['pt-BR · Spanish tenant', ['pt-BR'], 'es', 'pt'],
     ['no browser language · British tenant', [], 'en-GB', 'en'],
-    ['the first browser language with labels wins', ['de-DE', 'ca-ES', 'en'], 'es', 'ca'],
+    ['the first browser language with labels wins', ['nl-NL', 'ca-ES', 'en'], 'es', 'ca'],
   ])('%s', (_case, browser, tenant, expected) => {
     expect(negotiateWidgetLocale(browser, tenant)).toBe(expected);
   });
@@ -22,7 +24,7 @@ describe('negotiateWidgetLocale (decision 4, option B)', () => {
   it('an explicit embed locale with labels wins over everything; one without labels is ignored', () => {
     expect(negotiateWidgetLocale(['en-GB'], 'es', 'pt')).toBe('pt');
     expect(negotiateWidgetLocale(['en-GB'], 'es', 'fr-CA')).toBe('fr');
-    expect(negotiateWidgetLocale(['en-GB'], 'es', 'de')).toBe('en');
+    expect(negotiateWidgetLocale(['en-GB'], 'es', 'nl')).toBe('en');
   });
 
   afterEach(() => vi.unstubAllGlobals());

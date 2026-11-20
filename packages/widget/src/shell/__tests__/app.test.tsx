@@ -640,7 +640,7 @@ describe("App — 'opened' lleva el --surface resuelto (backplate del loader, te
 })
 
 
-it.each([['pt', 'Chat de apoio'], ['fr', 'Chat d’assistance'], ['it', 'Chat di assistenza']] as const)(
+it.each([['pt', 'Chat de apoio'], ['fr', 'Chat d’assistance'], ['it', 'Chat di assistenza'], ['de', 'Support-Chat']] as const)(
   'uses the API locale (%s) for the shell language and frame title when the host has no lang',
   async (locale, title) => {
     const store = createMessageStore()

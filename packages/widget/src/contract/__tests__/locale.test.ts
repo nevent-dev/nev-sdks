@@ -20,8 +20,12 @@ describe('resolveLocale — normaliza un candidato crudo (host lang, config.loca
   it.each(['it', 'it-IT', 'it-CH'])('negocia %s a it', (language) => {
     expect(resolveLocale(language)).toBe('it')
   })
-  it("'de' (no soportado) → null", () => {
-    expect(resolveLocale('de')).toBeNull()
+  it.each(['de', 'de-DE', 'de-AT', 'de-CH'])('%s → de', (locale) => {
+    expect(resolveLocale(locale)).toBe('de')
+  })
+
+  it("'nl' (no soportado) → null", () => {
+    expect(resolveLocale('nl')).toBeNull()
   })
   it("'' (cadena vacía) → null", () => {
     expect(resolveLocale('')).toBeNull()

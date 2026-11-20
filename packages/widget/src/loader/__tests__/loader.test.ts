@@ -753,6 +753,8 @@ describe('loader', () => {
       expect(iframe.title).toBe('Chat d’assistance')
       fakeShellMessage('locale', 'it', bootedInstanceId())
       expect(iframe.title).toBe('Chat di assistenza')
+      fakeShellMessage('locale', 'de', bootedInstanceId())
+      expect(iframe.title).toBe('Support-Chat')
     })
 
     it('negocia el lang francés del host y localiza el título del iframe', () => {
@@ -773,8 +775,8 @@ describe('loader', () => {
       expect(iframe.title).toBe('Chat di assistenza')
     })
 
-    it('lang del host no soportado (p.ej. "de"): igual que sin lang — nunca se inventa un idioma soportado más cercano', () => {
-      document.documentElement.lang = 'de'
+    it('lang del host no soportado (p.ej. "nl"): igual que sin lang — nunca se inventa un idioma soportado más cercano', () => {
+      document.documentElement.lang = 'nl'
       bootLoader(window, { shellUrl: SHELL_URL })
       getApi()('boot', 'inst_demo_festival_01')
       const iframe = document.querySelector('iframe')!
