@@ -2,10 +2,10 @@ import type { NewsletterLabels } from './types';
 
 /** German (Germany) translations for the newsletter widget. */
 export const de: NewsletterLabels = {
-  formTitle: 'Newsletter abonnieren',
+  formTitle: 'Für unseren Newsletter anmelden',
   formAriaLabel: 'Anmeldeformular für den Newsletter',
 
-  submitButton: 'Abonnieren',
+  submitButton: 'Anmelden',
   loadingButton: 'Wird gesendet…',
 
   successMessage: 'Sie haben den Newsletter abonniert und erhalten jetzt unsere Mitteilungen.',
