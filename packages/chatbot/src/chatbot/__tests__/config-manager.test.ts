@@ -167,7 +167,7 @@ describe('ConfigManager', () => {
 
     it('should throw error if locale is not supported', () => {
       expect(
-        () => new ConfigManager(createMinimalConfig({ locale: 'de' as never }))
+        () => new ConfigManager(createMinimalConfig({ locale: 'nl' as never }))
       ).toThrow('locale must be one of');
     });
 

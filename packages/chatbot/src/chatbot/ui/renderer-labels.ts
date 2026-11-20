@@ -100,6 +100,20 @@ const LABELS: Record<SupportedLocale, RendererLabels> = {
     openImage: 'Apri l’immagine in una nuova scheda',
     brokenImage: 'Immagine non disponibile',
   },
+  de: {
+    keyboardHint: 'Drücken Sie die Eingabetaste zum Senden oder Umschalt + Eingabe für eine neue Zeile.',
+    scrollToBottom: 'Zum Chatende springen',
+    user: 'Gesendete Nachricht',
+    bot: 'Nachricht des Assistenten',
+    today: 'Heute',
+    labelSeparator: ': ',
+    quickReplies: 'Schnellantworten',
+    carousel: 'Kartenkarussell',
+    previousCard: 'Vorherige Karte',
+    nextCard: 'Nächste Karte',
+    openImage: 'Bild in neuem Tab öffnen',
+    brokenImage: 'Bild nicht verfügbar',
+  },
 };
 
 export function rendererLabel(locale: string | undefined, key: keyof RendererLabels): string {

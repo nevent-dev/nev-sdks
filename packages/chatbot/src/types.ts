@@ -34,7 +34,7 @@ export type ThemeMode = 'light' | 'dark' | 'auto';
  * Supported locales for the chatbot UI strings.
  * Controls labels, placeholders, and system messages language.
  */
-export type SupportedLocale = 'es' | 'en' | 'ca' | 'pt' | 'fr' | 'it';
+export type SupportedLocale = 'es' | 'en' | 'ca' | 'pt' | 'fr' | 'it' | 'de';
 
 /**
  * Role of a chat message participant.
