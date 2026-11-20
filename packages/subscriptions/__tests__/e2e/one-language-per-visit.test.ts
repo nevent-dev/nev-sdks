@@ -243,9 +243,8 @@ describe('One language per visit (nevent-work#40)', () => {
     await widget.init();
 
     const config = new URL(configUrl(fetchMock));
-    const requested = config.searchParams.get('language');
-    expect(requested).toBe('auto');
-    expect(config.searchParams.get('sdkLanguages')?.split(',')).toContain('de');
+    expect(config.searchParams.get('language')).toBe('de');
+    expect(config.searchParams.has('sdkLanguages')).toBe(false);
     expect(widget.getLocale()).toBe('de');
     const shadow = getShadowRoot(container)!;
     expect(shadow.host.lang).toBe('de');
