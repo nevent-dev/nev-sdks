@@ -45,6 +45,7 @@ const CATALOG_LOADERS = {
   fr: () => import('./locales/fr'),
   it: () => import('./locales/it'),
   de: () => import('./locales/de'),
+  nl: () => import('./locales/nl'),
 } satisfies Record<Exclude<SupportedLocale, 'es'>, () => Promise<{ default: LocaleCatalog }>>;
 
 // ============================================================================
@@ -126,7 +127,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
   /**
    * Returns the currently active locale code.
    *
-   * @returns The active locale (e.g., 'es', 'en', 'ca', 'pt', 'fr', 'it', 'de')
+   * @returns The active locale (e.g., 'es', 'en', 'ca', 'pt', 'fr', 'it', 'de', 'nl')
    *
    * @example
    * ```typescript
@@ -255,7 +256,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * it to the nearest supported locale. If no match is found, returns the
    * default locale ('es').
    *
-   * @returns A supported locale code ('es' | 'en' | 'ca' | 'pt' | 'fr' | 'it' | 'de')
+   * @returns A supported locale code ('es' | 'en' | 'ca' | 'pt' | 'fr' | 'it' | 'de' | 'nl')
    *
    * @example
    * ```typescript
@@ -268,7 +269,7 @@ export class I18nManager extends CoreI18nManager<ChatbotTranslations> {
    * // navigator.language = 'ca'
    * I18nManager.detectLocale(); // 'ca'
    *
-   * // navigator.language = 'nl-NL' (unsupported)
+   * // navigator.language = 'fi-FI' (unsupported)
    * I18nManager.detectLocale(); // 'es' (default fallback)
    * ```
    */

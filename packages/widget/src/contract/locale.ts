@@ -2,7 +2,7 @@
 // SIN diccionarios (esos están en panel/strings.ts) — lo importa también el
 // loader (IIFE, ver vite.loader.config.ts), que no puede permitirse cargar
 // las traducciones completas solo para detectar el idioma del host.
-export type WidgetLocale = 'es' | 'en' | 'ca' | 'pt' | 'fr' | 'it' | 'de'
+export type WidgetLocale = 'es' | 'en' | 'ca' | 'pt' | 'fr' | 'it' | 'de' | 'nl'
 
 // Shared by the frame and its loader without bundling the panel strings.
 export const WIDGET_TITLES: Record<WidgetLocale, string> = {
@@ -13,6 +13,7 @@ export const WIDGET_TITLES: Record<WidgetLocale, string> = {
   fr: 'Chat d’assistance',
   it: 'Chat di assistenza',
   de: 'Support-Chat',
+  nl: 'Helpchat',
 }
 
 // Normaliza un candidato crudo (document.documentElement.lang del host,

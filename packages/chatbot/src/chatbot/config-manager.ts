@@ -88,7 +88,7 @@ const DEFAULTS: Omit<Required<ChatbotConfig>, 'chatbotId' | 'tenantId'> = {
 };
 
 /** Locales supported by the chatbot widget */
-const SUPPORTED_LOCALES: SupportedLocale[] = ['es', 'en', 'ca', 'pt', 'fr', 'it', 'de'];
+const SUPPORTED_LOCALES: SupportedLocale[] = ['es', 'en', 'ca', 'pt', 'fr', 'it', 'de', 'nl'];
 
 /** Theme modes supported by the chatbot widget */
 const SUPPORTED_THEMES: ThemeMode[] = ['light', 'dark', 'auto'];

@@ -24,8 +24,11 @@ describe('resolveLocale — normaliza un candidato crudo (host lang, config.loca
     expect(resolveLocale(locale)).toBe('de')
   })
 
-  it("'nl' (no soportado) → null", () => {
-    expect(resolveLocale('nl')).toBeNull()
+  it.each(['nl', 'nl-NL', 'nl-BE'])('%s → nl', (locale) => {
+    expect(resolveLocale(locale)).toBe('nl')
+  })
+  it("'sv' (no soportado) → null", () => {
+    expect(resolveLocale('sv')).toBeNull()
   })
   it("'' (cadena vacía) → null", () => {
     expect(resolveLocale('')).toBeNull()

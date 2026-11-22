@@ -1736,6 +1736,7 @@ export class MessageRenderer {
     if (language === 'pt') return 'pt-PT';
     if (language === 'it') return 'it-IT';
     if (language === 'de') return 'de-DE';
+    if (language === 'nl') return 'nl-NL';
     return language === 'fr' ? 'fr-FR' : undefined;
   }
 

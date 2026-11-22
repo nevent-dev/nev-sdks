@@ -47,6 +47,8 @@ describe('Chatbot in the visitor\'s language (nevent-work#40)', () => {
     ['fr-CA', 'fr', 'Envoyer', 'Appuyez sur Entrée'],
     ['it-CH', 'it', 'Invia', 'Premi Invio'],
     ['de-AT', 'de', 'Senden', 'Drücken Sie'],
+    ['nl-NL', 'nl', 'Verzenden', 'Druk op Enter'],
+    ['nl-BE', 'nl', 'Verzenden', 'Druk op Enter'],
   ])('renders the loaded catalog for %s', async (locale, language, send, hint) => {
     browser(locale);
     const { shadowRoot, cleanup: c } = await createInitializedWidget({ locale: undefined });

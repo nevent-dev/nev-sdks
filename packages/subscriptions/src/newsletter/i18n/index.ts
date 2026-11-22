@@ -16,6 +16,7 @@ import { pt } from './pt';
 import { fr } from './fr';
 import { it } from './it';
 import { de } from './de';
+import { nl } from './nl';
 
 export type { NewsletterLabels } from './types';
 
@@ -30,6 +31,7 @@ export const NEWSLETTER_LOCALES: Record<string, NewsletterLabels> = {
   fr,
   it,
   de,
+  nl,
 };
 
 /**
@@ -83,7 +85,7 @@ function initialLocale(locale?: string | null): string {
  * The locale an anonymous visitor sees the widget in (nevent-work#279, decision 4 of #274, option B):
  * 1. a locale the operator set in the embed, if the widget has labels for it;
  * 2. the first browser language whose labels the widget has (it negotiates among the tenant's language and the
- *    widget's own: es, en, ca, pt, fr, it, de);
+ *    widget's own: es, en, ca, pt, fr, it, de, nl);
  * 3. the tenant's language (`tenantLanguage` of the public config), if the widget has labels for it;
  * 4. English — never a fixed Spanish.
  * Without `tenantLanguage` (an API that does not send it yet) it is exactly today's choice, {@link createNewsletterI18n}:
@@ -146,7 +148,7 @@ export function preferredWidgetLocale(
  * The one locale of a visit (nevent-work#40). With an API that says the language of its default texts
  * (`textsLanguage`), the visit is in that language, so title, fields, consent, errors and messages never mix two; only
  * an explicit locale of the embed overrides it (the operator chose it, and usually wrote the newsletter's own texts in
- * it). For Portuguese, French, Italian and German requests, follow the reported language during API rollouts. Without `textsLanguage`, {@link negotiateWidgetLocale} as before.
+ * it). For Portuguese, French, Italian, German and Dutch requests, follow the reported language during API rollouts. Without `textsLanguage`, {@link negotiateWidgetLocale} as before.
  */
 export function visitLocale(
   browserLanguages: readonly string[],
@@ -157,9 +159,9 @@ export function visitLocale(
   const texts = baseLanguage(textsLanguage);
   if (texts && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, texts)) {
     const explicit = baseLanguage(explicitLocale);
-    // An older API may have fallen back to its tenant language for Portuguese, French, Italian or German.
+    // An older API may have fallen back to its tenant language for Portuguese, French, Italian, German or Dutch.
     // Follow the actual texts so the form and the consent have the same language.
-    if (explicit === 'pt' || explicit === 'fr' || explicit === 'it' || explicit === 'de') return texts;
+    if (explicit === 'pt' || explicit === 'fr' || explicit === 'it' || explicit === 'de' || explicit === 'nl') return texts;
     return explicit && Object.prototype.hasOwnProperty.call(NEWSLETTER_LOCALES, explicit) ? explicit : texts;
   }
   if (tenantLanguage === undefined || tenantLanguage === null || tenantLanguage.trim() === '') {

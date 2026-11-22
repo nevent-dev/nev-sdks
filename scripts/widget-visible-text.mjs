@@ -132,7 +132,7 @@ export function compare(found, baseline) {
 
 const PORTUGUESE_COPY = /(?<![\p{L}\p{M}])(?:você|vocês|conosco|arquivo|celular|conectando|reconectando|contato|senha|nova aba|subscripci[oó]n|subscricao|politica de privacidade|e-mail|tu|teu|tua)(?![\p{L}\p{M}])/iu;
 
-const REQUIRED_LOCALES = ['es', 'en', 'ca', 'pt', 'fr', 'it', 'de'];
+const REQUIRED_LOCALES = ['es', 'en', 'ca', 'pt', 'fr', 'it', 'de', 'nl'];
 const FRENCH_COPY = /(?<![\p{L}\p{M}])(?:haz clic|introduce tu|sin conexión|tu cuenta|todos los derechos reservados|click here|type a message|your account|new conversation|sem ligação|tente novamente|courriel)(?![\p{L}\p{M}])/iu;
 const FRENCH_TYPOGRAPHY = /(?:\p{L}'\p{L}|\.{3}|«(?!\u00a0)|(?<!\u00a0)»|[\p{L}\p{N}] *(?:[;!?%]|:(?![/\d])))/u;
 const ITALIAN_COPY = /(?<![\p{L}\p{M}])(?:haz clic|introduce tu|sin conexión|tu cuenta|click here|type a message|your account|new conversation|sem ligação|tente novamente|cliquez ici|saisissez votre|vous êtes hors ligne|nouvelle conversation)(?![\p{L}\p{M}])/iu;
@@ -144,6 +144,12 @@ const GERMAN_REGISTER = /\b(?:du|dich|dir|dein(?:e[mnrs]?)?)\b/iu;
 const GERMAN_FORMAL_CASE = /(?<![\p{L}\p{M}])(?:(?:Klicken|Geben|Wählen|Öffnen|Melden|Schreiben|Versuchen|Prüfen|Formulieren|Warten|Drücken) sie|(?:Sie|sie) (?:auf )?ihr(?:e[nmrs]?)? (?:Konto|Passwort|Ticket|E-Mail-Adresse))(?![\p{L}\p{M}])/u;
 const GERMAN_TYPOGRAPHY = /(?:["«»“”„‘‚]|\.{3}|—|[ \u00a0\u202f]+[:;!?]|\p{L}[:*_]innen\b|\p{L}Innen\b)/u;
 const GERMAN_COMPOUND = /\b(?:(?:E-Mail|QR|SMS|App|Nevent|Support) (?:Adresse|Code|Kampagne|Benachrichtigung|Logo|Chat|Konto)|(?:e-mail|qr-code|nachricht|datei|frage|datenschutzerklärung))\b/u;
+const DUTCH_COPY = /(?<![\p{L}\p{M}])(?:hola|haz clic|tu cuenta|escribe un mensaje|sin conexión|nueva conversación|type a message|your account|new conversation|try again|sem ligação|tente novamente|saisissez votre|nouvelle conversation|scrivi un messaggio|nuova conversazione|nachricht schreiben|keine verbindung)(?![\p{L}\p{M}])/iu;
+const DUTCH_REGISTER = /(?<![\p{L}\p{M}]’)(?<![\p{L}\p{M}])(?:je|jij|jou|jouw|jullie)(?![\p{L}\p{M}])/iu;
+const DUTCH_GENDER_SHORTHAND = /\b(?:hij\s*\/\s*zij|hem\s*\/\s*haar)\b/iu;
+const DUTCH_FORMAL_CASE = /\b(?:U|Uw|UW|uW)\b/u;
+const DUTCH_TYPOGRAPHY = /(?:["«»“”„‚–—]|\p{L}'\p{L}|\.{3}|[ \u00a0\u202f]+[:;!?])/u;
+const DUTCH_COMPOUND = /\b(?:e-?mail (?:adres|campagne|bericht)|push melding|QR code|WhatsApp sjabloon|Nevent (?:account|logo)|ticket nummer)\b/iu;
 const CATALOG_LITERAL = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
 function objectBody(code, name) {
@@ -175,19 +181,45 @@ function checkGerman(name, spanish, german, indent) {
     }
     if (GERMAN_COMPOUND.test(visible)) problems.push(`${name}.de: invalid German compound or case: ${literal}`);
   }
+  return problems.concat(labelLengths(name, 'de', spanish, german, indent, GERMAN_LENGTH_EXCEPTIONS));
+}
+
+function labelLengths(name, language, spanish, translated, indent, exceptions) {
+  const problems = [];
   const labels = body => {
     const pattern = new RegExp(`^${' '.repeat(indent)}([A-Za-z][\\w]*):\\s*'([^'\\n]*)',?`, 'gm');
     return new Map([...body.matchAll(pattern)].map(([, key, value]) => [key, value]));
   };
   const reference = labels(spanish);
-  for (const [key, label] of labels(german)) {
+  for (const [key, label] of labels(translated)) {
     const source = reference.get(key);
     if (SHORT_LABEL.test(key) && source?.length <= 25 && label.length > 1.6 * source.length
-        && GERMAN_LENGTH_EXCEPTIONS[`${name}.${key}`] !== label) {
-      problems.push(`${name}.de.${key}: label exceeds 1.6 times the Spanish length`);
+        && exceptions[`${name}.${key}`] !== label) {
+      problems.push(`${name}.${language}.${key}: label exceeds 1.6 times the Spanish length`);
     }
   }
   return problems;
+}
+
+// Vandaag is the standard date heading. The chatbot and support headers allow its full width.
+const DUTCH_LENGTH_EXCEPTIONS = {
+  'chatbot-renderers.today': 'Vandaag',
+  'support-panel.today': 'Vandaag',
+};
+
+function checkDutch(name, spanish, dutch, indent) {
+  const problems = [];
+  for (const [, , literal] of dutch.matchAll(CATALOG_LITERAL)) {
+    const visible = literal.replace(/\$\{[^}]*\}|\{\{?[A-Za-z]\w*\}\}?/g, 'x');
+    const expression = visible.match(DUTCH_COPY)?.[0];
+    if (expression) problems.push(`${name}.nl: ${expression}`);
+    if (DUTCH_REGISTER.test(visible) || DUTCH_FORMAL_CASE.test(visible)) problems.push(`${name}.nl: invalid Dutch register: ${literal}`);
+    const unmatchedQuotes = visible.replace(/(?<=\p{L})’(?=\p{L})/gu, '').replace(/‘[^‘’]*’/gu, '');
+    if (DUTCH_GENDER_SHORTHAND.test(visible)) problems.push(`${name}.nl: invalid Dutch gender shorthand: ${literal}`);
+    if (DUTCH_TYPOGRAPHY.test(visible) || /‘|(?<![sxz])’(?![st]\b)/iu.test(unmatchedQuotes)) problems.push(`${name}.nl: invalid Dutch typography: ${literal}`);
+    if (DUTCH_COMPOUND.test(visible)) problems.push(`${name}.nl: invalid Dutch compound: ${literal}`);
+  }
+  return problems.concat(labelLengths(name, 'nl', spanish, dutch, indent, DUTCH_LENGTH_EXCEPTIONS));
 }
 
 export function localeMapProblems(name, entries, languages, keys, indent = 4) {
@@ -203,6 +235,7 @@ export function localeMapProblems(name, entries, languages, keys, indent = 4) {
       if (expression) problems.push(`${name}.pt: ${expression}`);
     }
     if (locale === 'de') problems.push(...checkGerman(name, entries.es ?? '', body, indent));
+    if (locale === 'nl') problems.push(...checkDutch(name, entries.es ?? '', body, indent));
     if (locale === 'fr' || locale === 'it') {
       const copy = locale === 'fr' ? FRENCH_COPY : ITALIAN_COPY;
       const typography = locale === 'fr' ? FRENCH_TYPOGRAPHY : ITALIAN_TYPOGRAPHY;
