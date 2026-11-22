@@ -163,6 +163,7 @@ describe.runIf(checkDist)('Bundle Size', () => {
         en: 'Press Enter to send',
         fr: 'Appuyez sur Entrée pour envoyer',
         it: 'Premi Invio per inviare',
+        nl: 'Druk op Enter om te verzenden',
         pt: 'Prima Enter para enviar',
       };
       expect(chunks.map(file => file.slice(0, 2)).sort()).toEqual(Object.keys(foreignHints));

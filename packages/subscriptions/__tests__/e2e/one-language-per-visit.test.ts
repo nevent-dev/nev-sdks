@@ -107,13 +107,13 @@ describe('One language per visit (nevent-work#40)', () => {
   });
 
   it('a browser the widget has no labels for gets the language of the texts, not a second one', async () => {
-    browser(['nl-NL']);
-    const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'nl', textsLanguage: 'es' } });
+    browser(['sv-SE']);
+    const fetchMock = mockFetch({ configResponse: { tenantLanguage: 'sv', textsLanguage: 'es' } });
     const { widget } = createWidget({ locale: undefined });
     await widget.init();
 
     expect(configUrl(fetchMock)).toContain('language=auto');
-    // Before nevent-work#40 the widget showed English (no labels for nl) around Spanish texts from the API.
+    // Before nevent-work#40 the widget showed English (no labels for sv) around Spanish texts from the API.
     expect(widget.getLocale()).toBe('es');
     widget.destroy();
   });
@@ -191,7 +191,7 @@ describe('One language per visit (nevent-work#40)', () => {
 
   it.each([
     { browserLocale: 'fr-CA', tenantLanguage: 'es', explicit: undefined, requested: 'fr' },
-    { browserLocale: 'nl-NL', tenantLanguage: 'fr', explicit: undefined, requested: 'auto' },
+    { browserLocale: 'sv-SE', tenantLanguage: 'fr', explicit: undefined, requested: 'auto' },
     { browserLocale: 'en-GB', tenantLanguage: 'fr', explicit: 'fr-BE', requested: 'fr' },
   ])('keeps French config, local labels and consent aligned ($browserLocale, $requested)', async ({
     browserLocale, tenantLanguage, explicit, requested,
@@ -263,6 +263,49 @@ describe('One language per visit (nevent-work#40)', () => {
     widget.destroy();
   });
 
+  it.each(['nl-NL', 'nl-BE'])('renders one Dutch visit for %s when the API reports Dutch texts', async (language) => {
+    browser([language]);
+    const consent = 'Ik geef toestemming voor de verwerking van mijn persoonsgegevens.';
+    const fetchMock = mockFetch({ configResponse: {
+      tenantLanguage: 'es', textsLanguage: 'nl',
+      messages: { title: 'Nieuwsbrief van DEMO FEST', gdprText: consent },
+    } });
+    const { widget, container } = createWidget({ locale: undefined });
+    await widget.init();
+
+    const query = new URL(configUrl(fetchMock)).searchParams;
+    expect(query.get('language')).toBe('nl');
+    expect(query.has('sdkLanguages')).toBe(false);
+    expect(widget.getLocale()).toBe('nl');
+    const shadow = getShadowRoot(container)!;
+    expect(shadow.host.lang).toBe('nl');
+    expect(shadow.querySelector('form')?.getAttribute('aria-label')).toBe('Aanmeldformulier voor de nieuwsbrief');
+    expect(shadow.textContent).toContain('Nieuwsbrief van DEMO FEST');
+    expect(shadow.textContent).toContain(consent);
+    fillInput(shadow, 'input[name="email"]', 'fan@example.com');
+    toggleCheckbox(shadow, '.nevent-gdpr-checkbox', true);
+    submitForm(shadow);
+    await vi.advanceTimersByTimeAsync(100);
+    await flush();
+    const call = fetchMock.mock.calls.find((entry: unknown[]) => String(entry[0]).includes('/subscribe'));
+    const body = JSON.parse((call![1] as RequestInit).body as string);
+    expect(body.textsLanguage).toBe('nl');
+    expect(body.displayLanguage).toBe('nl');
+    widget.destroy();
+  });
+
+  it.each([undefined, 'nl-BE'])('follows older API texts for a Dutch visit with embed locale %s', async (locale) => {
+    browser(['nl-BE']);
+    const fetchMock = mockFetch({ configResponse: ENGLISH_TEXTS });
+    const { widget, container } = createWidget({ locale });
+    await widget.init();
+
+    expect(configUrl(fetchMock)).toContain('language=nl');
+    expect(widget.getLocale()).toBe('en');
+    expect(getShadowRoot(container)?.textContent).toContain('I agree to the processing of my personal data');
+    widget.destroy();
+  });
+
   it('uses the older API text language for an explicit German embed', async () => {
     browser(['de-DE']);
     const fetchMock = mockFetch({ configResponse: ENGLISH_TEXTS });
@@ -277,7 +320,7 @@ describe('One language per visit (nevent-work#40)', () => {
 
   it.each([
     { browserLocale: 'it-CH', tenantLanguage: 'es', explicit: undefined, requested: 'it' },
-    { browserLocale: 'nl-NL', tenantLanguage: 'it', explicit: undefined, requested: 'auto' },
+    { browserLocale: 'sv-SE', tenantLanguage: 'it', explicit: undefined, requested: 'auto' },
     { browserLocale: 'en-GB', tenantLanguage: 'it', explicit: 'it-CH', requested: 'it' },
   ])('keeps Italian config, local labels and consent aligned ($browserLocale, $requested)', async ({
     browserLocale, tenantLanguage, explicit, requested,
@@ -295,7 +338,7 @@ describe('One language per visit (nevent-work#40)', () => {
     const config = new URL(configUrl(fetchMock));
     expect(config.searchParams.get('language')).toBe(requested);
     expect(config.searchParams.get('sdkLanguages')?.split(',').sort()).toEqual(
-      requested === 'auto' ? ['ca', 'de', 'en', 'es', 'fr', 'it', 'pt'] : undefined
+      requested === 'auto' ? ['ca', 'de', 'en', 'es', 'fr', 'it', 'nl', 'pt'] : undefined
     );
     expect(widget.getLocale()).toBe('it');
     let shadow = getShadowRoot(container)!;
@@ -366,14 +409,14 @@ describe('preferredWidgetLocale and visitLocale', () => {
     expect(preferredWidgetLocale(['pt-BR', 'es'], undefined)).toBe('pt');
     expect(preferredWidgetLocale(['en-GB'], 'ca')).toBe('ca');
     expect(preferredWidgetLocale(['en-GB'], 'es')).toBe('es');
-    expect(preferredWidgetLocale(['nl-NL'], 'xx')).toBeUndefined();
+    expect(preferredWidgetLocale(['sv-SE'], 'xx')).toBeUndefined();
     expect(preferredWidgetLocale([], undefined)).toBeUndefined();
   });
 
   it('with textsLanguage, the visitor first and then the texts; without it, the negotiation of #279', () => {
     expect(visitLocale(['en-GB'], 'es', undefined, 'en')).toBe('en');
     expect(visitLocale(['fr-FR'], 'en-GB', undefined, 'en')).toBe('en');
-    expect(visitLocale(['nl-NL'], 'pt-PT', undefined, 'es')).toBe('es');
+    expect(visitLocale(['sv-SE'], 'pt-PT', undefined, 'es')).toBe('es');
     // a Catalan or Portuguese browser follows the language of the texts, never Catalan around Spanish
     expect(visitLocale(['ca-ES'], 'es', undefined, 'es')).toBe('es');
     expect(visitLocale(['pt-BR'], 'en', undefined, 'en')).toBe('en');
@@ -381,7 +424,7 @@ describe('preferredWidgetLocale and visitLocale', () => {
     expect(visitLocale(['en-GB'], 'es', 'pt-BR', 'pt')).toBe('pt');
     // Legacy explicit Catalan remains the operator's choice
     expect(visitLocale(['en-GB'], 'es', 'ca', 'es')).toBe('ca');
-    expect(visitLocale(['nl-NL'], 'pt-PT', undefined, undefined)).toBe('pt');
+    expect(visitLocale(['sv-SE'], 'pt-PT', undefined, undefined)).toBe('pt');
     expect(visitLocale(['en-GB'], undefined, undefined, undefined)).toBeUndefined();
   });
 });

@@ -79,3 +79,10 @@ it('localizes the Italian unread count while keeping singular and plural', () =>
   expect(STRINGS.it.pill(1)).toBe('1 nuovo messaggio, vai all’ultimo')
   expect(STRINGS.it.pill(12345)).toBe('12.345 nuovi messaggi, vai all’ultimo')
 })
+
+it('uses Dutch for the unread count and the regional time format', () => {
+  expect(Object.keys(STRINGS.nl).sort()).toEqual(Object.keys(STRINGS.es).sort())
+  expect(STRINGS.nl.timeLocale).toBe('nl-NL')
+  expect(STRINGS.nl.pill(1)).toBe('1 nieuw bericht. Naar het nieuwste bericht')
+  expect(STRINGS.nl.pill(12345)).toBe('12.345 nieuwe berichten. Naar het nieuwste bericht')
+})

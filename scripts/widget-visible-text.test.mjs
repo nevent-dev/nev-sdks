@@ -120,3 +120,35 @@ test('de checks text, register, typography, compounds and short label length', (
   assert.ok(captures('E-Mail Adresse').some(problem => problem.includes('invalid German compound')));
   assert.ok(captures('Unterstützung').some(problem => problem.includes('label exceeds')));
 });
+
+test('nl checks its own copy, formal register, typography, compounds and short labels', () => {
+  const es = "    title: 'Ayuda',";
+  const problems = (nl) => localeMapProblems('chatbot', { es, nl: `    title: '${nl}',` }, ['es', 'nl'], ['title']);
+  assert.deepEqual(problems('Hulp'), []);
+  assert.ok(!problems('Stuur een sms’je.').some(problem => problem.includes('invalid Dutch register')));
+  assert.ok(problems('Hola van Nevent.').some(problem => problem.includes('Hola')));
+  assert.ok(problems('Voor hij/zij.').some(problem => problem.includes('invalid Dutch gender shorthand')));
+  assert.ok(problems('De naam is ‘Test.').some(problem => problem.includes('invalid Dutch typography')));
+  assert.deepEqual(problems('Kies ‘Hulp’. Vul uw e-mailadres in.'), ['chatbot.nl.title: label exceeds 1.6 times the Spanish length']);
+  assert.ok(problems('Type a message').some(problem => problem.includes('Type a message')));
+  assert.ok(problems('Schrijf jouw bericht.').some(problem => problem.includes('invalid Dutch register')));
+  assert.ok(problems('Uw bericht').some(problem => problem.includes('invalid Dutch register')));
+  assert.ok(problems('Hulp – nu ?').some(problem => problem.includes('invalid Dutch typography')));
+  assert.ok(problems('e-mail adres').some(problem => problem.includes('invalid Dutch compound')));
+});
+
+
+test('nl rejects ASCII apostrophes in visible quotes and elisions', () => {
+  const es = "  text: 'Seleccione Ayuda.',";
+  const cases = [
+    ["  text: `Kies 'Hulp'.`,", true],
+    [String.raw`  text: 'Kies \'Hulp\'.',`, true],
+    ["  text: `Stuur een sms'je.`,", true],
+    ["  text: `Kies ‘Hulp’.`,", false],
+    ["  text: 'Stuur een sms’je.',", false],
+  ];
+  for (const [nl, invalid] of cases) {
+    const problems = localeMapProblems('chatbot', { es, nl }, ['es', 'nl'], ['text'], 2);
+    assert.equal(problems.some(problem => problem.includes('invalid Dutch typography')), invalid, nl);
+  }
+});

@@ -246,7 +246,7 @@ describe('I18nManager', () => {
     });
 
     it("should fallback to 'es' for unsupported locale", () => {
-      vi.stubGlobal('navigator', { language: 'nl-NL' });
+      vi.stubGlobal('navigator', { language: 'sv-SE' });
       expect(I18nManager.detectLocale()).toBe('es');
     });
 
