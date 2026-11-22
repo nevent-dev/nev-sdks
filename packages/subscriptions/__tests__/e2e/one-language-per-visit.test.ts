@@ -265,7 +265,7 @@ describe('One language per visit (nevent-work#40)', () => {
 
   it.each(['nl-NL', 'nl-BE'])('renders one Dutch visit for %s when the API reports Dutch texts', async (language) => {
     browser([language]);
-    const consent = 'Ik ga akkoord met de verwerking van mijn persoonsgegevens.';
+    const consent = 'Ik geef toestemming voor de verwerking van mijn persoonsgegevens.';
     const fetchMock = mockFetch({ configResponse: {
       tenantLanguage: 'es', textsLanguage: 'nl',
       messages: { title: 'Nieuwsbrief van DEMO FEST', gdprText: consent },

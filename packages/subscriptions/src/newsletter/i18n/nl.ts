@@ -16,7 +16,7 @@ export const nl: NewsletterLabels = {
   retryMessage: 'Opnieuw verbinden…',
 
   gdprText:
-    'Ik ga akkoord met de verwerking van mijn persoonsgegevens om commerciële berichten en promoties over {{companyName}} te ontvangen, volgens de {{privacyPolicyLink}}.',
+    'Ik geef toestemming voor de verwerking van mijn persoonsgegevens om commerciële berichten en promoties over {{companyName}} te ontvangen, volgens het {{privacyPolicyLink}}.',
   gdprRequired: 'Accepteer het privacybeleid om door te gaan.',
   privacyPolicyLabel: 'Privacybeleid',
 
