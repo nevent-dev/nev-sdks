@@ -24,7 +24,7 @@ const ROOTS = ['packages/subscriptions/src', 'packages/chatbot/src', 'packages/w
 const CATALOGS = [
   /^packages\/subscriptions\/src\/newsletter\/i18n\//,
   /^packages\/chatbot\/src\/chatbot\/i18n-manager\.ts$/,
-  /^packages\/chatbot\/src\/chatbot\/ui\/renderer-labels\.ts$/,
+  /^packages\/chatbot\/src\/chatbot\/locales\/[a-z]{2}\.ts$/,
   /^packages\/widget\/src\/contract\/locale\.ts$/,
   /^packages\/widget\/src\/panel\/strings\.ts$/,
 ];
@@ -235,8 +235,19 @@ export function scanLocaleMaps(repo = REPO) {
   const config = read(`${chatbot}/chatbot/config-manager.ts`);
   const configLocales = /\bconst SUPPORTED_LOCALES[^=]+=(.*?);/s.exec(config)?.[1] ?? '';
   const acceptedChatbotLocales = [...configLocales.matchAll(/'([a-z]{2})'/g)].map(([, locale]) => locale);
-  const catalog = collect(objectBody(read(`${chatbot}/chatbot/i18n-manager.ts`), 'TRANSLATIONS'), /^  ([a-z]{2}): \{\n([\s\S]*?)^  \},/gm);
-  const renderer = collect(objectBody(read(`${chatbot}/chatbot/ui/renderer-labels.ts`), 'LABELS'), /^  ([a-z]{2}): \{\n([\s\S]*?)^  \},/gm);
+  const localeRegistry = read(`${chatbot}/chatbot/i18n-manager.ts`);
+  const registeredChatbotLocales = [
+    /import defaultCatalog from '\.\/locales\/([a-z]{2})'/.exec(localeRegistry)?.[1],
+    ...[...localeRegistry.matchAll(/import\('\.\/locales\/([a-z]{2})'\)/g)].map(([, locale]) => locale),
+  ].filter(Boolean);
+  const chatbotCatalogs = Object.fromEntries(registeredChatbotLocales.map(locale => [
+    locale, objectBody(read(`${chatbot}/chatbot/locales/${locale}.ts`), 'catalog'),
+  ]));
+  const catalogSection = section => Object.fromEntries(Object.entries(chatbotCatalogs).map(([locale, body]) => [
+    locale, new RegExp(`^  ${section}: \\{\\n([\\s\\S]*?)^  \\},`, 'm').exec(body)?.[1] ?? '',
+  ]));
+  const catalog = catalogSection('translations');
+  const renderer = catalogSection('rendererLabels');
 
   const widget = 'packages/widget/src';
   const contract = read(`${widget}/contract/locale.ts`);

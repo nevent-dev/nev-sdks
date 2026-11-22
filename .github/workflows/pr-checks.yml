@@ -1,5 +1,4 @@
-# Guarda de texto fijo de los widgets (nevent-work#40, FAN-052; control 9 de la auditoría de idiomas).
-# Solo Node, sin instalar dependencias: unos segundos por PR. Los drafts se saltan (regla de CI de nevent-work#200).
+# Control de texto fijo (nevent-work#40) y presupuesto del chatbot (nevent-work#451, D21).
 name: PR checks
 
 on:
@@ -9,6 +8,13 @@ on:
     branches: [development]
     paths:
       - 'packages/*/src/**'
+      - 'packages/chatbot/**'
+      - 'packages/core/**'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - 'tsconfig*.json'
+      - 'vitest.config.ts'
       - 'scripts/widget-visible-text*'
       - '.github/workflows/pr-checks.yml'
 
@@ -32,3 +38,25 @@ jobs:
         with:
           node-version: '22'
       - run: node --test scripts/widget-visible-text.test.mjs
+
+  chatbot-performance:
+    name: Presupuesto y rendimiento del chatbot
+    if: ${{ !github.event.pull_request.draft }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build:core
+      - run: pnpm build:chatbot
+      - run: pnpm --filter @nevent/chatbot test:perf --minWorkers=1 --maxWorkers=2
+        env:
+          REQUIRE_CHATBOT_BUILD: '1'
+      - run: pnpm exec vitest run --minWorkers=1 --maxWorkers=2 packages/chatbot/src/chatbot/__tests__/e2e/visitor-language.test.ts

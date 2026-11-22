@@ -710,6 +710,13 @@ The SDK targets **ES2020** and supports all evergreen browsers:
 
 The UMD bundle (`nevent-chatbot.umd.cjs`) provides CommonJS compatibility for build tools that do not support ES modules natively.
 
+The ESM and UMD entry points include Spanish and load the selected non-Spanish
+catalog from `locales/` during `init()`. When self-hosting, publish the entire
+`dist/` directory and serve the locale modules as JavaScript. For cross-origin
+embeds, allow the SDK origin in the host's script CSP and serve the locale
+modules with CORS, just as for a cross-origin ESM entry point. If the selected
+catalog is unavailable, the widget uses its built-in Spanish text.
+
 ---
 
 ## Troubleshooting

@@ -135,9 +135,17 @@ jobs:
       - name: Upload chatbot to S3 (latest alias)
         if: steps.check-version.outputs.chatbot_exists == 'false'
         run: |
+          # Publish new chunks first and retain chunks referenced by cached SDKs.
+          if [ -d packages/chatbot/dist/locales ]; then
+            aws s3 sync packages/chatbot/dist/locales/ \
+              s3://prod-nevent-sdks/chatbot/latest/locales/ \
+              --region eu-west-1 \
+              --cache-control "public, max-age=31536000, immutable"
+          fi
           aws s3 sync packages/chatbot/dist/ \
             s3://prd-nevent-sdks/chatbot/latest/ \
             --region eu-west-1 \
+            --exclude 'locales/*' \
             --delete \
             --cache-control "public, max-age=300"
 

@@ -169,13 +169,13 @@ describe('Performance: Message rendering', () => {
   let renderer: MessageRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
     resetFactorySequences();
     renderer = new MessageRenderer(
       undefined,
       undefined,
-      new I18nManager('en'),
+      await I18nManager.create('en'),
       MessageSanitizer
     );
     container = renderer.render();

@@ -39,8 +39,8 @@ if (typeof HTMLElement !== 'undefined' && !HTMLElement.prototype.scrollTo) {
   HTMLElement.prototype.scrollTo = function () {};
 }
 
-function createI18n(): I18nManager {
-  return new I18nManager('en');
+function createI18n(): Promise<I18nManager> {
+  return I18nManager.create('en');
 }
 
 // ============================================================================
@@ -51,9 +51,9 @@ describe('BubbleRenderer — ARIA attributes', () => {
   let bubble: BubbleRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
-    bubble = new BubbleRenderer('bottom-right', undefined, createI18n());
+    bubble = new BubbleRenderer('bottom-right', undefined, await createI18n());
     container = bubble.render(() => {});
   });
 
@@ -130,9 +130,9 @@ describe('WindowRenderer — ARIA attributes', () => {
   let windowRenderer: WindowRenderer;
   let windowEl: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
-    windowRenderer = new WindowRenderer(undefined, undefined, createI18n());
+    windowRenderer = new WindowRenderer(undefined, undefined, await createI18n());
     windowEl = windowRenderer.render({
       title: 'Test Bot',
       subtitle: 'Online',
@@ -196,12 +196,12 @@ describe('MessageRenderer — ARIA attributes', () => {
   let renderer: MessageRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
     renderer = new MessageRenderer(
       undefined,
       undefined,
-      createI18n(),
+      await createI18n(),
       MessageSanitizer
     );
     container = renderer.render();
@@ -314,9 +314,9 @@ describe('InputRenderer — ARIA attributes', () => {
   let input: InputRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
-    input = new InputRenderer(undefined, createI18n());
+    input = new InputRenderer(undefined, await createI18n());
     container = input.render({ onSend: () => {} });
     document.body.appendChild(container);
   });
@@ -366,9 +366,9 @@ describe('TypingRenderer — ARIA attributes', () => {
   let typing: TypingRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
-    typing = new TypingRenderer(undefined, createI18n());
+    typing = new TypingRenderer(undefined, await createI18n());
     container = typing.render();
     document.body.appendChild(container);
   });
@@ -417,9 +417,9 @@ describe('QuickReplyRenderer — ARIA attributes', () => {
   let qr: QuickReplyRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
-    qr = new QuickReplyRenderer(undefined, createI18n());
+    qr = new QuickReplyRenderer(undefined, await createI18n());
     container = qr.render({
       replies: [
         { id: 'qr-1', label: 'Option A', value: 'a' },
@@ -626,12 +626,12 @@ describe('MessageRenderer — Streaming message accessibility', () => {
   let renderer: MessageRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
     renderer = new MessageRenderer(
       undefined,
       undefined,
-      createI18n(),
+      await createI18n(),
       MessageSanitizer
     );
     container = renderer.render();

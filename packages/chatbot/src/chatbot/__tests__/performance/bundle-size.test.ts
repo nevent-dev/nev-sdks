@@ -9,7 +9,7 @@
  *   npm run build && npm run test:perf
  *
  * Size budgets (uncompressed):
- * - ESM bundle  (nevent-chatbot.js)      < 484 KiB
+ * - ESM bundle  (nevent-chatbot.js)      < 474 KiB
  * - UMD bundle  (nevent-chatbot.umd.cjs) < 230 KB
  *
  * Gzip budget:
@@ -20,8 +20,8 @@
  * - index.d.ts (type declarations)
  */
 
-import { describe, it, expect, beforeAll } from 'vitest';
-import { statSync, readFileSync, existsSync } from 'fs';
+import { describe, it, expect } from 'vitest';
+import { statSync, readFileSync, existsSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import { gzipSync } from 'zlib';
 
@@ -45,8 +45,8 @@ const DIST_DIR = resolve(__dirname, '../../../../dist');
 // Size budgets (bytes)
 // ============================================================================
 
-// nevent-work#442 D21: 484 KiB for German. Split catalogues by language before adding another locale.
-const ESM_UNCOMPRESSED_LIMIT = 484 * 1024;
+// nevent-work#451 D21: 481,244 B after splitting catalogs, plus about 4 KiB of headroom.
+const ESM_UNCOMPRESSED_LIMIT = 474 * 1024;
 
 /** UMD bundle uncompressed size limit */
 const UMD_UNCOMPRESSED_LIMIT = 230 * 1024; // 230 KB
@@ -63,12 +63,13 @@ const UMD_PATH = resolve(DIST_DIR, 'nevent-chatbot.umd.cjs');
 
 /** True when the dist/ artifacts are present */
 const distExists = existsSync(ESM_PATH) && existsSync(UMD_PATH);
+const checkDist = distExists || process.env.REQUIRE_CHATBOT_BUILD === '1';
 
 // ============================================================================
 // Suite
 // ============================================================================
 
-describe.runIf(distExists)('Bundle Size', () => {
+describe.runIf(checkDist)('Bundle Size', () => {
   // --------------------------------------------------------------------------
   // Uncompressed sizes
   // --------------------------------------------------------------------------
@@ -151,6 +152,35 @@ describe.runIf(distExists)('Bundle Size', () => {
       expect(content).toContain('ChatbotWidget');
     });
 
+    it('ESM and UMD load the same non-default catalogs by relative path', () => {
+      const content = readFileSync(ESM_PATH, 'utf8');
+      const umd = readFileSync(UMD_PATH, 'utf8');
+      const localesDir = resolve(DIST_DIR, 'locales');
+      const chunks = readdirSync(localesDir).filter(file => file.endsWith('.js'));
+      const foreignHints = {
+        ca: 'Prem Intro per enviar',
+        de: 'Drücken Sie die Eingabetaste',
+        en: 'Press Enter to send',
+        fr: 'Appuyez sur Entrée pour envoyer',
+        it: 'Premi Invio per inviare',
+        pt: 'Prima Enter para enviar',
+      };
+      expect(chunks.map(file => file.slice(0, 2)).sort()).toEqual(Object.keys(foreignHints));
+      for (const bundle of [content, umd]) {
+        expect(bundle).toContain('Pulsa Intro para enviar');
+      }
+      for (const [language, hint] of Object.entries(foreignHints)) {
+        const file = chunks.find(chunk => chunk.startsWith(`${language}-`))!;
+        for (const bundle of [content, umd]) {
+          expect(bundle).toContain(`import("./locales/${file}")`);
+          expect(bundle).not.toContain(hint);
+        }
+        const chunk = readFileSync(resolve(localesDir, file), 'utf8');
+        expect(chunk).toContain(hint);
+        expect(chunk).toContain('sendButton');
+      }
+    });
+
     it('ESM bundle should not contain any obvious debug or test artifacts', () => {
       const content = readFileSync(ESM_PATH, 'utf8');
       // The bundle should not include vitest or test references
@@ -183,7 +213,7 @@ describe.runIf(distExists)('Bundle Size', () => {
 // Informational: skip message when dist is absent
 // ============================================================================
 
-describe.skipIf(distExists)('Bundle Size (skipped — dist not built)', () => {
+describe.skipIf(checkDist)('Bundle Size (skipped — dist not built)', () => {
   it('skipped: run `npm run build` in the chatbot package first', () => {
     console.warn(
       '[bundle-size] dist/ artifacts not found. Run `npm run build` before running this suite.'
