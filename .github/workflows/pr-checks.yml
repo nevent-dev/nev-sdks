@@ -40,7 +40,7 @@ jobs:
       - run: node --test scripts/widget-visible-text.test.mjs
 
   chatbot-performance:
-    name: Presupuesto y rendimiento del chatbot
+    name: Tamaño y carga de idiomas del chatbot
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -56,6 +56,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:core
       - run: pnpm build:chatbot
+      # Wall-clock benchmarks vary on shared runners. Run them locally with test:bench.
       - run: pnpm --filter @nevent/chatbot test:perf --minWorkers=1 --maxWorkers=2
         env:
           REQUIRE_CHATBOT_BUILD: '1'

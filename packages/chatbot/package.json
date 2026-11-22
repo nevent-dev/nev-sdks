@@ -26,7 +26,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:integration": "vitest run --reporter=verbose src/chatbot/__tests__/integration/",
-    "test:perf": "vitest run --reporter=verbose src/chatbot/__tests__/performance/",
+    "test:perf": "vitest run --reporter=verbose src/chatbot/__tests__/performance/bundle-size.test.ts",
+    "test:bench": "vitest run --reporter=verbose src/chatbot/__tests__/performance/benchmark.test.ts",
     "test:all": "vitest run --reporter=verbose",
     "clean": "rm -rf dist *.tsbuildinfo"
   },

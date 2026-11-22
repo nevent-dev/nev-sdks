@@ -717,6 +717,9 @@ embeds, allow the SDK origin in the host's script CSP and serve the locale
 modules with CORS, just as for a cross-origin ESM entry point. If the selected
 catalog is unavailable, the widget uses its built-in Spanish text.
 
+`test:perf` checks the built artifacts against the byte budgets. Use `test:bench`
+for local wall-clock measurements.
+
 ---
 
 ## Troubleshooting
