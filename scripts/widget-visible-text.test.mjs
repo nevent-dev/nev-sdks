@@ -136,3 +136,19 @@ test('nl checks its own copy, formal register, typography, compounds and short l
   assert.ok(problems('Hulp – nu ?').some(problem => problem.includes('invalid Dutch typography')));
   assert.ok(problems('e-mail adres').some(problem => problem.includes('invalid Dutch compound')));
 });
+
+
+test('nl rejects ASCII apostrophes in visible quotes and elisions', () => {
+  const es = "  text: 'Seleccione Ayuda.',";
+  const cases = [
+    ["  text: `Kies 'Hulp'.`,", true],
+    [String.raw`  text: 'Kies \'Hulp\'.',`, true],
+    ["  text: `Stuur een sms'je.`,", true],
+    ["  text: `Kies ‘Hulp’.`,", false],
+    ["  text: 'Stuur een sms’je.',", false],
+  ];
+  for (const [nl, invalid] of cases) {
+    const problems = localeMapProblems('chatbot', { es, nl }, ['es', 'nl'], ['text'], 2);
+    assert.equal(problems.some(problem => problem.includes('invalid Dutch typography')), invalid, nl);
+  }
+});

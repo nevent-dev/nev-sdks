@@ -148,7 +148,7 @@ const DUTCH_COPY = /(?<![\p{L}\p{M}])(?:hola|haz clic|tu cuenta|escribe un mensa
 const DUTCH_REGISTER = /(?<![\p{L}\p{M}]’)(?<![\p{L}\p{M}])(?:je|jij|jou|jouw|jullie)(?![\p{L}\p{M}])/iu;
 const DUTCH_GENDER_SHORTHAND = /\b(?:hij\s*\/\s*zij|hem\s*\/\s*haar)\b/iu;
 const DUTCH_FORMAL_CASE = /\b(?:U|Uw|UW|uW)\b/u;
-const DUTCH_TYPOGRAPHY = /(?:["«»“”„‚–—]|\p{L}'\p{L}|\.{3}|[ \u00a0\u202f]+[:;!?])/u;
+const DUTCH_TYPOGRAPHY = /(?:['"«»“”„‚–—]|\.{3}|[ \u00a0\u202f]+[:;!?])/u;
 const DUTCH_COMPOUND = /\b(?:e-?mail (?:adres|campagne|bericht)|push melding|QR code|WhatsApp sjabloon|Nevent (?:account|logo)|ticket nummer)\b/iu;
 const CATALOG_LITERAL = /(['"`])((?:\\.|(?!\1)[^\\])*)\1/g;
 
