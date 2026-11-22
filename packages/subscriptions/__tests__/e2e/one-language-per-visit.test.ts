@@ -274,8 +274,8 @@ describe('One language per visit (nevent-work#40)', () => {
     await widget.init();
 
     const query = new URL(configUrl(fetchMock)).searchParams;
-    expect(query.get('language')).toBe('auto');
-    expect(query.get('sdkLanguages')?.split(',')).toContain('nl');
+    expect(query.get('language')).toBe('nl');
+    expect(query.has('sdkLanguages')).toBe(false);
     expect(widget.getLocale()).toBe('nl');
     const shadow = getShadowRoot(container)!;
     expect(shadow.host.lang).toBe('nl');
@@ -294,10 +294,10 @@ describe('One language per visit (nevent-work#40)', () => {
     widget.destroy();
   });
 
-  it('follows the reported language of older API texts for an explicit Dutch embed', async () => {
+  it.each([undefined, 'nl-BE'])('follows older API texts for a Dutch visit with embed locale %s', async (locale) => {
     browser(['nl-BE']);
     const fetchMock = mockFetch({ configResponse: ENGLISH_TEXTS });
-    const { widget, container } = createWidget({ locale: 'nl-BE' });
+    const { widget, container } = createWidget({ locale });
     await widget.init();
 
     expect(configUrl(fetchMock)).toContain('language=nl');
