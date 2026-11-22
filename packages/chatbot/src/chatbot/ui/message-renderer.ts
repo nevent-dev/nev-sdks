@@ -27,7 +27,6 @@
  * and updateMessage() with ChatMessage objects.
  */
 
-import { rendererLabel } from './renderer-labels';
 import type {
   ActionButton,
   ChatMessage,
@@ -326,7 +325,7 @@ export class MessageRenderer {
     wrapper.setAttribute('data-message-id', message.id);
     wrapper.setAttribute('data-role', 'assistant');
     wrapper.setAttribute('role', 'article');
-    wrapper.setAttribute('aria-label', this.getBotLabel(this.i18n.getLocale()));
+    wrapper.setAttribute('aria-label', this.i18n.rendererLabel('bot'));
     wrapper.setAttribute('aria-setsize', '-1');
     wrapper.setAttribute('aria-live', 'polite');
     wrapper.setAttribute('aria-atomic', 'false');
@@ -502,10 +501,9 @@ export class MessageRenderer {
     }
 
     // Update aria-label with the actual content for screen readers
-    const locale = this.i18n.getLocale();
     wrapper.setAttribute(
       'aria-label',
-      `${this.getBotLabel(locale)}${rendererLabel(locale, 'labelSeparator')}${finalContent}`
+      `${this.i18n.rendererLabel('bot')}${this.i18n.rendererLabel('labelSeparator')}${finalContent}`
     );
 
     this.scrollToBottom(true);
@@ -887,29 +885,7 @@ export class MessageRenderer {
    * @returns Localized scroll to bottom label
    */
   private getScrollToBottomLabel(): string {
-    return rendererLabel(this.i18n.getLocale(), 'scrollToBottom');
-  }
-
-  /**
-   * Returns a localized "You said:" label for user messages.
-   * Used as the accessible prefix in aria-label on message articles.
-   *
-   * @param locale - Active locale code
-   * @returns Localized sender label string
-   */
-  private getUserLabel(locale: string): string {
-    return rendererLabel(locale, 'user');
-  }
-
-  /**
-   * Returns a localized "Bot said:" label for assistant messages.
-   * Used as the accessible prefix in aria-label on message articles.
-   *
-   * @param locale - Active locale code
-   * @returns Localized sender label string
-   */
-  private getBotLabel(locale: string): string {
-    return rendererLabel(locale, 'bot');
+    return this.i18n.rendererLabel('scrollToBottom');
   }
 
   /**
@@ -1156,12 +1132,11 @@ export class MessageRenderer {
 
     // Accessible label tells screen readers who sent the message and its content
     // for navigation purposes (e.g. when using heading/article shortcuts).
-    const locale = this.i18n.getLocale();
-    const senderLabel =
-      message.role === 'user'
-        ? this.getUserLabel(locale)
-        : this.getBotLabel(locale);
-    wrapper.setAttribute('aria-label', `${senderLabel}${rendererLabel(locale, 'labelSeparator')}${message.content}`);
+    const senderLabel = this.i18n.rendererLabel(message.role === 'user' ? 'user' : 'bot');
+    wrapper.setAttribute(
+      'aria-label',
+      `${senderLabel}${this.i18n.rendererLabel('labelSeparator')}${message.content}`
+    );
     wrapper.setAttribute('aria-setsize', '-1'); // Unknown total; use -1 per spec
 
     const isUser = message.role === 'user';
@@ -1665,7 +1640,7 @@ export class MessageRenderer {
     const isYesterday = this.isSameDay(date, yesterday);
 
     if (isToday) {
-      return rendererLabel(this.i18n.getLocale(), 'today');
+      return this.i18n.rendererLabel('today');
     }
 
     if (isYesterday) {

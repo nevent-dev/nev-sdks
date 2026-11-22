@@ -55,6 +55,7 @@ import type {
   ChatbotError,
   ConversationState,
   ServerChatbotConfig,
+  SupportedLocale,
   QuickReply,
   Conversation,
   PersistedConversationState,
@@ -163,7 +164,8 @@ export class ChatbotWidget {
   private stateManager: StateManager;
 
   /** Internationalization manager for UI strings */
-  private i18n: I18nManager;
+  private i18n!: I18nManager;
+  private readonly requestedLocale: SupportedLocale;
 
   /** Dynamic CSS generation and injection */
   private cssGenerator: CSSGenerator;
@@ -269,6 +271,7 @@ export class ChatbotWidget {
 
   /** Whether init() has completed successfully */
   private initialized = false;
+  private initialization: Promise<void> | undefined;
 
   /** Whether destroy() has been called */
   private destroyed = false;
@@ -339,8 +342,7 @@ export class ChatbotWidget {
       this.errorBoundary.setErrorHandler(resolvedConfig.onError);
     }
 
-    // Initialize i18n with the resolved locale
-    this.i18n = new I18nManager(resolvedConfig.locale);
+    this.requestedLocale = resolvedConfig.locale ?? I18nManager.detectLocale();
 
     // Initialize state manager with persistence preference
     this.stateManager = new StateManager(
@@ -409,10 +411,20 @@ export class ChatbotWidget {
       return;
     }
 
+    this.initialization ??= this.initialize().finally(() => {
+      this.initialization = undefined;
+    });
+    return this.initialization;
+  }
+
+  private initialize(): Promise<void> {
     return this.errorBoundary.guardAsync(async () => {
       const config = this.configManager.getConfig();
 
       try {
+        this.i18n = await I18nManager.create(this.requestedLocale);
+        if (this.destroyed) return;
+
         // Step 1: Find container if containerId provided (inline mode)
         if (config.containerId) {
           this.container = document.querySelector(`#${config.containerId}`);

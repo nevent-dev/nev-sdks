@@ -30,7 +30,6 @@
  * coordinating uploads, clearing the input, and re-enabling it after send.
  */
 
-import { rendererLabel } from './renderer-labels';
 import type { FileAttachment, InputStyles } from '../../types';
 import { I18nManager } from '../i18n-manager';
 import { MessageSanitizer } from '../message-sanitizer';
@@ -467,7 +466,7 @@ export class InputRenderer {
    * @returns Localized keyboard hint string
    */
   private getKeyboardHint(): string {
-    return rendererLabel(this.i18n.getLocale?.(), 'keyboardHint');
+    return this.i18n.rendererLabel('keyboardHint');
   }
 
   /**

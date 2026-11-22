@@ -37,7 +37,6 @@
  * ```
  */
 
-import { rendererLabel } from './renderer-labels';
 import type { QuickReply, QuickReplyStyles } from '../../types';
 import type { I18nManager } from '../i18n-manager';
 
@@ -797,6 +796,6 @@ export class QuickReplyRenderer {
    * @returns Translated label string for the role="group" element.
    */
   private getGroupAriaLabel(): string {
-    return rendererLabel(this.i18n.getLocale(), 'quickReplies');
+    return this.i18n.rendererLabel('quickReplies');
   }
 }

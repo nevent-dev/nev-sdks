@@ -5,7 +5,7 @@
  * that language when neither the web nor the chatbot has one (COMMS-012), the singular countdown (FAN-050) and the
  * Spanish branding (FAN-074).
  */
-import { describe, it, expect, afterEach } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { createInitializedWidget, flushPromises } from './helpers';
 import { I18nManager } from '../../i18n-manager';
 import { ConfigManager } from '../../config-manager';
@@ -39,6 +39,40 @@ describe('Chatbot in the visitor\'s language (nevent-work#40)', () => {
     expect((widget as unknown as { i18n: I18nManager }).i18n.getLocale()).toBe('es');
   });
 
+  it.each([
+    ['es-ES', 'es', 'Enviar', 'Pulsa Intro'],
+    ['en-GB', 'en', 'Send', 'Press Enter'],
+    ['ca-ES', 'ca', 'Enviar', 'Prem Intro'],
+    ['pt-PT', 'pt', 'Enviar', 'Prima Enter'],
+    ['fr-CA', 'fr', 'Envoyer', 'Appuyez sur Entrée'],
+    ['it-CH', 'it', 'Invia', 'Premi Invio'],
+    ['de-AT', 'de', 'Senden', 'Drücken Sie'],
+  ])('renders the loaded catalog for %s', async (locale, language, send, hint) => {
+    browser(locale);
+    const { shadowRoot, cleanup: c } = await createInitializedWidget({ locale: undefined });
+    cleanup = c;
+    expect(shadowRoot.host.getAttribute('lang')).toBe(language);
+    expect(shadowRoot.querySelector('.nevent-chatbot-send-button')?.getAttribute('aria-label')).toBe(send);
+    expect(shadowRoot.querySelector('#nevent-chatbot-input-hint')?.textContent).toContain(hint);
+  });
+
+  it('renders Spanish strings and lang if the chosen catalog fails to load', async () => {
+    browser('fr-FR');
+    vi.doMock('../../locales/fr', () => {
+      throw new Error('Locale module could not be fetched');
+    });
+
+    try {
+      const { shadowRoot, cleanup: c } = await createInitializedWidget({ locale: undefined });
+      cleanup = c;
+      expect(shadowRoot.host.getAttribute('lang')).toBe('es');
+      expect(shadowRoot.querySelector('.nevent-chatbot-send-button')?.getAttribute('aria-label')).toBe('Enviar');
+      expect(shadowRoot.querySelector('#nevent-chatbot-input-hint')?.textContent).toContain('Pulsa Intro');
+    } finally {
+      vi.doUnmock('../../locales/fr');
+    }
+  });
+
   it('with no greeting from the web or the server, the widget greets in its own language (COMMS-012)', async () => {
     browser('en-GB');
     const { shadowRoot, cleanup: c } = await createInitializedWidget(
@@ -47,18 +81,18 @@ describe('Chatbot in the visitor\'s language (nevent-work#40)', () => {
     );
     cleanup = c;
     await flushPromises(10);
-    const english = new I18nManager('en').t('defaultWelcomeMessage');
+    const english = (await I18nManager.create('en')).t('defaultWelcomeMessage');
     expect(shadowRoot.textContent ?? '').toContain(english);
   });
 
-  it('one second left is «1 segundo» / «1 second»; more is plural (FAN-050)', () => {
-    expect(new I18nManager('es').t('rateLimitCountdownOne')).toBe('Demasiados mensajes. Espera 1 segundo.');
-    expect(new I18nManager('en').t('rateLimitCountdownOne')).toBe('Too many messages. Please wait 1 second.');
-    expect(new I18nManager('es').format('rateLimitCountdown', { seconds: 3 })).toBe('Demasiados mensajes. Espera 3 segundos.');
+  it('one second left is «1 segundo» / «1 second»; more is plural (FAN-050)', async () => {
+    expect((await I18nManager.create('es')).t('rateLimitCountdownOne')).toBe('Demasiados mensajes. Espera 1 segundo.');
+    expect((await I18nManager.create('en')).t('rateLimitCountdownOne')).toBe('Too many messages. Please wait 1 second.');
+    expect((await I18nManager.create('es')).format('rateLimitCountdown', { seconds: 3 })).toBe('Demasiados mensajes. Espera 3 segundos.');
   });
 
-  it('the branding is in Spanish in the Spanish interface (FAN-074)', () => {
-    expect(new I18nManager('es').t('poweredBy')).toBe('Con la tecnología de Nevent');
-    expect(new I18nManager('en').t('poweredBy')).toBe('Powered by Nevent');
+  it('the branding is in Spanish in the Spanish interface (FAN-074)', async () => {
+    expect((await I18nManager.create('es')).t('poweredBy')).toBe('Con la tecnología de Nevent');
+    expect((await I18nManager.create('en')).t('poweredBy')).toBe('Powered by Nevent');
   });
 });

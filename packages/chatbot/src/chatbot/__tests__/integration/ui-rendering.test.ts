@@ -48,8 +48,8 @@ if (typeof HTMLElement !== 'undefined' && !HTMLElement.prototype.scrollTo) {
 // Shared fixtures
 // ============================================================================
 
-function createI18n(): I18nManager {
-  return new I18nManager('en');
+function createI18n(): Promise<I18nManager> {
+  return I18nManager.create('en');
 }
 
 /** Waits for micro-tasks to settle between renders */
@@ -68,9 +68,9 @@ describe('MessageRenderer — rendering', () => {
   let container: HTMLElement;
   let i18n: I18nManager;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
-    i18n = createI18n();
+    i18n = await createI18n();
     renderer = new MessageRenderer(
       undefined,
       undefined,
@@ -131,8 +131,8 @@ describe('MessageRenderer — rendering', () => {
   it.each([
     ['fr', 'Message envoyé : '],
     ['it', 'Messaggio inviato: '],
-  ])('renders %s message labels, dates and timestamps', (locale, userLabel) => {
-    i18n.setLocale(locale);
+  ])('renders %s message labels, dates and timestamps', async (locale, userLabel) => {
+    await i18n.setLocale(locale);
     const sent = new Date(2020, 6, 14, 18, 9);
     renderer.addMessage(createMockMessage({ timestamp: sent.toISOString() }));
 
@@ -351,10 +351,10 @@ describe('TypingRenderer — show/hide', () => {
   let renderer: TypingRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
     vi.useFakeTimers();
-    renderer = new TypingRenderer(undefined, createI18n());
+    renderer = new TypingRenderer(undefined, await createI18n());
     container = renderer.render();
     document.body.appendChild(container);
   });
@@ -395,9 +395,9 @@ describe('InputRenderer — basic rendering', () => {
   let renderer: InputRenderer;
   let container: HTMLElement;
 
-  beforeEach(() => {
+  beforeEach(async () => {
     document.body.innerHTML = '';
-    renderer = new InputRenderer(undefined, createI18n());
+    renderer = new InputRenderer(undefined, await createI18n());
     container = renderer.render({
       onSend: () => {},
       placeholder: 'Type here…',

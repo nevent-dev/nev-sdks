@@ -24,7 +24,6 @@
  * responsible for lifecycle management (removing the element on clear/destroy).
  */
 
-import { rendererLabel } from './renderer-labels';
 import type { RichContent, ActionButton, ActionButtonType } from '../../types';
 import { I18nManager } from '../i18n-manager';
 import { MessageSanitizer } from '../message-sanitizer';
@@ -687,7 +686,7 @@ export class RichContentRenderer {
    * @returns Localised carousel label string.
    */
   private getCarouselAriaLabel(): string {
-    return rendererLabel(this.i18n.getLocale(), 'carousel');
+    return this.i18n.rendererLabel('carousel');
   }
 
   /**
@@ -697,7 +696,7 @@ export class RichContentRenderer {
    * @returns Localised nav button label string.
    */
   private getCarouselNavAriaLabel(direction: 'prev' | 'next'): string {
-    return rendererLabel(this.i18n.getLocale(), direction === 'prev' ? 'previousCard' : 'nextCard');
+    return this.i18n.rendererLabel(direction === 'prev' ? 'previousCard' : 'nextCard');
   }
 
   /**
@@ -706,7 +705,7 @@ export class RichContentRenderer {
    * @returns Localised "open image" label string.
    */
   private getOpenImageLabel(): string {
-    return rendererLabel(this.i18n.getLocale(), 'openImage');
+    return this.i18n.rendererLabel('openImage');
   }
 
   /**
@@ -715,6 +714,6 @@ export class RichContentRenderer {
    * @returns Localised broken-image label string.
    */
   private getBrokenImageLabel(): string {
-    return rendererLabel(this.i18n.getLocale(), 'brokenImage');
+    return this.i18n.rendererLabel('brokenImage');
   }
 }
