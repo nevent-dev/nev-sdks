@@ -2,10 +2,10 @@ import type { NewsletterLabels } from './types';
 
 /** French (France) translations for the newsletter widget. */
 export const fr: NewsletterLabels = {
-  formTitle: 'S’inscrire à notre newsletter',
+  formTitle: 'S’abonner à notre newsletter',
   formAriaLabel: 'Formulaire d’inscription à la newsletter',
 
-  submitButton: 'S’inscrire',
+  submitButton: 'S’abonner',
   loadingButton: 'Envoi en cours…',
 
   successMessage: 'Votre inscription est confirmée. Vous recevrez nos communications.',
@@ -31,7 +31,7 @@ export const fr: NewsletterLabels = {
   fieldInvalid: 'Valeur non valide pour {{fieldName}}.',
   invalidEmailFormat: 'Saisissez une adresse e-mail valide.',
   invalidPhoneFormat: 'Saisissez un numéro de téléphone valide.',
-  invalidNumberFormat: 'Saisissez un numéro valide.',
+  invalidNumberFormat: 'Saisissez un nombre valide.',
   invalidUrlFormat: 'Saisissez une URL valide.',
 
   statusRegionLabel: 'État du formulaire',

@@ -136,6 +136,13 @@ describe('Translation (t)', () => {
     const i18n = createNewsletterI18n('pt');
     expect(i18n.t('submitButton')).toBe('Subscrever');
   });
+
+  it('should use the CRM and API French title, button and number error', () => {
+    const i18n = createNewsletterI18n('fr');
+    expect(i18n.t('formTitle')).toBe('S’abonner à notre newsletter');
+    expect(i18n.t('submitButton')).toBe('S’abonner');
+    expect(i18n.t('invalidNumberFormat')).toBe('Saisissez un nombre valide.');
+  });
 });
 
 // ---------------------------------------------------------------------------
